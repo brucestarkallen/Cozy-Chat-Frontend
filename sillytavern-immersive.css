@@ -2,12 +2,17 @@
    IMMERSIVE READING — SillyTavern
    Paste into: User Settings → Custom CSS
 
+   KNOW THIS: loading or switching a UI theme REPLACES whatever
+   is in the Custom CSS box — SillyTavern theme files carry their
+   own custom CSS field. If the chat suddenly looks like it used
+   to, the box was emptied by a theme change. Re-paste this file.
+
    Strips the chat down to prose: no avatar column, no card
    around every message, no timestamps or ID badges. The name
    becomes a small quiet label.
 
    Written against SillyTavern's real message markup. Every
-   selector is scoped to #chat .mes[mesid] so it outranks a
+   selector is scoped to #chat#chat .mes[mesid] so it outranks a
    theme's own rules — themes are where the card and the
    justified text usually come from, not SillyTavern itself.
 
@@ -24,7 +29,7 @@
 :root {
   --immersive-page: #0d0f13;
 }
-#chat {
+#chat#chat {
   background-color: var(--immersive-page, #0d0f13) !important;
   background-image: none !important;
   backdrop-filter: none !important;
@@ -32,21 +37,21 @@
 }
 
 /* ---- 1. avatar column, and the gap it leaves --------------- */
-#chat .mes[mesid] .mesAvatarWrapper,
-#chat .mes[mesid] .for_checkbox,
-#chat .mes[mesid] .del_checkbox {
+#chat#chat .mes[mesid] .mesAvatarWrapper,
+#chat#chat .mes[mesid] .for_checkbox,
+#chat#chat .mes[mesid] .del_checkbox {
   display: none !important;
 }
 
 /* ---- 2. the card, wherever the theme draws it -------------- */
 /* Base SillyTavern draws nothing here, so anything you see is  */
 /* your theme. Cleared on all three levels to be sure.          */
-#chat div.mes[mesid],
-#chat div.mes[mesid][is_user],
-#chat div.mes[mesid] > .mes_block,
-#chat div.mes[mesid][is_user] > .mes_block,
-#chat div.mes[mesid] > .mes_block > .mes_text,
-#chat div.mes[mesid][is_user] > .mes_block > .mes_text {
+#chat#chat div.mes[mesid],
+#chat#chat div.mes[mesid][is_user],
+#chat#chat div.mes[mesid] > .mes_block,
+#chat#chat div.mes[mesid][is_user] > .mes_block,
+#chat#chat div.mes[mesid] > .mes_block > .mes_text,
+#chat#chat div.mes[mesid][is_user] > .mes_block > .mes_text {
   background: none !important;
   background-color: transparent !important;
   border: 0 !important;
@@ -55,10 +60,10 @@
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
-#chat .mes[mesid]::before,
-#chat .mes[mesid]::after,
-#chat .mes[mesid] > .mes_block::before,
-#chat .mes[mesid] > .mes_block::after {
+#chat#chat .mes[mesid]::before,
+#chat#chat .mes[mesid]::after,
+#chat#chat .mes[mesid] > .mes_block::before,
+#chat#chat .mes[mesid] > .mes_block::after {
   content: none !important;
   display: none !important;
 }
@@ -66,13 +71,13 @@
 /* ---- 3. one measure for the whole message ------------------ */
 /* The side padding is the reading gutter — keep it, or the text */
 /* runs into the edge of the screen.                             */
-#chat .mes[mesid] {
+#chat#chat .mes[mesid] {
   width: 100% !important;
-  max-width: 46rem;
+  max-width: 46rem !important;
   margin: 0 auto !important;
   padding: 0 16px 1.7em 16px !important;
 }
-#chat .mes[mesid] > .mes_block {
+#chat#chat .mes[mesid] > .mes_block {
   padding: 0 !important;
   margin: 0 !important;
   width: 100% !important;
@@ -80,29 +85,29 @@
 }
 
 /* ---- 4. the text itself ------------------------------------ */
-#chat .mes[mesid] > .mes_block > .mes_text {
+#chat#chat .mes[mesid] > .mes_block > .mes_text {
   padding: 0 !important;
   margin: 0 !important;
   line-height: 1.72 !important;
   /* justified text on a phone tears white rivers down the column */
   text-align: left !important;
 }
-#chat .mes[mesid] > .mes_block > .mes_text > p {
+#chat#chat .mes[mesid] > .mes_block > .mes_text > p {
   text-align: left !important;
   margin: 0 0 0.85em !important;
 }
-#chat .mes[mesid] > .mes_block > .mes_text > p:last-child {
+#chat#chat .mes[mesid] > .mes_block > .mes_text > p:last-child {
   margin-bottom: 0 !important;
 }
 
 /* ---- 5. name: a small quiet label, not a headline ---------- */
-#chat .mes[mesid] > .mes_block > .ch_name {
+#chat#chat .mes[mesid] > .mes_block > .ch_name {
   margin: 0 0 0.3em 0 !important;
   padding: 0 !important;
   min-height: 0 !important;
   font-weight: normal !important;
 }
-#chat .mes[mesid] .ch_name .name_text {
+#chat#chat .mes[mesid] .ch_name .name_text {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
   font-size: 10.5px !important;
   font-weight: 600 !important;
@@ -112,60 +117,60 @@
 }
 
 /* ---- 6. metadata that adds nothing while reading ----------- */
-#chat .mes[mesid] .timestamp,
-#chat .mes[mesid] .mesIDDisplay,
-#chat .mes[mesid] .mes_timer,
-#chat .mes[mesid] .tokenCounterDisplay,
-#chat .mes[mesid] .mes_ghost {
+#chat#chat .mes[mesid] .timestamp,
+#chat#chat .mes[mesid] .mesIDDisplay,
+#chat#chat .mes[mesid] .mes_timer,
+#chat#chat .mes[mesid] .tokenCounterDisplay,
+#chat#chat .mes[mesid] .mes_ghost {
   display: none !important;
 }
 /* Extensions and future SillyTavern versions drop extra markers into
    the name row. Rather than name each one, keep the name and hide
    the rest of that row's contents. The buttons sit outside it and
    are unaffected. */
-#chat .mes[mesid] > .mes_block > .ch_name > div > div > *:not(.name_text) {
+#chat#chat .mes[mesid] > .mes_block > .ch_name > div > div > *:not(.name_text) {
   display: none !important;
 }
 
 /* ---- 7. your turns: a rule, not a box ---------------------- */
-#chat .mes[mesid][is_user="true"] > .mes_block > .mes_text {
+#chat#chat .mes[mesid][is_user="true"] > .mes_block > .mes_text {
   border-left: 2px solid currentColor !important;
   padding-left: 14px !important;
   opacity: 0.72;
 }
-#chat .mes[mesid][is_user="true"] .ch_name .name_text {
+#chat#chat .mes[mesid][is_user="true"] .ch_name .name_text {
   opacity: 0.32 !important;
 }
 
 /* ---- 8. reasoning: present, not loud ----------------------- */
-#chat .mes[mesid] .mes_reasoning_details {
+#chat#chat .mes[mesid] .mes_reasoning_details {
   margin: 0 0 0.7em 0 !important;
   opacity: 0.55;
   font-size: 0.9em;
 }
-#chat .mes[mesid] .mes_reasoning_details:hover { opacity: 0.9; }
+#chat#chat .mes[mesid] .mes_reasoning_details:hover { opacity: 0.9; }
 
 /* ---- 9. buttons and swipes: there when wanted -------------- */
-#chat .mes[mesid] .mes_buttons {
+#chat#chat .mes[mesid] .mes_buttons {
   opacity: 0;
   transition: opacity 0.15s;
 }
-#chat .mes[mesid]:hover .mes_buttons,
-#chat .mes[mesid]:focus-within .mes_buttons {
+#chat#chat .mes[mesid]:hover .mes_buttons,
+#chat#chat .mes[mesid]:focus-within .mes_buttons {
   opacity: 0.7;
 }
 /* touchscreens have no hover — show them on the newest message only */
 @media (hover: none) {
-  #chat .mes[mesid] .mes_buttons { opacity: 0 !important; }
-  #chat .mes[mesid].last_mes .mes_buttons { opacity: 0.5 !important; }
+  #chat#chat .mes[mesid] .mes_buttons { opacity: 0 !important; }
+  #chat#chat .mes[mesid].last_mes .mes_buttons { opacity: 0.5 !important; }
 }
-#chat .mes[mesid] .swipe_left,
-#chat .mes[mesid] .swipeRightBlock { opacity: 0.2; }
-#chat .mes[mesid].last_mes .swipe_left,
-#chat .mes[mesid].last_mes .swipeRightBlock { opacity: 0.55; }
+#chat#chat .mes[mesid] .swipe_left,
+#chat#chat .mes[mesid] .swipeRightBlock { opacity: 0.2; }
+#chat#chat .mes[mesid].last_mes .swipe_left,
+#chat#chat .mes[mesid].last_mes .swipeRightBlock { opacity: 0.55; }
 
 /* ---- 10. narration / system lines -------------------------- */
-#chat .mes[mesid][is_system="true"] > .mes_block > .mes_text {
+#chat#chat .mes[mesid][is_system="true"] > .mes_block > .mes_text {
   opacity: 0.6;
   font-style: italic;
 }
@@ -178,22 +183,22 @@
 
 /* Hide names entirely. Fine when two speakers alternate. */
 /*
-#chat .mes[mesid] .ch_name .name_text { display: none !important; }
-#chat .mes[mesid] > .mes_block > .ch_name { margin-bottom: 0 !important; }
+#chat#chat .mes[mesid] .ch_name .name_text { display: none !important; }
+#chat#chat .mes[mesid] > .mes_block > .ch_name { margin-bottom: 0 !important; }
 */
 
 /* Dim everything except the newest message. The single biggest
    change for immersion on a long scene. Hover restores it. */
 /*
-#chat .mes[mesid]:not(.last_mes) > .mes_block > .mes_text {
+#chat#chat .mes[mesid]:not(.last_mes) > .mes_block > .mes_text {
   opacity: 0.5; transition: opacity 0.25s;
 }
-#chat .mes[mesid]:not(.last_mes):hover > .mes_block > .mes_text { opacity: 1; }
+#chat#chat .mes[mesid]:not(.last_mes):hover > .mes_block > .mes_text { opacity: 1; }
 */
 
 /* Serif body, for a book-like feel. */
 /*
-#chat .mes[mesid] > .mes_block > .mes_text {
+#chat#chat .mes[mesid] > .mes_block > .mes_text {
   font-family: Georgia, "Times New Roman", serif !important;
   font-size: 1.06em;
 }
@@ -201,7 +206,7 @@
 
 /* Wider measure for landscape or a tablet. */
 /*
-#chat .mes[mesid] { max-width: 60rem; }
+#chat#chat .mes[mesid] { max-width: 60rem !important; }
 */
 
 /* Fade the top icon row until you reach for it. */

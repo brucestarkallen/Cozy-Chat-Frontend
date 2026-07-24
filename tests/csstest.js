@@ -41,6 +41,19 @@ const mes=(isUser,isSystem,last)=>`
   </div>
   <div class="swipeRightBlock"><div class="swipe_right"></div><div class="swipes-counter">1/3</div></div>
 </div>`;
+// Not attached to the document: jsdom's buggy cascade would let it pollute
+// every computed-style check. Section 7b resolves the cascade itself from
+// the sheet texts, so text is all it needs.
+// a theme extension's stylesheet: injected AFTER the Custom CSS box, all
+// !important — later position wins every specificity tie, which is exactly
+// how the immersive look was being overridden on device.
+const LATE_THEME=`
+#chat{background:transparent !important;background-color:transparent !important}
+#chat .mes{max-width:none !important;background-color:#112233 !important;border-radius:14px !important;padding:16px !important}
+#chat .mes .mesAvatarWrapper{display:flex !important}
+#chat .mes .mesIDDisplay{display:block !important}
+#chat .mes_text{text-align:justify !important}
+`;
 const dom=new JSDOM(`<!DOCTYPE html><html><head><style>${ST_BASE}</style><style>${THEME}</style>
 <style>.scene-card .right{text-align:right}</style><style>${css}</style></head>
 <body><div id="chat">${mes('false','false',false)}${mes('true','false',false)}${mes('false','false',true)}${mes('false','true',false)}</div></body></html>`);
@@ -145,6 +158,85 @@ ck('user turn has a left rule',cs(user.querySelector('.mes_text')).borderLeftWid
 ck('user turn indented',cs(user.querySelector('.mes_text')).paddingLeft==='14px');
 ck('assistant turn has no rule',cs(ai.querySelector('.mes_text')).borderLeftWidth==='0px',cs(ai.querySelector('.mes_text')).borderLeftWidth);
 ck('system line italic',cs(sys.querySelector('.mes_text')).fontStyle==='italic');
+
+console.log('\n=== 7b. A THEME LOADING AFTER US STILL LOSES ===');
+// jsdom's cascade is wrong here: among !important declarations it lets the
+// LATER one win even at lower specificity. Real browsers follow the spec —
+// higher specificity wins. So this section resolves the cascade itself,
+// using jsdom only for selector matching (which it does correctly).
+{
+  // pin the harness limitation: if this ever fails, jsdom fixed its cascade
+  // and this section can go back to reading computed styles directly.
+  const probe=new (require('jsdom').JSDOM)('<!DOCTYPE html><html><head>'+
+    '<style>#a#a{color:red !important}</style><style>#a{color:blue !important}</style>'+
+    '</head><body><div id="a">x</div></body></html>');
+  const buggy=probe.window.getComputedStyle(probe.window.document.getElementById('a')).color!=='red';
+  ck('harness note: jsdom cascade bug still present (see comment)',buggy);
+
+  const stripAt=t=>{ // unwrap @media blocks so their rules are visible
+    let out='',i=0;
+    while(i<t.length){
+      const a=t.indexOf('@media',i);
+      if(a<0){out+=t.slice(i);break;}
+      out+=t.slice(i,a);
+      const open=t.indexOf('{',a); let depth=1,j=open+1;
+      while(j<t.length&&depth){if(t[j]==='{')depth++;if(t[j]==='}')depth--;j++;}
+      out+=t.slice(open+1,j-1); i=j;
+    }
+    return out;
+  };
+  const parse=(text,sheetIdx)=>{
+    const rules=[]; let order=0;
+    const bare=stripAt(text.replace(/\/\*[\s\S]*?\*\//g,''));
+    for(const chunk of bare.split('}')){
+      const br=chunk.indexOf('{'); if(br<0)continue;
+      const sels=chunk.slice(0,br).split(','), body=chunk.slice(br+1);
+      const decls=body.split(';').map(x=>x.trim()).filter(Boolean).map(x=>{
+        const c=x.indexOf(':'); if(c<0)return null;
+        return {prop:x.slice(0,c).trim(), imp:/!important/.test(x)};
+      }).filter(Boolean);
+      for(const sel of sels){ if(sel.trim()) rules.push({sel:sel.trim(),decls,sheetIdx,order:order++}); }
+    }
+    return rules;
+  };
+  const spec=sel=>{
+    const t=sel.replace(/::[a-z-]+/g,'');
+    const a=(t.match(/#[\w-]+/g)||[]).length;
+    const b=(t.match(/\.[\w-]+|\[[^\]]*\]|:[\w-]+(\([^)]*\))?/g)||[]).length;
+    const c=(t.replace(/#[\w-]+|\.[\w-]+|\[[^\]]*\]|:[\w-]+(\([^)]*\))?|[>+~*]/g,' ')
+              .split(/\s+/).filter(x=>/^[a-z]/i.test(x))).length;
+    return [a,b,c];
+  };
+  const cmp=(x,y)=>x[0]-y[0]||x[1]-y[1]||x[2]-y[2];
+  const SHEETS=[ST_BASE,THEME,css,LATE_THEME];   // document order; ours is index 2
+  const rules=SHEETS.flatMap((t,i)=>parse(t,i));
+  const winner=(el,prop)=>{
+    const hits=[];
+    for(const r of rules){
+      let m=false; try{m=el.matches(r.sel);}catch(_){}
+      if(!m)continue;
+      for(const dcl of r.decls) if(dcl.prop===prop)
+        hits.push({imp:dcl.imp,spec:spec(r.sel),sheetIdx:r.sheetIdx,order:r.order});
+    }
+    const pool=hits.some(h=>h.imp)?hits.filter(h=>h.imp):hits;
+    pool.sort((x,y)=>cmp(x.spec,y.spec)||x.order-y.order);
+    return pool.length?pool[pool.length-1]:null;
+  };
+  const chatEl=d.querySelector('#chat');
+  const cases=[
+    ['reading surface beats a later transparent !important', chatEl,'background-color'],
+    ['measure beats a later max-width:none !important', ai,'max-width'],
+    ['card removal beats a later background !important', ai,'background-color'],
+    ['avatar hiding beats a later display:flex !important', ai.querySelector('.mesAvatarWrapper'),'display'],
+    ['id badge hiding holds too', ai.querySelector('.mesIDDisplay'),'display'],
+    ['left alignment beats a later justify !important', ai.querySelector('.mes_text'),'text-align'],
+  ];
+  for(const [name,el,prop] of cases){
+    const w=winner(el,prop);
+    ck(name, !!w && w.sheetIdx===2,
+       w?('won by sheet '+w.sheetIdx+' spec '+w.spec.join(',')):'no rule matched');
+  }
+}
 
 console.log('\n=== 8. NOTHING ESSENTIAL LOST ===');
 for(const [n,sel] of [['message text','.mes_text'],['name','.name_text'],['swipe arrow','.swipe_left'],
