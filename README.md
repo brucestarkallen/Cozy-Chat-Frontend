@@ -215,6 +215,37 @@ negative test that deliberately reintroduces a fixed bug to prove the guard fire
 
 ---
 
+## Running it on your phone (Termux)
+
+One command installs it, and re-running the same command is how you update:
+
+```
+curl -fsSL https://raw.githubusercontent.com/brucestarkallen/Cozy-Chat-Frontend/main/install.sh | bash
+```
+
+That sets up a `cozy` command:
+
+| | |
+|---|---|
+| `cozy` | update, start the server, open it |
+| `cozy status` | running? which version? |
+| `cozy stop` | stop the server |
+| `cozy restart` | restart it |
+| `cozy update` | pull the latest without restarting |
+| `cozy log` | recent server output |
+| `cozy path` | where the files live |
+
+The server is detached, so it keeps running when you close Termux. Change the
+port with `COZY_PORT=8788 cozy` if something else is using 8787 — it tells you
+when that happens rather than failing quietly.
+
+**Your chats won't follow you here.** Browsers keep storage separate per
+address, so the local copy starts empty even if you have conversations on the
+github.io version. Open the old one, **Back up**, then open the local one and
+**Restore**.
+
+---
+
 ## Bonus: the same reading layout in SillyTavern
 
 `sillytavern-immersive.css` strips SillyTavern's chat down to the same shape as
