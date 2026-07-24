@@ -209,9 +209,29 @@ network-first, so a refresh always gets the newest version.
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
 **Tests.** `v32test.js`, `v31test.js`, `v3test.js`, `v2test.js`, `domtest.js`, `migtest.js` and
-`negtest.js` run under Node with jsdom (`npm i jsdom fake-indexeddb`). 228 checks across the
+`negtest.js` and `csstest.js` run under Node with jsdom (`npm i jsdom fake-indexeddb`). 269 checks across the
 matching engine, JSON tolerance, prompt assembly, streaming, migration, and a
 negative test that deliberately reintroduces a fixed bug to prove the guard fires.
+
+---
+
+## Bonus: the same reading layout in SillyTavern
+
+`sillytavern-immersive.css` strips SillyTavern's chat down to the same shape as
+this app — no avatar column, no bubble around every message, no timestamps or
+ID badges, names reduced to a small quiet label.
+
+Paste it into **User Settings → Custom CSS**. It applies immediately; nothing
+is installed and nothing is permanent — clear the box to go back.
+
+Written against SillyTavern's actual `#message_template`, and tested with that
+markup under a competing theme to confirm each override wins (`csstest.js`,
+41 checks).
+
+Ten numbered blocks, each independent — delete any one you don't want. At the
+bottom there are commented-out extras: hide names entirely, serif body text,
+wider measure for landscape, dim everything except the newest message, and
+fade the top icon row until you reach for it.
 
 ---
 

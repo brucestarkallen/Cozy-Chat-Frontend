@@ -1,0 +1,165 @@
+/* ============================================================
+   IMMERSIVE READING — SillyTavern
+   Paste into: User Settings → Custom CSS
+   ------------------------------------------------------------
+   Strips the chat down to prose: no avatar column, no bubble
+   around every message, no timestamps or ID badges. Names shrink
+   to a small quiet label; buttons stay out of the way until you
+   want them.
+
+   Every block below is independent. Delete any one you don't
+   want — nothing else breaks.
+   ============================================================ */
+
+/* ---- 1. the avatar column and the gap it leaves ------------- */
+#chat .mes .mesAvatarWrapper,
+#chat .mes .for_checkbox,
+#chat .mes .del_checkbox {
+  display: none !important;
+}
+
+/* ---- 2. the bubble around every message --------------------- */
+#chat .mes {
+  background: none !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 0 0 1.6em 0 !important;
+  margin: 0 !important;
+}
+#chat .mes_block {
+  margin: 0 !important;
+  padding: 0 !important;
+  max-width: 100% !important;
+}
+
+/* ---- 3. comfortable measure, centred ------------------------ */
+#chat {
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+}
+#chat .mes_text {
+  max-width: 46em;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  font-size: 1.02em;
+  line-height: 1.72 !important;
+  text-align: left !important;   /* justified text on a phone leaves rivers */
+}
+#chat .mes_text p {
+  margin: 0 0 0.85em !important;
+}
+#chat .mes_text p:last-child { margin-bottom: 0 !important; }
+
+/* ---- 4. name row: a small quiet label, not a headline -------- */
+#chat .ch_name {
+  max-width: 46em;
+  margin: 0 auto 0.35em !important;
+  padding: 0 !important;
+  min-height: 0 !important;
+  align-items: center !important;
+}
+#chat .ch_name .name_text {
+  font-size: 10.5px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.09em !important;
+  text-transform: uppercase !important;
+  opacity: 0.5;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
+}
+
+/* ---- 5. metadata that adds nothing while reading ------------- */
+#chat .mes .timestamp,
+#chat .mes .mesIDDisplay,
+#chat .mes .mes_timer,
+#chat .mes .tokenCounterDisplay {
+  display: none !important;
+}
+
+/* ---- 6. per-message buttons: out of the way until wanted ----- */
+#chat .mes .mes_buttons {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+#chat .mes:hover .mes_buttons,
+#chat .mes.mes_focus .mes_buttons,
+#chat .mes:focus-within .mes_buttons {
+  opacity: 0.75;
+}
+/* on a touchscreen there is no hover — show them only on the newest message */
+@media (hover: none) {
+  #chat .mes .mes_buttons { opacity: 0 !important; }
+  #chat .mes.last_mes .mes_buttons { opacity: 0.55 !important; }
+}
+
+/* ---- 7. user turns: a rule, not a box ----------------------- */
+#chat .mes[is_user="true"] .mes_text {
+  border-left: 2px solid rgba(255, 255, 255, 0.22);
+  padding-left: 14px;
+  opacity: 0.82;
+}
+#chat .mes[is_user="true"] .ch_name { opacity: 0.55; }
+
+/* ---- 8. reasoning block: present, not loud ------------------ */
+#chat .mes_reasoning_details {
+  max-width: 46em;
+  margin: 0 auto 0.7em !important;
+  opacity: 0.6;
+  font-size: 0.9em;
+}
+#chat .mes_reasoning_details:hover { opacity: 0.9; }
+#chat .mes_reasoning_details summary { padding: 2px 0 !important; }
+
+/* ---- 9. swipe arrows: keep them, quiet them ----------------- */
+#chat .mes .swipe_left,
+#chat .mes .swipeRightBlock {
+  opacity: 0.25;
+  transition: opacity 0.15s;
+}
+#chat .mes:hover .swipe_left,
+#chat .mes:hover .swipeRightBlock,
+#chat .mes.last_mes .swipe_left,
+#chat .mes.last_mes .swipeRightBlock {
+  opacity: 0.6;
+}
+#chat .mes .swipes-counter { font-size: 10px; opacity: 0.7; }
+
+/* ---- 10. system / narrator lines --------------------------- */
+#chat .mes[is_system="true"] .mes_text {
+  opacity: 0.62;
+  font-style: italic;
+}
+
+/* ============================================================
+   OPTIONAL — uncomment what you want
+   ============================================================ */
+
+/* Hide names entirely. Only sensible when two speakers alternate
+   and you can always tell who is talking. */
+/*
+#chat .ch_name .name_text { display: none !important; }
+#chat .ch_name { margin-bottom: 0 !important; }
+*/
+
+/* Wider measure for a tablet or landscape. */
+/*
+#chat .mes_text, #chat .ch_name, #chat .mes_reasoning_details { max-width: 60em; }
+*/
+
+/* Serif body, for a book-like feel. */
+/*
+#chat .mes_text { font-family: Georgia, "Times New Roman", serif !important; font-size: 1.08em; }
+*/
+
+/* Dim every message except the newest, so the eye lands on the
+   new text first. Reading back up still works — hover restores it. */
+/*
+#chat .mes:not(.last_mes) .mes_text { opacity: 0.55; transition: opacity 0.2s; }
+#chat .mes:not(.last_mes):hover .mes_text { opacity: 1; }
+*/
+
+/* Hide the top icon row until you tap the area near it. */
+/*
+#top-settings-holder { opacity: 0.12; transition: opacity 0.2s; }
+#top-settings-holder:hover, #top-settings-holder:focus-within { opacity: 1; }
+*/
