@@ -564,30 +564,28 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 .edit-card.done .row{display:none}
 
 /* ---------- document bar ---------- */
-/* Attached-file chip. Collapsed to a single quiet line so it doesn't sit on
-   top of the conversation; the actions appear only when you tap it. */
-.docbar{
-  display:flex;align-items:center;gap:7px;padding:4px 12px;flex:none;
-  background:transparent;border-bottom:1px solid var(--border-soft);
+/* Attached file lives as one icon in the top bar — no strip, no extra row.
+   Tapping it opens a small card with the actions. */
+.file-btn{position:relative}
+.file-btn.on{color:var(--ember)}
+.file-pop{
+  position:absolute;top:46px;right:8px;z-index:35;min-width:200px;max-width:min(300px,calc(100vw - 24px));
+  background:var(--bg-2);border:1px solid var(--border);border-radius:var(--r);
+  box-shadow:var(--shadow);padding:6px;
+  opacity:0;transform:translateY(-6px);pointer-events:none;transition:opacity .16s,transform .16s;
 }
-.doc-chip{
-  display:flex;align-items:center;gap:6px;padding:2px 4px;border-radius:6px;
-  max-width:100%;min-width:0;color:var(--muted);
-  font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;
+.file-pop.show{opacity:1;transform:none;pointer-events:auto}
+.file-pop .fname{
+  padding:7px 9px 8px;font-family:var(--mono);font-size:11px;letter-spacing:.04em;
+  color:var(--ember);word-break:break-all;border-bottom:1px solid var(--border-soft);margin-bottom:5px;
 }
-.doc-chip:hover{color:var(--text-2)}
-.doc-chip .nm{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.doc-chip .car{transition:transform .18s}
-.docbar.open .doc-chip .car{transform:rotate(180deg)}
-.docbar.open .doc-chip{color:var(--ember)}
-.doc-acts{display:none;gap:6px;margin-left:auto}
-.docbar.open .doc-acts{display:flex}
-.doc-acts button{
-  font-family:var(--mono);font-size:10px;letter-spacing:.05em;
-  color:var(--text-2);padding:3px 8px;border:1px solid var(--border);border-radius:6px;
+.file-pop button{
+  display:block;width:100%;text-align:left;padding:9px 10px;border-radius:7px;
+  font-size:14px;color:var(--text-2);
 }
-.doc-acts button:hover{border-color:var(--ember);color:var(--text)}
-.doc-acts button:disabled{opacity:.35;cursor:default}
+.file-pop button:hover:not(:disabled){background:var(--surface);color:var(--text)}
+.file-pop button:disabled{opacity:.35;cursor:default}
+.file-pop button.danger:hover{color:var(--danger)}
 .doc-row{
   display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:7px;
   border:1px solid var(--border);border-radius:var(--r);background:var(--surface);cursor:pointer;
@@ -665,7 +663,7 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
   .composer{padding:9px 12px 10px}
   .msg{margin-bottom:20px}
   .doc-edit{min-height:44dvh}
-  .docbar{padding:6px 10px}
+  .file-pop{right:6px;top:44px}
 }
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.01ms !important;transition-duration:.01ms !important}
@@ -733,6 +731,11 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
         <div class="chat-title" id="chatTitle">New chat</div>
         <div class="model-chip" id="modelChip">No provider set up</div>
       </div>
+      <button class="icon-btn file-btn" id="fileBtn" title="Attached file" aria-label="Attached file" aria-expanded="false" hidden>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/>
+        </svg>
+      </button>
       <button class="icon-btn" id="exportBtn" title="Save as Markdown" aria-label="Save as Markdown">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>
@@ -746,19 +749,11 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
       </button>
     </header>
 
-    <div class="docbar" id="docBar" hidden>
-      <button class="doc-chip" id="docChip" aria-expanded="false">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex:none">
-          <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/>
-        </svg>
-        <span class="nm" id="docBarName"></span>
-        <svg class="car" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" style="flex:none"><path d="m6 9 6 6 6-6"/></svg>
-      </button>
-      <span class="doc-acts">
-        <button id="docViewBtn">Open</button>
-        <button id="docUndoBtn">Undo</button>
-        <button id="docDetachBtn">Detach</button>
-      </span>
+    <div class="file-pop" id="filePop">
+      <div class="fname" id="fileName"></div>
+      <button id="docViewBtn">Open the file</button>
+      <button id="docUndoBtn">Undo last change</button>
+      <button class="danger" id="docDetachBtn">Stop using it here</button>
     </div>
 
     <div class="thread" id="thread">
@@ -1154,10 +1149,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v3.1.0
+   COZY CHAT v3.2.0
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "3.1.0";
+const VERSION = "3.2.0";
 
 const PRESETS = {
   anthropic:  { name:"Claude",     kind:"anthropic", url:"https://api.anthropic.com/v1", model:"claude-sonnet-4-6", ctx:200000, hint:"e.g. claude-sonnet-4-6, claude-opus-4-5" },
@@ -1535,8 +1530,8 @@ function renderThread(){
   const el = $("#threadInner");
   $("#chatTitle").textContent = current ? current.title : "New chat";
   const p = activeProv();
-  $("#modelChip").textContent = p ? (p.name + " · " + (p.model || "no model set")) : "No provider set up";
-  renderDocBar();
+  $("#modelChip").textContent = connLabel(p);
+  renderFileBtn();
   if (!current || !current.messages.length){
     el.innerHTML = welcomeHtml();
     $("#regenBtn").hidden = true; $("#clearBtn").hidden = true; updateEmber(); return;
@@ -1546,14 +1541,28 @@ function renderThread(){
   $("#regenBtn").hidden = false; $("#clearBtn").hidden = false;
   updateEmber(); scrollDown(true);
 }
-function renderDocBar(){
-  const bar = $("#docBar");
+function renderFileBtn(){
+  const btn = $("#fileBtn");
   const d = (current && current.docId) ? docs.find(x => x.id === current.docId) : null;
-  bar.hidden = !d;
+  btn.hidden = !d;
+  btn.classList.toggle("on", !!d);
   if (d){
-    $("#docBarName").textContent = d.name || "untitled";
+    $("#fileName").textContent = (d.name || "").trim() || "untitled";
     $("#docUndoBtn").disabled = !(d.undo && d.undo.length);
-  }
+  } else closeFilePop();
+}
+// The connection name and the model name are usually the same thing typed
+// twice ("Neuralwatt Glm-5.2-fast" + "glm-5.2-fast"). Show it once.
+function squash(s){ return String(s || "").toLowerCase().replace(/[^a-z0-9]/g, ""); }
+function connLabel(p){
+  if (!p) return "No connection yet";
+  const model = (p.model || "").trim();
+  const name  = (p.name  || "").trim();
+  if (!model) return name || "no model set";
+  if (!name) return model;
+  const a = squash(name), b = squash(model);
+  if (a.includes(b) || b.includes(a)) return model;
+  return name + " · " + model;
 }
 function welcomeHtml(){
   const p = activeProv();
@@ -1565,7 +1574,7 @@ function welcomeHtml(){
   }
   const st = ["Explain something to me","Help me draft a message","Review this code","Think through a decision with me"];
   return '<div class="welcome">' + mark + '<h2>What\'s on your mind?</h2>'
-    + '<p>Connected to ' + escapeHtml(p.name) + ' · ' + escapeHtml(p.model || "no model set") + '</p>'
+    + '<p>' + escapeHtml(connLabel(p)) + '</p>'
     + '<div class="starter-grid">' + st.map(s=>'<button class="starter" data-starter="'+escapeHtml(s)+'">'+escapeHtml(s)+'</button>').join("") + '</div></div>';
 }
 function sourcesHtml(list){
@@ -2695,7 +2704,7 @@ async function applyEdit(msgId, editId){
     e.status = "applied"; e.note = r.note;
     await DB.docPut(JSON.parse(JSON.stringify(doc)));
   }
-  renderThread(); renderDocBar(); await persist();
+  renderThread(); renderFileBtn(); await persist();
 }
 async function applyAll(msgId){
   const m = current.messages.find(x => x.id === msgId);
@@ -2711,7 +2720,7 @@ async function undoDoc(){
   doc.text = doc.undo.pop().text;
   doc.updatedAt = Date.now();
   await DB.docPut(JSON.parse(JSON.stringify(doc)));
-  renderDocBar(); updateEmber();
+  renderFileBtn(); updateEmber();
   if (openDocId === doc.id) $("#docEditArea").value = doc.text;
   toast("Undone");
 }
@@ -2728,10 +2737,7 @@ async function saveDoc(d){
   await DB.docPut(JSON.parse(JSON.stringify(d)));
   docs.sort((a,b) => b.updatedAt - a.updatedAt);
 }
-function collapseDocBar(){
-  const bar = $("#docBar");
-  if (bar){ bar.classList.remove("open"); $("#docChip").setAttribute("aria-expanded","false"); }
-}
+function collapseDocBar(){ closeFilePop(); }
 function renderDocList(){
   const el = $("#docList");
   if (!docs.length){ el.innerHTML = '<div class="hint">No files yet.</div>'; return; }
@@ -2911,11 +2917,19 @@ on("#effortSeg", "click", function(e){
   S.effort = b.dataset.effort; saveSettings(); renderEffort();
 });
 
-/* the attached-file strip stays collapsed until you tap it */
-on("#docChip", "click", function(){
-  const bar = $("#docBar");
-  const open = bar.classList.toggle("open");
-  $("#docChip").setAttribute("aria-expanded", open ? "true" : "false");
+/* the attached file is one icon in the top bar; tapping opens a small card */
+function closeFilePop(){
+  const p = $("#filePop");
+  if (p){ p.classList.remove("show"); $("#fileBtn").setAttribute("aria-expanded","false"); }
+}
+on("#fileBtn", "click", function(e){
+  e.stopPropagation();
+  const p = $("#filePop");
+  const open = p.classList.toggle("show");
+  $("#fileBtn").setAttribute("aria-expanded", open ? "true" : "false");
+});
+document.addEventListener("click", function(e){
+  if (!e.target.closest("#filePop") && !e.target.closest("#fileBtn")) closeFilePop();
 });
 
 /* ==========================================================
@@ -3015,7 +3029,7 @@ on("#docSaveBtn", "click", async function(){
     if (d.undo.length > 8) d.undo.shift();
   }
   d.text = $("#docEditArea").value;
-  await saveDoc(d); renderDocBar(); updateEmber(); toast("Saved");
+  await saveDoc(d); renderFileBtn(); updateEmber(); toast("Saved");
 });
 on("#docAttachBtn", "click", async function(){
   if (!openDocId) return;
@@ -3039,7 +3053,7 @@ on("#docRenameBtn", "click", async function(){
   const t = n.trim();
   if (!t){ toast("A file needs a name"); return; }
   d.name = t; await saveDoc(d);
-  $("#docEditTitle").textContent = d.name; renderDocBar(); renderDocList();
+  $("#docEditTitle").textContent = d.name; renderFileBtn(); renderDocList();
 });
 on("#docDelBtn", "click", async function(){
   const d = docs.find(x => x.id === openDocId);
@@ -3049,11 +3063,14 @@ on("#docDelBtn", "click", async function(){
   for (const c of convos) if (c.docId === d.id){ delete c.docId; await DB.put(JSON.parse(JSON.stringify(c))); }
   closeDocEdit(); renderDocList(); renderThread(); toast("Deleted");
 });
-on("#docViewBtn", "click", function(){ if (current && current.docId) openDocEditor(current.docId); });
-on("#docUndoBtn", "click", undoDoc);
+on("#docViewBtn", "click", function(){ closeFilePop(); if (current && current.docId) openDocEditor(current.docId); });
+on("#docUndoBtn", "click", function(){ closeFilePop(); undoDoc(); });
 on("#docDetachBtn", "click", async function(){
   if (!current) return;
-  delete current.docId; await persist(); renderThread(); toast("Detached");
+  closeFilePop();
+  const d = docs.find(x => x.id === current.docId);
+  delete current.docId; await persist(); renderThread();
+  toast(d ? (d.name + " is no longer part of this chat — the file is still saved") : "Removed from this chat");
 });
 
 /* --- edit cards --- */

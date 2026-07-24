@@ -129,28 +129,19 @@ console.log('\n=== 5. MODEL LIST FAILURE IS SOFT ===');
   ck('no crash', true);
 }
 
-console.log('\n=== 6. FILE CHIP IS COLLAPSED ===');
+console.log('\n=== 6. ATTACHED FILE INDICATOR ===');
 {
   const dom=await boot(base());
   const w=dom.window,d=dom.window.document;
+  ck('no icon before anything is attached', d.querySelector('#fileBtn').hidden===true);
   await w.eval('(async()=>{const doc=await newDoc("spec.md","body");newConvo();await attachDoc(doc.id);})()');
   await new Promise(r=>setTimeout(r,300));
-  ck('strip visible when a file is attached', d.querySelector('#docBar').hidden===false);
-  ck('starts collapsed', !d.querySelector('#docBar').classList.contains('open'));
-  ck('file name shown', d.querySelector('#docBarName').textContent==='spec.md');
-  ck('actions hidden until tapped', d.querySelector('#docChip').getAttribute('aria-expanded')==='false');
-  ev(w,d.querySelector('#docChip'),'click');
-  ck('tapping reveals the actions', d.querySelector('#docBar').classList.contains('open'));
-  ck('aria updated', d.querySelector('#docChip').getAttribute('aria-expanded')==='true');
-  ev(w,d.querySelector('#docChip'),'click');
-  ck('tapping again collapses', !d.querySelector('#docBar').classList.contains('open'));
-  // empty name can't happen
-  w.eval('docs[0].name=""');w.eval('renderDocBar()');
-  ck('empty name falls back to a label', d.querySelector('#docBarName').textContent==='untitled',
-     JSON.stringify(d.querySelector('#docBarName').textContent));
+  ck('icon appears in the top bar', d.querySelector('#fileBtn').hidden===false);
+  ck('file name available in the popover', d.querySelector('#fileName').textContent==='spec.md');
+  ck('popover starts closed', !d.querySelector('#filePop').classList.contains('show'));
   await w.eval('(async()=>{delete current.docId;await persist();renderThread();})()');
   await new Promise(r=>setTimeout(r,200));
-  ck('strip gone when nothing attached', d.querySelector('#docBar').hidden===true);
+  ck('icon gone when nothing attached', d.querySelector('#fileBtn').hidden===true);
 }
 
 console.log('\n=== 7. EFFORT PICKER UI ===');

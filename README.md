@@ -69,8 +69,8 @@ Tap **Test** before saving.
 
 **Files the assistant can edit**
 - Sidebar → **Files**. Create one, or import from your device.
-- Attached files show as one quiet line above the conversation. Tap it for
-  Open / Undo / Detach; it stays collapsed otherwise.
+- An attached file shows as a single icon in the top bar — no extra row on
+  screen. Tap it for Open / Undo / Stop using it here.
 - Attach a file to a chat and the assistant can change it directly. It proposes
   edits as red/green cards — **Apply**, **Skip**, or **Apply all**.
 - Every applied batch goes on an undo stack (last 8), so **Undo** is one tap.
@@ -202,13 +202,14 @@ network-first, so a refresh always gets the newest version.
 | `applyEditToText()` | Applies one approved edit |
 | `reasonStyle()` / `applyReasoning()` | Which thinking parameter each service wants |
 | `loadModels()` | Fetches the model dropdown from `/models` |
+| `connLabel()` | Shows the model once instead of connection name + model |
 | `runSearch()` | Web search calls per service |
 | `renderMarkdown()` | Markdown → HTML |
 | `send()` | Sends and reads the streaming reply |
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
-**Tests.** `v31test.js`, `v3test.js`, `v2test.js`, `domtest.js`, `migtest.js` and
-`negtest.js` run under Node with jsdom (`npm i jsdom fake-indexeddb`). 199 checks across the
+**Tests.** `v32test.js`, `v31test.js`, `v3test.js`, `v2test.js`, `domtest.js`, `migtest.js` and
+`negtest.js` run under Node with jsdom (`npm i jsdom fake-indexeddb`). 228 checks across the
 matching engine, JSON tolerance, prompt assembly, streaming, migration, and a
 negative test that deliberately reintroduces a fixed bug to prove the guard fires.
 

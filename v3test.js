@@ -98,7 +98,7 @@ console.log('\n=== 5. LIVE EDIT FLOW (attach → propose → apply → undo) ===
   const w2=dom2.window,d2=dom2.window.document;
   await w2.eval('(async()=>{const doc=await newDoc("spec.md","header\\nold value\\nfooter");newConvo();await attachDoc(doc.id);})()');
   await new Promise(r=>setTimeout(r,300));
-  ck('doc bar visible when attached', d2.querySelector('#docBar').hidden===false);
+  ck('file icon visible when attached', d2.querySelector('#fileBtn').hidden===false);
   const sys=w2.eval('assembleMessages("openai").system');
   ck('protocol sent to model', sys.includes('<docedits>'));
   ck('file contents sent to model', sys.includes('old value')&&sys.includes('[DOCUMENT: spec.md]'));
