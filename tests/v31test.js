@@ -1,3 +1,4 @@
+// TEST FILE - not for pasting into SillyTavern. Run with: node tests/v31test.js
 const fs=require('fs');const {JSDOM}=require('jsdom');require('fake-indexeddb/auto');
 const html=fs.readFileSync('./out/index.html','utf8');
 function sse(cs){let i=0;return{getReader(){return{read(){

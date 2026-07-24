@@ -1,3 +1,4 @@
+// TEST FILE - not for pasting into SillyTavern. Run with: node tests/v2test.js
 const fs=require('fs');
 const {JSDOM}=require('jsdom');
 require('fake-indexeddb/auto');

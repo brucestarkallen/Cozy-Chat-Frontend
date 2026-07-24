@@ -1,3 +1,4 @@
+// TEST FILE - not for pasting into SillyTavern. Run with: node tests/negtest.js
 const fs=require('fs');const {JSDOM}=require('jsdom');require('fake-indexeddb/auto');
 const html=fs.readFileSync('/tmp/sabotage.html','utf8');
 const warns=[],errs=[];

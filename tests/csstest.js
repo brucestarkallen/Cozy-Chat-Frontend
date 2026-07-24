@@ -1,3 +1,4 @@
+// TEST FILE - not for pasting into SillyTavern. Run with: node tests/csstest.js
 const fs=require('fs');const {JSDOM}=require('jsdom');
 const css=fs.readFileSync('./out/sillytavern-immersive.css','utf8');
 let pass=0,fail=0;

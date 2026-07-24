@@ -1,3 +1,4 @@
+// TEST FILE - not for pasting into SillyTavern. Run with: node tests/migtest.js
 const fs=require('fs');const {JSDOM}=require('jsdom');require('fake-indexeddb/auto');
 const html=fs.readFileSync('./out/index.html','utf8');
 const ck=(n,ok,x)=>console.log((ok?'  ok  ':'  FAIL'),n,x===undefined?'':'→ '+x);
