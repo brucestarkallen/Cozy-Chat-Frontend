@@ -116,6 +116,29 @@
   opacity: 0.45 !important;
 }
 
+/* ---- 5b. turn number, as a quiet folio mark ---------------- */
+/* The old #N badge lived inside the avatar column removed above, so
+   it is rebuilt here instead of un-hidden: the message element itself
+   carries mesid="N", printed at the right end of the name line. */
+#chat#chat .mes[mesid] {
+  position: relative !important;
+}
+#chat#chat .mes[mesid]::before {
+  content: "#" attr(mesid);
+  position: absolute;
+  top: 2px;
+  right: 16px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  opacity: 0.35;
+  pointer-events: none;
+}
+/* keep the message buttons clear of the number */
+#chat#chat .mes[mesid] .mes_buttons {
+  margin-right: 2.6em !important;
+}
+
 /* ---- 6. metadata that adds nothing while reading ----------- */
 #chat#chat .mes[mesid] .timestamp,
 #chat#chat .mes[mesid] .mesIDDisplay,
@@ -159,10 +182,14 @@
 #chat#chat .mes[mesid]:focus-within .mes_buttons {
   opacity: 0.7;
 }
-/* touchscreens have no hover — show them on the newest message only */
+/* Touchscreens: faint on every message so edit is always findable —
+   invisible buttons cannot be tapped in practice. Tapping a message
+   lifts them (mobile browsers apply hover on tap); the newest message
+   keeps them lifted. */
 @media (hover: none) {
-  #chat#chat .mes[mesid] .mes_buttons { opacity: 0 !important; }
-  #chat#chat .mes[mesid].last_mes .mes_buttons { opacity: 0.5 !important; }
+  #chat#chat .mes[mesid] .mes_buttons { opacity: 0.28 !important; }
+  #chat#chat .mes[mesid].last_mes .mes_buttons,
+  #chat#chat .mes[mesid]:hover .mes_buttons { opacity: 0.8 !important; }
 }
 #chat#chat .mes[mesid] .swipe_left,
 #chat#chat .mes[mesid] .swipeRightBlock { opacity: 0.2; }

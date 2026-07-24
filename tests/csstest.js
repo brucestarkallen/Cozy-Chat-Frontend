@@ -238,6 +238,32 @@ console.log('\n=== 7b. A THEME LOADING AFTER US STILL LOSES ===');
   }
 }
 
+console.log('\n=== 7c. TURN NUMBER AND TOUCH BUTTONS ===');
+{
+  // jsdom cannot resolve ::before content or evaluate media queries, so
+  // these are declaration-level checks against the stylesheet text, plus
+  // matching checks that the selectors bind to real elements.
+  ck('turn number printed from the mesid attribute',
+     /::before\s*\{[^}]*content:\s*"#"\s*attr\(mesid\)/.test(css));
+  ck('folio selector matches a real message', ai.matches('#chat#chat .mes[mesid]'));
+  ck('folio cannot swallow taps', /::before\s*\{[^}]*pointer-events:\s*none/.test(css));
+  ck('folio anchored to the message box',
+     /\.mes\[mesid\]\s*\{[^}]*position:\s*relative\s*!important/.test(css));
+  ck('buttons keep clear of the number',
+     /\.mes_buttons\s*\{[^}]*margin-right:\s*2\.6em\s*!important/.test(css));
+
+  const media=(css.match(/@media\s*\(hover:\s*none\)\s*\{([\s\S]*?)\n\}/)||[])[1]||'';
+  ck('touch: buttons faint on EVERY message, never invisible',
+     /\.mes_buttons\s*\{\s*opacity:\s*0\.28\s*!important/.test(media), 
+     (media.match(/opacity:[^;]+/)||[''])[0]);
+  ck('touch: tapping a message lifts its buttons',
+     /\.mes\[mesid\]:hover\s+\.mes_buttons/.test(media));
+  ck('touch: newest message keeps them lifted',
+     /last_mes\s+\.mes_buttons/.test(media));
+  ck('touch: no zero-opacity buttons remain in the media block',
+     !/opacity:\s*0\s*!important/.test(media));
+}
+
 console.log('\n=== 8. NOTHING ESSENTIAL LOST ===');
 for(const [n,sel] of [['message text','.mes_text'],['name','.name_text'],['swipe arrow','.swipe_left'],
   ['swipe counter','.swipes-counter'],['buttons','.mes_buttons'],['reasoning','.mes_reasoning_details']])
