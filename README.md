@@ -69,6 +69,8 @@ Tap **Test** before saving.
 
 **Files the assistant can edit**
 - Sidebar → **Files**. Create one, or import from your device.
+- Attached files show as one quiet line above the conversation. Tap it for
+  Open / Undo / Detach; it stays collapsed otherwise.
 - Attach a file to a chat and the assistant can change it directly. It proposes
   edits as red/green cards — **Apply**, **Skip**, or **Apply all**.
 - Every applied batch goes on an undo stack (last 8), so **Undo** is one tap.
@@ -100,7 +102,28 @@ Tap **Test** before saving.
 - Shown in a collapsible block
 - Handles models with a separate reasoning field *and* models that write
   `<think>…</think>` inline. The tags never leak into the reply text.
-- Editable tag list under Settings → Chat
+- **Effort** — Settings → Chat: Off / Low / Medium / High.
+  Every service spells this differently, so the app sends the right shape for
+  each one and works it out from your connection and model name:
+
+| Service | What gets sent |
+|---|---|
+| Claude 4.6+ | `thinking: {type:"adaptive"}` + `output_config.effort` |
+| Claude 4.6 and older | `thinking: {type:"enabled", budget_tokens}` |
+| OpenAI | `reasoning_effort` |
+| GLM / Z.ai | `thinking: {type:"enabled"}`, plus `reasoning_effort` above Low |
+| Qwen | `enable_thinking` |
+| OpenRouter | `reasoning: {effort}` |
+| DeepSeek | nothing — the reasoner model decides for itself |
+
+  A GLM model on a custom endpoint is detected from the model name, so
+  NeuralWatt and Wafer get the GLM shape automatically. There's an override on
+  each connection if a service needs something else.
+
+**Picking a model**
+- **Load list** next to the Model field pulls the service's `/models` and turns
+  it into a dropdown. The list is saved with the connection.
+- If a service doesn't offer that endpoint, nothing breaks — type the name as before.
 
 **Web search**
 - Off by default. Turn it on in Settings → Search and a magnifier appears next to
@@ -177,13 +200,15 @@ network-first, so a refresh always gets the newest version.
 | `DOCEDIT_PROTOCOL` | What the assistant is told about editing files |
 | `locate()` | Three-tier text matching for file edits |
 | `applyEditToText()` | Applies one approved edit |
+| `reasonStyle()` / `applyReasoning()` | Which thinking parameter each service wants |
+| `loadModels()` | Fetches the model dropdown from `/models` |
 | `runSearch()` | Web search calls per service |
 | `renderMarkdown()` | Markdown → HTML |
 | `send()` | Sends and reads the streaming reply |
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
-**Tests.** `v3test.js`, `v2test.js`, `domtest.js`, `migtest.js` and `negtest.js`
-run under Node with jsdom (`npm i jsdom fake-indexeddb`). 129 checks across the
+**Tests.** `v31test.js`, `v3test.js`, `v2test.js`, `domtest.js`, `migtest.js` and
+`negtest.js` run under Node with jsdom (`npm i jsdom fake-indexeddb`). 199 checks across the
 matching engine, JSON tolerance, prompt assembly, streaming, migration, and a
 negative test that deliberately reintroduces a fixed bug to prove the guard fires.
 

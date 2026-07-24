@@ -564,19 +564,30 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 .edit-card.done .row{display:none}
 
 /* ---------- document bar ---------- */
+/* Attached-file chip. Collapsed to a single quiet line so it doesn't sit on
+   top of the conversation; the actions appear only when you tap it. */
 .docbar{
-  display:flex;align-items:center;gap:8px;padding:7px 12px;flex:none;
-  background:var(--surface);border-bottom:1px solid var(--border-soft);
+  display:flex;align-items:center;gap:7px;padding:4px 12px;flex:none;
+  background:transparent;border-bottom:1px solid var(--border-soft);
 }
-.docbar .nm{
-  flex:1;min-width:0;font-family:var(--mono);font-size:11px;letter-spacing:.05em;
-  color:var(--ember);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+.doc-chip{
+  display:flex;align-items:center;gap:6px;padding:2px 4px;border-radius:6px;
+  max-width:100%;min-width:0;color:var(--muted);
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;
 }
-.docbar button{
-  font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;
-  color:var(--text-2);padding:4px 8px;border:1px solid var(--border);border-radius:6px;
+.doc-chip:hover{color:var(--text-2)}
+.doc-chip .nm{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.doc-chip .car{transition:transform .18s}
+.docbar.open .doc-chip .car{transform:rotate(180deg)}
+.docbar.open .doc-chip{color:var(--ember)}
+.doc-acts{display:none;gap:6px;margin-left:auto}
+.docbar.open .doc-acts{display:flex}
+.doc-acts button{
+  font-family:var(--mono);font-size:10px;letter-spacing:.05em;
+  color:var(--text-2);padding:3px 8px;border:1px solid var(--border);border-radius:6px;
 }
-.docbar button:hover{border-color:var(--ember);color:var(--text)}
+.doc-acts button:hover{border-color:var(--ember);color:var(--text)}
+.doc-acts button:disabled{opacity:.35;cursor:default}
 .doc-row{
   display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:7px;
   border:1px solid var(--border);border-radius:var(--r);background:var(--surface);cursor:pointer;
@@ -623,6 +634,23 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
   font-size:12px;color:var(--text-2);white-space:nowrap;
 }
 .preset-bar button:hover{border-color:var(--ember);color:var(--text)}
+
+
+/* effort picker */
+.seg{display:flex;gap:0;border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.seg button{
+  flex:1;padding:9px 4px;font-size:13px;font-weight:600;color:var(--muted);
+  border-right:1px solid var(--border);transition:background .15s,color .15s;
+}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--ember);color:#191106}
+.model-pick{display:flex;gap:8px;align-items:center}
+.model-pick input{flex:1}
+.model-pick button{
+  padding:10px 12px;border:1px solid var(--border);border-radius:var(--r);
+  font-size:12px;color:var(--text-2);white-space:nowrap;
+}
+.model-pick button:hover{border-color:var(--ember);color:var(--text)}
 
 /* ---------- mobile ---------- */
 @media (max-width:900px){
@@ -719,13 +747,18 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
     </header>
 
     <div class="docbar" id="docBar" hidden>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ember)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex:none">
-        <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/>
-      </svg>
-      <span class="nm" id="docBarName"></span>
-      <button id="docViewBtn">Open</button>
-      <button id="docUndoBtn">Undo</button>
-      <button id="docDetachBtn">Detach</button>
+      <button class="doc-chip" id="docChip" aria-expanded="false">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex:none">
+          <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/>
+        </svg>
+        <span class="nm" id="docBarName"></span>
+        <svg class="car" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" style="flex:none"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <span class="doc-acts">
+        <button id="docViewBtn">Open</button>
+        <button id="docUndoBtn">Undo</button>
+        <button id="docDetachBtn">Detach</button>
+      </span>
     </div>
 
     <div class="thread" id="thread">
@@ -829,8 +862,27 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
         </div>
         <div class="field">
           <label class="lbl" for="pModel">Model</label>
-          <input type="text" id="pModel" placeholder="e.g. glm-5.2" autocapitalize="off" autocomplete="off" spellcheck="false">
+          <div class="model-pick">
+            <input type="text" id="pModel" placeholder="e.g. glm-5.2" autocapitalize="off" autocomplete="off" spellcheck="false" list="modelList">
+            <button id="loadModelsBtn">Load list</button>
+          </div>
+          <datalist id="modelList"></datalist>
+          <select id="pModelSel" style="margin-top:8px" hidden></select>
           <div class="hint" id="modelHint"></div>
+        </div>
+        <div class="field">
+          <label class="lbl" for="pReason">Thinking style</label>
+          <select id="pReason">
+            <option value="auto">Work it out from the service and model</option>
+            <option value="anthropic">Claude — adaptive thinking + effort</option>
+            <option value="anthropic-budget">Claude, older models — thinking budget</option>
+            <option value="openai">OpenAI style — reasoning_effort</option>
+            <option value="zai">GLM / Z.ai — thinking: enabled</option>
+            <option value="qwen">Qwen — enable_thinking</option>
+            <option value="openrouter">OpenRouter — reasoning object</option>
+            <option value="none">Don't send anything</option>
+          </select>
+          <div class="hint">Every service spells this differently. Leave it on the first option unless thinking doesn't turn on.</div>
         </div>
         <div class="field">
           <label class="lbl" for="pCtx">Context window (tokens)</label>
@@ -853,6 +905,16 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 
     <!-- CHAT -->
     <div class="sheet-body" data-panel="chat" hidden>
+      <div class="field">
+        <label class="lbl">Thinking effort</label>
+        <div class="seg" id="effortSeg">
+          <button data-effort="off">Off</button>
+          <button data-effort="low">Low</button>
+          <button data-effort="medium">Medium</button>
+          <button data-effort="high">High</button>
+        </div>
+        <div class="hint" id="effortHint"></div>
+      </div>
       <div class="field">
         <label class="lbl" for="chatSys">This chat only — extra system text</label>
         <textarea class="f" id="chatSys" placeholder="Applies to the open conversation only. Added after the instruction set." style="min-height:64px"></textarea>
@@ -1092,10 +1154,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v3.0.0
+   COZY CHAT v3.1.0
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "3.0.0";
+const VERSION = "3.1.0";
 
 const PRESETS = {
   anthropic:  { name:"Claude",     kind:"anthropic", url:"https://api.anthropic.com/v1", model:"claude-sonnet-4-6", ctx:200000, hint:"e.g. claude-sonnet-4-6, claude-opus-4-5" },
@@ -1123,6 +1185,60 @@ const SEARCH_HINTS = {
   serper:  "Google results, fast and cheap. 2,500 free credits on signup. Key from serper.dev.",
   brave:   "Independent index. The free tier ended Feb 2026 — new accounts get $5 credit a month and a card is required. Also refuses browser calls, so you'll need a relay."
 };
+
+/* Each service spells "think harder" differently, and sending the wrong shape
+   is silently ignored (or 400s), so resolve it explicitly per connection. */
+function reasonStyle(p){
+  const s = p.reason || "auto";
+  if (s !== "auto") return s;
+  const m = (p.model || "").toLowerCase();
+  if (p.kind === "anthropic") return "anthropic";
+  if (p.preset === "openrouter") return "openrouter";
+  if (p.preset === "zai" || /\bglm\b|^glm|glm-/.test(m)) return "zai";
+  if (/qwen/.test(m)) return "qwen";
+  if (p.preset === "deepseek") return "none";       // reasoner model decides for itself
+  return "openai";
+}
+const EFFORT_HINTS = {
+  anthropic: "Sends adaptive thinking with an effort level. Required on Opus 4.7 and newer.",
+  "anthropic-budget": "Sends a fixed thinking budget. Only for Claude 4.6 and older — newer models reject it.",
+  openai: "Sends reasoning_effort. Ignored by models that don't reason.",
+  zai: "Sends thinking: enabled/disabled, plus an effort level above Low.",
+  qwen: "Sends enable_thinking.",
+  openrouter: "Sends a reasoning object with an effort level.",
+  none: "Nothing extra is sent — the model decides on its own."
+};
+function applyReasoning(body, p){
+  const eff = S.effort || "off";
+  const style = reasonStyle(p);
+  if (style === "none") return;
+  if (style === "anthropic"){
+    if (eff === "off") return;                       // omit → model default
+    body.thinking = { type:"adaptive" };
+    body.output_config = { effort: eff };
+    return;
+  }
+  if (style === "anthropic-budget"){
+    if (eff === "off") return;
+    const budget = { low:2048, medium:8192, high:24576 }[eff];
+    const max = Number(S.maxTokens) || 4096;
+    body.thinking = { type:"enabled", budget_tokens: Math.max(1024, Math.min(budget, max - 512)) };
+    if (body.max_tokens <= body.thinking.budget_tokens) body.max_tokens = body.thinking.budget_tokens + 1024;
+    return;
+  }
+  if (style === "zai"){
+    body.thinking = { type: eff === "off" ? "disabled" : "enabled" };
+    if (eff !== "off" && eff !== "low") body.reasoning_effort = eff;
+    return;
+  }
+  if (style === "qwen"){ body.enable_thinking = eff !== "off"; return; }
+  if (style === "openrouter"){
+    body.reasoning = eff === "off" ? { enabled:false } : { effort: eff };
+    return;
+  }
+  // openai
+  if (eff !== "off") body.reasoning_effort = eff;
+}
 
 /* ---------- IndexedDB ---------- */
 const DB = (() => {
@@ -1169,7 +1285,7 @@ const DEFAULTS = {
   system: "", injections: [],
   temperature: 1, maxTokens: 4096,
   showThinking: true, catchThinkTags: true, thinkTags: "think, thinking, reasoning, thought",
-  enterSends: false, autoTitle: true, theme: "dark",
+  enterSends: false, autoTitle: true, theme: "dark", effort: "off",
   search: { on:false, provider:"native", key:"", count:5, relay:"", always:false }
 };
 let S = loadSettings();
@@ -1435,9 +1551,8 @@ function renderDocBar(){
   const d = (current && current.docId) ? docs.find(x => x.id === current.docId) : null;
   bar.hidden = !d;
   if (d){
-    $("#docBarName").textContent = d.name;
+    $("#docBarName").textContent = d.name || "untitled";
     $("#docUndoBtn").disabled = !(d.undo && d.undo.length);
-    $("#docUndoBtn").style.opacity = (d.undo && d.undo.length) ? "1" : ".4";
   }
 }
 function welcomeHtml(){
@@ -1585,6 +1700,7 @@ function buildPayload(opts){
     };
     if (asm.system) body.system = asm.system;
     if (useNative) body.tools = [{ type:"web_search_20250305", name:"web_search", max_uses:Number(S.search.count)||5 }];
+    applyReasoning(body, p);
     return {
       url: (p.proxy || p.url).replace(/\/+$/,"") + "/messages",
       headers: { "content-type":"application/json", "x-api-key":p.apiKey,
@@ -1592,14 +1708,16 @@ function buildPayload(opts){
       body: body
     };
   }
+  const body = {
+    model:p.model, max_tokens:Number(S.maxTokens)||4096,
+    temperature:Number(S.temperature), stream:true,
+    messages: asm.system ? [{ role:"system", content:asm.system }].concat(asm.messages) : asm.messages
+  };
+  applyReasoning(body, p);
   return {
     url: (p.proxy || p.url).replace(/\/+$/,"") + "/chat/completions",
     headers: { "content-type":"application/json", "authorization":"Bearer " + p.apiKey },
-    body: {
-      model:p.model, max_tokens:Number(S.maxTokens)||4096,
-      temperature:Number(S.temperature), stream:true,
-      messages: asm.system ? [{ role:"system", content:asm.system }].concat(asm.messages) : asm.messages
-    }
+    body: body
   };
 }
 
@@ -1845,8 +1963,10 @@ function editProv(id){
   if (p){
     $("#pName").value=p.name; $("#pUrl").value=p.url; $("#pKey").value=p.apiKey||"";
     $("#pModel").value=p.model||""; $("#pCtx").value=p.ctx||128000; $("#pProxy").value=p.proxy||"";
+    $("#pReason").value = p.reason || "auto";
     $("#modelHint").textContent = PRESETS[preset].hint;
-  } else applyPreset("anthropic");
+    fillModelList(p.models || []);
+  } else { applyPreset("anthropic"); $("#pReason").value = "auto"; fillModelList([]); }
   $("#delProvBtn").hidden = !p;
   $("#provEditor").hidden = false;
   if ($("#provEditor").scrollIntoView) $("#provEditor").scrollIntoView({ behavior:"smooth", block:"nearest" });
@@ -1856,13 +1976,15 @@ function applyPreset(key){
   $("#pName").value=pr.name; $("#pUrl").value=pr.url; $("#pModel").value=pr.model; $("#pCtx").value=pr.ctx;
   $("#modelHint").textContent = pr.hint;
   $("#urlHint").textContent = key==="anthropic" ? "Leave as-is unless you know otherwise." : "Usually ends in /v1";
+  fillModelList([]);
 }
 function saveProv(){
   const preset = $("#pPreset").value;
   const data = { id:editingProv||uid(), preset:preset, kind:PRESETS[preset].kind,
     name:$("#pName").value.trim()||PRESETS[preset].name, url:$("#pUrl").value.trim(),
     apiKey:$("#pKey").value.trim(), model:$("#pModel").value.trim(),
-    ctx:Number($("#pCtx").value)||128000, proxy:$("#pProxy").value.trim() };
+    ctx:Number($("#pCtx").value)||128000, proxy:$("#pProxy").value.trim(),
+    reason:$("#pReason").value, models:(editingProv && (S.providers.find(x=>x.id===editingProv)||{}).models) || [] };
   if (!data.url){ toast("Address can't be empty"); return; }
   const i = S.providers.findIndex(p=>p.id===data.id);
   if (i>=0) S.providers[i]=data; else S.providers.push(data);
@@ -1995,6 +2117,7 @@ function syncSettingsUI(){
   $("#temp").value = S.temperature;
   $("#maxTok").value = S.maxTokens;
   $("#thinkTags").value = S.thinkTags;
+  renderEffort();
   setToggle($("#tgThink"), S.showThinking);
   setToggle($("#tgThinkTags"), S.catchThinkTags);
   setToggle($("#tgEnter"), S.enterSends);
@@ -2068,7 +2191,7 @@ on("#convoList", "click", async function(e){
     renderSidebar(); renderThread(); return;
   }
   const row = e.target.closest("[data-id]");
-  if (row){ current = convos.find(c=>c.id===row.dataset.id)||null; renderSidebar(); renderThread(); closeDrawer(); }
+  if (row){ current = convos.find(c=>c.id===row.dataset.id)||null; renderSidebar(); renderThread(); collapseDocBar(); closeDrawer(); }
 });
 
 on("#threadInner", "click", async function(e){
@@ -2605,6 +2728,10 @@ async function saveDoc(d){
   await DB.docPut(JSON.parse(JSON.stringify(d)));
   docs.sort((a,b) => b.updatedAt - a.updatedAt);
 }
+function collapseDocBar(){
+  const bar = $("#docBar");
+  if (bar){ bar.classList.remove("open"); $("#docChip").setAttribute("aria-expanded","false"); }
+}
 function renderDocList(){
   const el = $("#docList");
   if (!docs.length){ el.innerHTML = '<div class="hint">No files yet.</div>'; return; }
@@ -2639,7 +2766,7 @@ async function newDoc(name, text){
 async function attachDoc(id){
   if (!current) newConvo();
   current.docId = id;
-  await persist(); renderThread(); renderDocList();
+  await persist(); renderThread(); renderDocList(); collapseDocBar();
   const d = docs.find(x => x.id === id);
   toast(d ? ("Attached " + d.name) : "Attached");
 }
@@ -2722,6 +2849,75 @@ async function addAttachments(files){
   renderAttachTray();
 }
 
+
+/* ==========================================================
+   MODEL LIST + THINKING EFFORT + FILE CHIP
+   ========================================================== */
+function fillModelList(models){
+  const dl = $("#modelList"), sel = $("#pModelSel");
+  dl.innerHTML = models.map(m => '<option value="' + escapeHtml(m) + '"></option>').join("");
+  if (models.length){
+    sel.hidden = false;
+    sel.innerHTML = '<option value="">— pick from ' + models.length + ' models —</option>'
+      + models.map(m => '<option value="' + escapeHtml(m) + '">' + escapeHtml(m) + '</option>').join("");
+    const cur = $("#pModel").value;
+    if (models.indexOf(cur) >= 0) sel.value = cur;
+  } else { sel.hidden = true; sel.innerHTML = ""; }
+}
+async function loadModels(){
+  const preset = $("#pPreset").value, kind = PRESETS[preset].kind;
+  const base = ($("#pProxy").value.trim() || $("#pUrl").value.trim()).replace(/\/+$/, "");
+  const key = $("#pKey").value.trim();
+  if (!base || !key){ toast("Fill in the address and key first"); return; }
+  toast("Loading models…");
+  try {
+    const headers = kind === "anthropic"
+      ? { "x-api-key":key, "anthropic-version":"2023-06-01", "anthropic-dangerous-direct-browser-access":"true" }
+      : { "authorization":"Bearer " + key };
+    const res = await fetch(base + "/models", { headers: headers });
+    if (!res.ok) throw new Error("the service replied " + res.status);
+    const j = await res.json();
+    const list = (j.data || j.models || j || []);
+    const ids = list.map(function(m){ return typeof m === "string" ? m : (m.id || m.name || ""); })
+                    .filter(Boolean).sort();
+    if (!ids.length) throw new Error("it returned an empty list");
+    if (editingProv){
+      const p = S.providers.find(x => x.id === editingProv);
+      if (p){ p.models = ids; saveSettings(); }
+    }
+    fillModelList(ids);
+    toast("Found " + ids.length + " models");
+  } catch (err){
+    toast("Couldn't load the list — " + String(err.message || err) + ". Type the name instead.");
+  }
+}
+on("#loadModelsBtn", "click", loadModels);
+on("#pModelSel", "change", function(e){ if (e.target.value) $("#pModel").value = e.target.value; });
+
+function renderEffort(){
+  const cur = S.effort || "off";
+  Array.prototype.forEach.call(document.querySelectorAll("#effortSeg button"), function(b){
+    b.classList.toggle("on", b.dataset.effort === cur);
+  });
+  const p = activeProv();
+  const hint = $("#effortHint");
+  if (!p){ hint.textContent = "Add a connection first."; return; }
+  const style = reasonStyle(p);
+  hint.textContent = (cur === "off" ? "" : "") + (EFFORT_HINTS[style] || "");
+}
+on("#effortSeg", "click", function(e){
+  const b = e.target.closest("[data-effort]");
+  if (!b) return;
+  S.effort = b.dataset.effort; saveSettings(); renderEffort();
+});
+
+/* the attached-file strip stays collapsed until you tap it */
+on("#docChip", "click", function(){
+  const bar = $("#docBar");
+  const open = bar.classList.toggle("open");
+  $("#docChip").setAttribute("aria-expanded", open ? "true" : "false");
+});
+
 /* ==========================================================
    WIRING
    ========================================================== */
@@ -2797,8 +2993,8 @@ on("#docList", "click", function(e){
 });
 on("#docNewBtn", "click", async function(){
   const n = prompt("File name", "notes.md");
-  if (!n) return;
-  const d = await newDoc(n.trim(), "");
+  if (n === null) return;
+  const d = await newDoc(n.trim() || "untitled.md", "");
   openDocEditor(d.id);
 });
 on("#docImportBtn", "click", function(){ $("#docPicker").click(); });
@@ -2839,8 +3035,10 @@ on("#docRenameBtn", "click", async function(){
   const d = docs.find(x => x.id === openDocId);
   if (!d) return;
   const n = prompt("File name", d.name);
-  if (!n) return;
-  d.name = n.trim(); await saveDoc(d);
+  if (n === null) return;
+  const t = n.trim();
+  if (!t){ toast("A file needs a name"); return; }
+  d.name = t; await saveDoc(d);
   $("#docEditTitle").textContent = d.name; renderDocBar(); renderDocList();
 });
 on("#docDelBtn", "click", async function(){
