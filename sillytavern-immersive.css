@@ -15,6 +15,22 @@
    don't want; nothing else changes.
    ============================================================ */
 
+/* ---- 0. a reading surface --------------------------------- */
+/* Without the per-message cards, the wallpaper shows straight
+   through behind the prose and the text has nothing to sit on.
+   This lays a solid dark page under the chat.
+   Change the colour here, or set it to transparent to bring the
+   wallpaper back. */
+:root {
+  --immersive-page: #0d0f13;
+}
+#chat {
+  background-color: var(--immersive-page, #0d0f13) !important;
+  background-image: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
 /* ---- 1. avatar column, and the gap it leaves --------------- */
 #chat .mes[mesid] .mesAvatarWrapper,
 #chat .mes[mesid] .for_checkbox,
@@ -25,9 +41,12 @@
 /* ---- 2. the card, wherever the theme draws it -------------- */
 /* Base SillyTavern draws nothing here, so anything you see is  */
 /* your theme. Cleared on all three levels to be sure.          */
-#chat .mes[mesid],
-#chat .mes[mesid] .mes_block,
-#chat .mes[mesid] > .mes_block > .mes_text {
+#chat div.mes[mesid],
+#chat div.mes[mesid][is_user],
+#chat div.mes[mesid] > .mes_block,
+#chat div.mes[mesid][is_user] > .mes_block,
+#chat div.mes[mesid] > .mes_block > .mes_text,
+#chat div.mes[mesid][is_user] > .mes_block > .mes_text {
   background: none !important;
   background-color: transparent !important;
   border: 0 !important;
@@ -98,6 +117,13 @@
 #chat .mes[mesid] .mes_timer,
 #chat .mes[mesid] .tokenCounterDisplay,
 #chat .mes[mesid] .mes_ghost {
+  display: none !important;
+}
+/* Extensions and future SillyTavern versions drop extra markers into
+   the name row. Rather than name each one, keep the name and hide
+   the rest of that row's contents. The buttons sit outside it and
+   are unaffected. */
+#chat .mes[mesid] > .mes_block > .ch_name > div > div > *:not(.name_text) {
   display: none !important;
 }
 

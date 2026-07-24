@@ -50,8 +50,25 @@ const all=d.querySelectorAll('#chat .mes');const ai=all[0],user=all[1],last=all[
 console.log('=== 1. CSS IS WELL FORMED ===');
 {let dep=0,bad=false;for(const c of css){if(c==='{')dep++;if(c==='}'){dep--;if(dep<0)bad=true;}}
  ck('braces balanced',dep===0&&!bad,'depth '+dep);
- ck('every rule scoped to #chat',css.replace(/\/\*[\s\S]*?\*\//g,'').split('}').filter(r=>r.includes('{'))
-   .every(r=>{const s=r.split('{')[0];return s.includes('#chat')||s.includes('#top-settings-holder')||s.includes('@media');}));
+ // Anything outside #chat could restyle unrelated parts of SillyTavern.
+ // A :root block is allowed only if it declares nothing but our own variables.
+ {
+   const bare=css.replace(/\/\*[\s\S]*?\*\//g,'');
+   const offenders=[];
+   for(const chunk of bare.split('}')){
+     if(!chunk.includes('{'))continue;
+     const sel=chunk.split('{')[0].trim(), body=chunk.split('{').slice(1).join('{');
+     if(sel.includes('#chat')||sel.includes('#top-settings-holder')||sel.startsWith('@media'))continue;
+     if(sel===':root'){
+       const decls=body.split(';').map(x=>x.trim()).filter(Boolean);
+       if(decls.every(x=>x.startsWith('--immersive-')))continue;
+       offenders.push(':root sets something other than our own variables');
+       continue;
+     }
+     offenders.push(sel.slice(0,50));
+   }
+   ck('nothing styled outside #chat',offenders.length===0,offenders[0]||'clean');
+ }
  // A comment containing */ closes itself early and everything after it leaks
  // out as broken CSS. The browser then discards the rest of the sheet silently.
  let probs=[],i=0;
@@ -102,6 +119,26 @@ for(const [n,sel] of [['avatar column','.mesAvatarWrapper'],['id badge','.mesIDD
  ck('name dimmed',n.opacity==='0.45',n.opacity);}
 ck('buttons start hidden',cs(ai.querySelector('.mes_buttons')).opacity==='0');
 ck('newest message shows swipes more',cs(last.querySelector('.swipe_left')).opacity==='0.55',cs(last.querySelector('.swipe_left')).opacity);
+
+console.log('\n=== 6b. THE PROSE HAS SOMETHING TO SIT ON ===');
+{
+  const c=cs(d.querySelector('#chat'));
+  // jsdom doesn't resolve custom properties, so check the declaration itself
+  ck('chat gets a solid reading surface',/#chat\s*\{[^}]*background-color:\s*var\(--immersive-page/.test(css));
+  ck('surface has a fallback if the variable goes missing',
+     /var\(--immersive-page,\s*#[0-9a-fA-F]{3,8}\s*\)/.test(css),
+     (css.match(/var\(--immersive-page[^)]*\)/)||[''])[0]);
+  ck('the variable is actually defined',/--immersive-page:\s*#[0-9a-fA-F]{3,8}/.test(css));
+  ck('wallpaper blur removed',['none',''].includes(c.backdropFilter||''),c.backdropFilter||'none');
+  ck('surface colour is tunable in one place',/--immersive-page:/.test(css));
+  // a stray marker dropped into the name row by an extension must not show
+  const row=ai.querySelector('.ch_name > div > div');
+  const extra=d.createElement('span'); extra.className='someExtensionMarker'; extra.textContent='?';
+  row.appendChild(extra);
+  ck('unknown name-row marker hidden',cs(extra).display==='none',cs(extra).display);
+  ck('the name itself still shows',cs(ai.querySelector('.name_text')).display!=='none');
+  extra.remove();
+}
 
 console.log('\n=== 7. USER VS ASSISTANT ===');
 ck('user turn has a left rule',cs(user.querySelector('.mes_text')).borderLeftWidth==='2px',cs(user.querySelector('.mes_text')).borderLeftWidth);
