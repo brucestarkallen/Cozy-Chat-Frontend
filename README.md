@@ -57,37 +57,65 @@ Tap **Test** before saving.
 - Copy, delete, retry per message
 - Markdown, tables, code blocks with copy buttons
 
-**Thinking**
-- Reasoning shows in a collapsible block
-- Handles models that use a separate reasoning field *and* models that write
-  `<think>…</think>` inline in the reply. The tags never leak into the text.
-- Editable tag list under Settings → Chat if your model uses something else
+**Finding things**
+- **Search every chat** — matches message contents, not just titles, with the hit highlighted
+- **Pin** a chat: long-press its title (or right-click it in the list)
+- Archived chats stay out of the list but still turn up in search
 
-**Instructions** (Settings → Instructions)
-- A main system prompt that always sits at the top
-- Plus any number of extra instruction blocks you can place anywhere:
-  - **Very top** — before the conversation, next to the system prompt
+**Attachments**
+- Tap the paperclip, or just paste an image straight into the message box
+- Images go to the model as images; text files are inlined as code blocks
+- 6 MB per file
+
+**Files the assistant can edit**
+- Sidebar → **Files**. Create one, or import from your device.
+- Attach a file to a chat and the assistant can change it directly. It proposes
+  edits as red/green cards — **Apply**, **Skip**, or **Apply all**.
+- Every applied batch goes on an undo stack (last 8), so **Undo** is one tap.
+- Matching is deliberately strict: exact first, then punctuation-normalised
+  (curly quotes, em dashes), then a fuzzy word-window that **only applies when the
+  difference is whitespace**. If the model misquotes a single word, the edit is
+  refused rather than written approximately into your file.
+- Malformed JSON from the model is repaired where it's safely repairable
+  (trailing commas, raw newlines inside strings) and reported plainly when it isn't.
+- Open, save, rename, export, or copy the file at any time.
+
+**Instruction sets** (Settings → Instructions)
+- Save any number of named sets and switch between them instantly
+- Each holds its own system prompt and its own instruction blocks
+- **Copy** an existing set, **Export** one to a file, **Import** one back
+- Each block can sit at:
+  - **Very top** — before the conversation
   - **At depth N** — counts back from the newest message. Depth 0 sits right
     before the reply (strongest); depth 4 sits four messages up
   - **Very bottom** — after everything
-- Each block can be sent as System, You, or Assistant, and toggled on/off
+- Blocks can be sent as System, You, or Assistant, and toggled on/off
+- Settings → Chat also has an extra system box that applies to **the open chat only**
+
+**Saved prompts**
+- Sidebar → **Prompts**, or the Prompts button under the message box
+- Save what you've typed with one tap, then drop it back in whenever
+
+**Thinking**
+- Shown in a collapsible block
+- Handles models with a separate reasoning field *and* models that write
+  `<think>…</think>` inline. The tags never leak into the reply text.
+- Editable tag list under Settings → Chat
 
 **Web search**
-- Off by default. Turn it on in Settings → Search, then a magnifier appears
-  next to the message box. Tap it to search on the next message only, or set
-  it to search every message.
-- Sources appear as a collapsible list under the reply.
+- Off by default. Turn it on in Settings → Search and a magnifier appears next to
+  the message box — tap for one message, or set it to search everything.
 
 | Service | Free allowance | Notes |
 |---|---|---|
-| Claude's own search | none, billed per search | No extra key. Claude only. |
-| Tavily | 1,000/month, no card | Returns page text. Best free pick. |
+| Claude's own search | none — $10 per 1,000 | No extra key. Claude connections only. |
+| **Tavily** | **1,000/month, no card** | Returns page text. Best free pick. |
 | Exa | 1,000/month | Meaning-based, includes contents |
 | Serper | 2,500 to start | Google results, cheap after |
 | Brave | $5 credit/month, card required | Free tier ended Feb 2026. Needs a relay. |
 
-Google's Programmable Search (the one TypingMind used) is closed to new
-signups and shuts down 1 Jan 2027, so it isn't offered here.
+Google's Programmable Search (the one TypingMind used) is closed to new signups
+and shuts down 1 Jan 2027, so it isn't offered here.
 
 **Look**
 Six themes: Hearth, Parchment, Cyber, Normandy, Terminal, Dusk.
@@ -97,8 +125,6 @@ Settings → App, or tap the moon icon to cycle.
 - Ember bar above the message box fills as the context window fills
 - Backup and restore everything to a JSON file
 - Save any conversation as Markdown
-
----
 
 ## If a connection won't connect
 
@@ -145,12 +171,21 @@ network-first, so a refresh always gets the newest version.
 | `:root[data-theme=…]` | Every theme's colours — copy a block to add your own |
 | `THEMES` | Registers a theme in the picker |
 | `PRESETS` | The service dropdown |
+| `PS()` | The active instruction set — all prompt reads go through it |
 | `splitReasoning()` | Pulls `<think>` blocks out of replies |
-| `assembleMessages()` | System prompt + depth injections → final message list |
+| `assembleMessages()` | System prompt + depth blocks + file + attachments → final message list |
+| `DOCEDIT_PROTOCOL` | What the assistant is told about editing files |
+| `locate()` | Three-tier text matching for file edits |
+| `applyEditToText()` | Applies one approved edit |
 | `runSearch()` | Web search calls per service |
 | `renderMarkdown()` | Markdown → HTML |
 | `send()` | Sends and reads the streaming reply |
-| `updateEmber()` | The context bar |
+| `on()` | Safe event binding — a missing element warns instead of breaking the app |
+
+**Tests.** `v3test.js`, `v2test.js`, `domtest.js`, `migtest.js` and `negtest.js`
+run under Node with jsdom (`npm i jsdom fake-indexeddb`). 129 checks across the
+matching engine, JSON tolerance, prompt assembly, streaming, migration, and a
+negative test that deliberately reintroduces a fixed bug to prove the guard fires.
 
 ---
 

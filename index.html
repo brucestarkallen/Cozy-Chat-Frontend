@@ -501,6 +501,129 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 }
 .depth-viz b{color:var(--ember);font-weight:600}
 
+
+/* ---------- search in sidebar ---------- */
+.sb-search{position:relative;margin:0 12px 8px}
+.sb-search input{
+  width:100%;background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r);padding:8px 30px 8px 32px;font-size:14px;outline:none;
+}
+.sb-search input:focus{border-color:var(--ember)}
+.sb-search .mag{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+.sb-search .clr{position:absolute;right:6px;top:50%;transform:translateY(-50%);color:var(--muted);padding:4px;border-radius:5px}
+.sb-search .clr:hover{color:var(--text)}
+.convo .pin{flex:none;color:var(--ember);opacity:.85}
+.convo-hit{
+  font-size:11.5px;color:var(--muted);line-height:1.4;margin-top:2px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.convo-hit mark{background:var(--ember);color:#1a1206;border-radius:2px;padding:0 2px}
+.convo-col{flex:1;min-width:0}
+.sec-head{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);padding:10px 10px 4px;
+}
+
+/* ---------- diff cards ---------- */
+.edits{
+  margin:12px 0 4px;border:1px solid var(--ember);border-radius:var(--r);
+  background:var(--bg-2);overflow:hidden;
+}
+.edits-head{
+  display:flex;align-items:center;gap:8px;padding:9px 12px;
+  border-bottom:1px solid var(--border-soft);background:var(--surface);
+}
+.edits-head .t{flex:1;font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--ember)}
+.edits-head button{
+  font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--text-2);padding:4px 8px;border:1px solid var(--border);border-radius:6px;
+}
+.edits-head button:hover{border-color:var(--ember);color:var(--text)}
+.edit-card{padding:10px 12px;border-bottom:1px solid var(--border-soft)}
+.edit-card:last-child{border-bottom:0}
+.edit-card .why{font-size:12.5px;color:var(--text-2);margin-bottom:7px;line-height:1.45}
+.edit-card .kind{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:5px;display:flex;align-items:center;gap:7px;
+}
+.edit-card .kind .st{margin-left:auto;text-transform:none;letter-spacing:0}
+.edit-card .st.ok{color:var(--ok)}
+.edit-card .st.bad{color:var(--danger)}
+.diff{font-family:var(--mono);font-size:12px;line-height:1.5;border-radius:7px;overflow:hidden;margin-bottom:6px}
+.diff div{padding:6px 9px;white-space:pre-wrap;word-break:break-word;max-height:190px;overflow:auto}
+.diff .del{background:rgba(217,99,74,.13);border-left:2px solid var(--danger);color:var(--text-2)}
+.diff .add{background:rgba(127,174,107,.13);border-left:2px solid var(--ok);color:var(--text)}
+.edit-card .row{display:flex;gap:7px;margin-top:8px}
+.edit-card .row button{
+  padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;
+  border:1px solid var(--border);color:var(--text-2);
+}
+.edit-card .row button.go{background:var(--ok);color:#0d1508;border-color:var(--ok)}
+.edit-card.done{opacity:.55}
+.edit-card.done .row{display:none}
+
+/* ---------- document bar ---------- */
+.docbar{
+  display:flex;align-items:center;gap:8px;padding:7px 12px;flex:none;
+  background:var(--surface);border-bottom:1px solid var(--border-soft);
+}
+.docbar .nm{
+  flex:1;min-width:0;font-family:var(--mono);font-size:11px;letter-spacing:.05em;
+  color:var(--ember);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.docbar button{
+  font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--text-2);padding:4px 8px;border:1px solid var(--border);border-radius:6px;
+}
+.docbar button:hover{border-color:var(--ember);color:var(--text)}
+.doc-row{
+  display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:7px;
+  border:1px solid var(--border);border-radius:var(--r);background:var(--surface);cursor:pointer;
+}
+.doc-row.active{border-color:var(--ember);box-shadow:inset 2px 0 0 var(--ember)}
+.doc-row .info{flex:1;min-width:0}
+.doc-row .nm{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.doc-row .meta{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:1px}
+.doc-edit{
+  width:100%;min-height:min(56dvh,440px);background:var(--code-bg);color:#e8ddd0;
+  border:1px solid var(--border);border-radius:var(--r);padding:11px 12px;
+  font-family:var(--mono);font-size:13px;line-height:1.55;resize:vertical;outline:none;
+}
+.doc-edit:focus{border-color:var(--ember)}
+
+/* ---------- prompt library ---------- */
+.prompt-row{
+  display:flex;align-items:center;gap:9px;padding:9px 11px;margin-bottom:7px;
+  border:1px solid var(--border);border-radius:var(--r);background:var(--surface);
+}
+.prompt-row .info{flex:1;min-width:0;cursor:pointer}
+.prompt-row .nm{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prompt-row .pv{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+
+/* ---------- attachments ---------- */
+.attach-tray{display:flex;flex-wrap:wrap;gap:6px;padding:0 4px 7px}
+.chip{
+  display:flex;align-items:center;gap:6px;padding:4px 8px;
+  background:var(--surface-2);border:1px solid var(--border);border-radius:14px;
+  font-size:12px;color:var(--text-2);max-width:190px;
+}
+.chip span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip button{color:var(--muted);display:grid;place-items:center;flex:none}
+.chip button:hover{color:var(--danger)}
+.chip img{width:20px;height:20px;border-radius:4px;object-fit:cover;flex:none}
+.msg-atts{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:8px}
+.msg-atts img{max-width:180px;max-height:180px;border-radius:var(--r);border:1px solid var(--border)}
+
+/* ---------- preset bar ---------- */
+.preset-bar{display:flex;gap:8px;align-items:center;margin-bottom:14px}
+.preset-bar select{flex:1}
+.preset-bar button{
+  padding:9px 11px;border:1px solid var(--border);border-radius:var(--r);
+  font-size:12px;color:var(--text-2);white-space:nowrap;
+}
+.preset-bar button:hover{border-color:var(--ember);color:var(--text)}
+
 /* ---------- mobile ---------- */
 @media (max-width:900px){
   .menu-btn{display:grid}
@@ -513,6 +636,8 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
   .thread-inner{padding:16px 14px 8px}
   .composer{padding:9px 12px 10px}
   .msg{margin-bottom:20px}
+  .doc-edit{min-height:44dvh}
+  .docbar{padding:6px 10px}
 }
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.01ms !important;transition-duration:.01ms !important}
@@ -549,11 +674,22 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
       New chat
     </button>
 
+    <div class="sb-search">
+      <svg class="mag" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/>
+      </svg>
+      <input type="text" id="convoSearch" placeholder="Search all chats" autocapitalize="off" spellcheck="false">
+      <button class="clr" id="clearSearch" hidden aria-label="Clear search">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+
     <div class="convo-list" id="convoList"></div>
 
     <div class="sb-foot">
+      <button id="docsBtn">Files</button>
+      <button id="promptsBtn">Prompts</button>
       <button id="backupBtn">Back up</button>
-      <button id="restoreBtn">Restore</button>
     </div>
   </aside>
 
@@ -582,6 +718,16 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
       </button>
     </header>
 
+    <div class="docbar" id="docBar" hidden>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ember)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex:none">
+        <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/>
+      </svg>
+      <span class="nm" id="docBarName"></span>
+      <button id="docViewBtn">Open</button>
+      <button id="docUndoBtn">Undo</button>
+      <button id="docDetachBtn">Detach</button>
+    </div>
+
     <div class="thread" id="thread">
       <div class="thread-inner" id="threadInner"></div>
     </div>
@@ -592,7 +738,13 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
         <div class="ember-fill" id="emberFill"></div>
       </div>
       <div class="composer">
+        <div class="attach-tray" id="attachTray" hidden></div>
         <div class="input-shell">
+          <button class="tool-btn" id="attachBtn" title="Attach a file or image" aria-label="Attach">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 11.5 12.5 20a5 5 0 0 1-7-7l8-8a3.3 3.3 0 0 1 4.7 4.7l-8 8a1.7 1.7 0 0 1-2.4-2.4l7.4-7.4"/>
+            </svg>
+          </button>
           <button class="tool-btn" id="searchToggle" title="Search the web for this message" aria-label="Search the web" aria-pressed="false">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
               <circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/>
@@ -608,6 +760,7 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
         <div class="meta-row">
           <span id="ctxLabel">0 tokens</span>
           <span class="spacer"></span>
+          <button id="quickPromptBtn">Prompts</button>
           <button id="regenBtn" hidden>Retry</button>
           <button id="clearBtn" hidden>Clear</button>
         </div>
@@ -700,6 +853,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 
     <!-- CHAT -->
     <div class="sheet-body" data-panel="chat" hidden>
+      <div class="field">
+        <label class="lbl" for="chatSys">This chat only — extra system text</label>
+        <textarea class="f" id="chatSys" placeholder="Applies to the open conversation only. Added after the instruction set." style="min-height:64px"></textarea>
+      </div>
       <div class="row2">
         <div class="field">
           <label class="lbl" for="temp">Temperature</label>
@@ -748,6 +905,22 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 
     <!-- INSTRUCTIONS -->
     <div class="sheet-body" data-panel="inst" hidden>
+      <div class="field">
+        <label class="lbl" for="presetSel">Instruction set</label>
+        <div class="preset-bar">
+          <select id="presetSel"></select>
+          <button id="presetNewBtn">New</button>
+          <button id="presetDupBtn">Copy</button>
+        </div>
+        <div class="btn-row" style="margin-top:-6px">
+          <button class="btn" id="presetRenameBtn">Rename</button>
+          <button class="btn" id="presetExportBtn">Export</button>
+          <button class="btn" id="presetImportBtn">Import</button>
+          <button class="btn" id="presetDelBtn" style="margin-left:auto">Delete</button>
+        </div>
+        <div class="hint" style="margin-top:9px">Each set holds its own system prompt and instruction blocks. Switching is instant and applies to your next message.</div>
+      </div>
+      <hr style="border:0;border-top:1px solid var(--border-soft);margin:18px 0">
       <div class="field">
         <label class="lbl" for="sysPrompt">Main system prompt</label>
         <textarea class="f" id="sysPrompt" placeholder="How the assistant should behave. Leave blank for none."></textarea>
@@ -843,15 +1016,86 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
   </div>
 </div>
 
+
+<!-- ============ DOCUMENTS ============ -->
+<div class="modal" id="docsModal">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h3>Files</h3>
+      <button class="icon-btn" id="closeDocs" aria-label="Close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="sheet-body">
+      <div class="hint" style="margin-bottom:12px">
+        Attach a file to a chat and the assistant can edit it directly — it proposes changes as
+        red/green cards you approve one by one. Every applied batch can be undone.
+      </div>
+      <div id="docList"></div>
+      <div class="btn-row" style="margin-top:12px">
+        <button class="btn primary" id="docNewBtn">New file</button>
+        <button class="btn" id="docImportBtn">Import from device</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ DOC EDITOR ============ -->
+<div class="modal" id="docEditModal">
+  <div class="sheet" style="max-width:760px">
+    <div class="sheet-head">
+      <h3 id="docEditTitle">File</h3>
+      <button class="icon-btn" id="closeDocEdit" aria-label="Close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="sheet-body">
+      <textarea class="doc-edit" id="docEditArea" spellcheck="false" autocapitalize="off"></textarea>
+      <div class="meta-row" style="padding:8px 2px 0"><span id="docEditStat"></span></div>
+      <div class="btn-row" style="margin-top:12px">
+        <button class="btn primary" id="docSaveBtn">Save</button>
+        <button class="btn" id="docAttachBtn">Attach to chat</button>
+        <button class="btn" id="docExportBtn">Export</button>
+        <button class="btn" id="docCopyBtn">Copy</button>
+        <button class="btn" id="docRenameBtn">Rename</button>
+        <button class="btn" id="docDelBtn" style="margin-left:auto">Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ PROMPTS ============ -->
+<div class="modal" id="promptsModal">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h3>Saved prompts</h3>
+      <button class="icon-btn" id="closePrompts" aria-label="Close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="sheet-body">
+      <div class="hint" style="margin-bottom:12px">Tap one to drop it into the message box.</div>
+      <div id="promptList"></div>
+      <div class="btn-row" style="margin-top:12px">
+        <button class="btn primary" id="promptNewBtn">Save a new prompt</button>
+        <button class="btn" id="promptFromInputBtn">Save what's typed</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 <input type="file" id="filePicker" accept="application/json,.json" hidden>
+<input type="file" id="docPicker" accept=".md,.txt,.json,.yaml,.yml,.csv,.xml,.html,.js,.py,text/*" hidden>
+<input type="file" id="attachPicker" accept="image/*,.md,.txt,.json,.yaml,.yml,.csv,.xml,.html,.js,.py,.ts,text/*" multiple hidden>
+<input type="file" id="presetPicker" accept="application/json,.json" hidden>
 <script>
 "use strict";
 /* ==========================================================
    COZY CHAT v2.0.0
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "2.0.0";
+const VERSION = "3.0.0";
 
 const PRESETS = {
   anthropic:  { name:"Claude",     kind:"anthropic", url:"https://api.anthropic.com/v1", model:"claude-sonnet-4-6", ctx:200000, hint:"e.g. claude-sonnet-4-6, claude-opus-4-5" },
@@ -886,20 +1130,22 @@ const DB = (() => {
   function open(){
     if (dbp) return dbp;
     dbp = new Promise((res, rej) => {
-      const r = indexedDB.open("cozychat", 1);
+      const r = indexedDB.open("cozychat", 2);
       r.onupgradeneeded = () => {
         const db = r.result;
         if (!db.objectStoreNames.contains("convos")) db.createObjectStore("convos", { keyPath:"id" });
+        if (!db.objectStoreNames.contains("docs"))   db.createObjectStore("docs",   { keyPath:"id" });
       };
       r.onsuccess = () => res(r.result);
       r.onerror = () => rej(r.error);
     });
     return dbp;
   }
-  async function tx(mode, fn){
+  async function tx(mode, fn, store){
     const db = await open();
+    const name = store || "convos";
     return new Promise((res, rej) => {
-      const t = db.transaction("convos", mode), st = t.objectStore("convos");
+      const t = db.transaction(name, mode), st = t.objectStore(name);
       let out; try { out = fn(st); } catch(e){ rej(e); return; }
       t.oncomplete = () => res(out && out.result !== undefined ? out.result : out);
       t.onerror = () => rej(t.error);
@@ -909,13 +1155,17 @@ const DB = (() => {
     all:   () => tx("readonly",  s => s.getAll()),
     put:   c  => tx("readwrite", s => s.put(c)),
     del:   id => tx("readwrite", s => s.delete(id)),
-    clear: () => tx("readwrite", s => s.clear())
+    clear: () => tx("readwrite", s => s.clear()),
+    docAll:  () => tx("readonly",  s => s.getAll(),   "docs"),
+    docPut:  d  => tx("readwrite", s => s.put(d),     "docs"),
+    docDel:  id => tx("readwrite", s => s.delete(id), "docs")
   };
 })();
 
 /* ---------- settings ---------- */
 const DEFAULTS = {
   providers: [], activeProvider: null,
+  presets: [], activePreset: null, prompts: [],
   system: "", injections: [],
   temperature: 1, maxTokens: 4096,
   showThinking: true, catchThinkTags: true, thinkTags: "think, thinking, reasoning, thought",
@@ -929,14 +1179,32 @@ function loadSettings(){
     const out = Object.assign({}, DEFAULTS, raw);
     out.search = Object.assign({}, DEFAULTS.search, raw.search || {});
     out.injections = raw.injections || [];
+    out.presets = raw.presets || [];
+    out.prompts = raw.prompts || [];
+    // migrate a pre-v3 config: the loose system prompt becomes the first set
+    if (!out.presets.length){
+      out.presets = [{ id:"default", name:"Default", system: out.system || "", injections: out.injections || [] }];
+      out.activePreset = "default";
+    }
+    if (!out.presets.some(p => p.id === out.activePreset)) out.activePreset = out.presets[0].id;
     return out;
-  } catch { return JSON.parse(JSON.stringify(DEFAULTS)); }
+  } catch { const d = JSON.parse(JSON.stringify(DEFAULTS));
+    d.presets = [{ id:"default", name:"Default", system:"", injections:[] }]; d.activePreset = "default"; return d; }
+}
+// the active instruction set — every read of system/injections goes through here
+function PS(){
+  let p = S.presets.find(x => x.id === S.activePreset);
+  if (!p){ p = S.presets[0]; S.activePreset = p ? p.id : null; }
+  if (!p){ p = { id:"default", name:"Default", system:"", injections:[] }; S.presets = [p]; S.activePreset = p.id; }
+  if (!p.injections) p.injections = [];
+  return p;
 }
 function saveSettings(){ localStorage.setItem("cozychat:settings", JSON.stringify(S)); }
 function activeProv(){ return S.providers.find(p => p.id === S.activeProvider) || S.providers[0] || null; }
 
 /* ---------- state ---------- */
 let convos = [], current = null, streaming = null, editingProv = null;
+let docs = [], openDocId = null, convoQuery = "", pendingAtts = [];
 let searchArmed = false, pinned = true;
 
 const $  = s => document.querySelector(s);
@@ -1093,21 +1361,66 @@ async function persist(){
   if (i > 0){ convos.splice(i,1); convos.unshift(current); }
   renderSidebar();
 }
+function searchHit(c, q){
+  // returns a highlighted snippet if the query appears in the body, else null
+  const lq = q.toLowerCase();
+  for (const m of c.messages || []){
+    const t = String(m.content || "");
+    const i = t.toLowerCase().indexOf(lq);
+    if (i >= 0){
+      const from = Math.max(0, i - 34), to = Math.min(t.length, i + q.length + 66);
+      const pre = (from ? "…" : "") + t.slice(from, i);
+      const mid = t.slice(i, i + q.length);
+      const post = t.slice(i + q.length, to) + (to < t.length ? "…" : "");
+      return escapeHtml(pre) + "<mark>" + escapeHtml(mid) + "</mark>" + escapeHtml(post);
+    }
+  }
+  return null;
+}
+function convoRow(c, hit){
+  const del = '<button class="convo-del" data-del="' + c.id + '" aria-label="Delete chat">'
+    + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">'
+    + '<path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M7 7l1 13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-13"/></svg></button>';
+  const pin = c.pinned
+    ? '<svg class="pin" width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 9 9l-6 .8 4.5 4-1.4 6.2L12 16.8l5.9 3.2-1.4-6.2 4.5-4L15 9Z"/></svg>' : "";
+  return '<div class="convo' + (current && c.id===current.id ? " active":"") + '" data-id="' + c.id + '">'
+    + pin + '<div class="convo-col"><div class="convo-title">' + escapeHtml(c.title) + '</div>'
+    + (hit ? '<div class="convo-hit">' + hit + '</div>' : "") + '</div>' + del + '</div>';
+}
 function renderSidebar(){
   const list = $("#convoList");
-  if (!convos.length){ list.innerHTML = '<div class="empty-note">Nothing here yet.<br>Start a chat and it\'ll show up.</div>'; return; }
-  list.innerHTML = convos.map(c =>
-    '<div class="convo' + (current && c.id===current.id ? " active":"") + '" data-id="' + c.id + '">'
-    + '<span class="convo-title">' + escapeHtml(c.title) + '</span>'
-    + '<button class="convo-del" data-del="' + c.id + '" aria-label="Delete chat">'
-    + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">'
-    + '<path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M7 7l1 13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-13"/></svg></button></div>').join("");
+  const q = convoQuery.trim();
+  $("#clearSearch").hidden = !q;
+
+  if (q){
+    const hits = [];
+    for (const c of convos){
+      const inTitle = c.title.toLowerCase().includes(q.toLowerCase());
+      const hit = searchHit(c, q);
+      if (inTitle || hit) hits.push(convoRow(c, hit));
+    }
+    list.innerHTML = hits.length
+      ? '<div class="sec-head">' + hits.length + ' match' + (hits.length===1?"":"es") + '</div>' + hits.join("")
+      : '<div class="empty-note">Nothing matches “' + escapeHtml(q) + '”.</div>';
+    return;
+  }
+
+  const live = convos.filter(c => !c.archived);
+  if (!live.length){ list.innerHTML = '<div class="empty-note">Nothing here yet.<br>Start a chat and it\'ll show up.</div>'; return; }
+  const pinned = live.filter(c => c.pinned), rest = live.filter(c => !c.pinned);
+  let html = "";
+  if (pinned.length) html += '<div class="sec-head">Pinned</div>' + pinned.map(c => convoRow(c, null)).join("");
+  if (rest.length)   html += (pinned.length ? '<div class="sec-head">Recent</div>' : "") + rest.map(c => convoRow(c, null)).join("");
+  const arch = convos.filter(c => c.archived).length;
+  if (arch) html += '<div class="sec-head">' + arch + ' archived — search to find them</div>';
+  list.innerHTML = html;
 }
 function renderThread(){
   const el = $("#threadInner");
   $("#chatTitle").textContent = current ? current.title : "New chat";
   const p = activeProv();
   $("#modelChip").textContent = p ? (p.name + " · " + (p.model || "no model set")) : "No provider set up";
+  renderDocBar();
   if (!current || !current.messages.length){
     el.innerHTML = welcomeHtml();
     $("#regenBtn").hidden = true; $("#clearBtn").hidden = true; updateEmber(); return;
@@ -1116,6 +1429,16 @@ function renderThread(){
   el.innerHTML = current.messages.map((m,i) => msgHtml(m, i === lastA)).join("");
   $("#regenBtn").hidden = false; $("#clearBtn").hidden = false;
   updateEmber(); scrollDown(true);
+}
+function renderDocBar(){
+  const bar = $("#docBar");
+  const d = (current && current.docId) ? docs.find(x => x.id === current.docId) : null;
+  bar.hidden = !d;
+  if (d){
+    $("#docBarName").textContent = d.name;
+    $("#docUndoBtn").disabled = !(d.undo && d.undo.length);
+    $("#docUndoBtn").style.opacity = (d.undo && d.undo.length) ? "1" : ".4";
+  }
 }
 function welcomeHtml(){
   const p = activeProv();
@@ -1162,16 +1485,19 @@ function msgHtml(m, isLastAssistant){
     : renderMarkdown(m.content);
   return '<div class="msg ' + m.role + '" data-mid="' + m.id + '">'
     + '<div class="msg-head"><span class="lbl">' + escapeHtml(label) + '</span>' + swipe + acts + '</div>'
-    + think + sourcesHtml(m.sources)
-    + '<div class="msg-body">' + body + '</div></div>';
+    + think + sourcesHtml(m.sources) + attsHtml(m.attachments)
+    + '<div class="msg-body">' + body + '</div>'
+    + editCardsHtml(m) + '</div>';
 }
 function nearBottom(){ const t = $("#thread"); return t.scrollHeight - t.scrollTop - t.clientHeight < 120; }
 function scrollDown(force){ if (force || pinned){ const t = $("#thread"); t.scrollTop = t.scrollHeight; } }
 
 function updateEmber(){
   const p = activeProv(), limit = (p && p.ctx) || 128000;
-  let used = estTokens(S.system);
-  for (const i of S.injections) if (i.enabled) used += estTokens(i.text);
+  let used = estTokens(PS().system);
+  for (const i of PS().injections) if (i.enabled) used += estTokens(i.text);
+  if (current && current.sysExtra) used += estTokens(current.sysExtra);
+  if (current && current.docId){ const dd = docs.find(x=>x.id===current.docId); if (dd) used += estTokens(dd.text) + 260; }
   if (current) for (const m of current.messages) used += estTokens(m.content) + 4;
   used += estTokens($("#input").value);
   const pct = Math.min(100, (used/limit)*100);
@@ -1195,10 +1521,22 @@ function assembleMessages(kind){
         c += "\n\n<web_results>\n" + m.sources.map((s,i) =>
           "[" + (i+1) + "] " + s.title + "\n" + s.url + "\n" + (s.snippet || "")).join("\n\n") + "\n</web_results>";
       }
+      const atts = m.attachments || [];
+      for (const a of atts) if (a.kind === "text"){
+        c = "```" + (a.name || "file") + "\n" + a.text + "\n```\n\n" + c;
+      }
+      const imgs = atts.filter(a => a.kind === "image");
+      if (imgs.length){
+        const blocks = imgs.map(a => kind === "anthropic"
+          ? { type:"image", source:{ type:"base64", media_type:a.mime, data:a.data } }
+          : { type:"image_url", image_url:{ url:"data:" + a.mime + ";base64," + a.data } });
+        blocks.push({ type:"text", text: c || " " });
+        return { role:m.role, content: blocks };
+      }
       return { role:m.role, content:c };
     });
 
-  const live = S.injections.filter(i => i.enabled && i.text.trim());
+  const live = PS().injections.filter(i => i.enabled && i.text.trim());
   const topSys = live.filter(i => i.pos === "top" && i.role === "system").map(i => i.text);
   const rest   = live.filter(i => !(i.pos === "top" && i.role === "system"));
 
@@ -1218,13 +1556,19 @@ function assembleMessages(kind){
   const merged = [];
   for (const m of out){
     const prev = merged[merged.length - 1];
-    if (prev && prev.role === m.role) prev.content += "\n\n" + m.content;
+    if (prev && prev.role === m.role && typeof prev.content === "string" && typeof m.content === "string")
+      prev.content += "\n\n" + m.content;
     else merged.push({ role:m.role, content:m.content });
   }
   // a trailing assistant turn is a prefill; Anthropic rejects trailing whitespace
   const tail = merged[merged.length - 1];
-  if (tail && tail.role === "assistant") tail.content = tail.content.replace(/\s+$/, "");
-  const system = [S.system].concat(topSys).filter(t => t && t.trim()).join("\n\n");
+  if (tail && tail.role === "assistant" && typeof tail.content === "string")
+    tail.content = tail.content.replace(/\s+$/, "");
+  let sysParts = [PS().system].concat(topSys);
+  if (current && current.sysExtra && current.sysExtra.trim()) sysParts.push(current.sysExtra);
+  const doc = (current && current.docId) ? docs.find(d => d.id === current.docId) : null;
+  if (doc) sysParts.push(DOCEDIT_PROTOCOL.replace("{{NAME}}", doc.name) + "\n\n[DOCUMENT: " + doc.name + "]\n" + doc.text);
+  const system = sysParts.filter(t => t && t.trim()).join("\n\n");
   return { messages: merged, system: system };
 }
 
@@ -1317,6 +1661,7 @@ async function send(userText, mode){
 
   if (userText != null){
     const um = { id:uid(), role:"user", content:userText, ts:Date.now() };
+    if (pendingAtts.length){ um.attachments = pendingAtts.slice(); pendingAtts = []; renderAttachTray(); }
     current.messages.push(um);
     if (S.autoTitle && current.title === "New chat") current.title = userText.trim().split("\n")[0].slice(0,44) || "New chat";
     renderThread(); await persist();
@@ -1428,6 +1773,11 @@ async function send(userText, mode){
     asst.content = fin.text || raw;
     if (fin.think) asst.thinking = fin.think;
     if (sources.length) asst.sources = sources;
+    if (current.docId){
+      const pd = parseDocEdits(asst.content);
+      if (pd.edits.length){ asst.edits = pd.edits; asst.content = stripDocEdits(asst.content); }
+      else if (pd.error){ asst.editError = pd.error; asst.content = stripDocEdits(asst.content); }
+    }
     if (!asst.content && !asst.thinking) asst.content = "_(empty reply)_";
     if (continuing && asst.content.length === startLen) toast("Model had nothing more to add");
   } catch (err){
@@ -1547,8 +1897,8 @@ function depthViz(i){
 }
 function renderInjections(){
   const el = $("#injList");
-  if (!S.injections.length){ el.innerHTML = '<div class="hint" style="margin-bottom:10px">None yet.</div>'; return; }
-  el.innerHTML = S.injections.map(i =>
+  if (!PS().injections.length){ el.innerHTML = '<div class="hint" style="margin-bottom:10px">None yet.</div>'; return; }
+  el.innerHTML = PS().injections.map(i =>
     '<div class="inj" data-inj="' + i.id + '">'
     + '<div class="inj-top">'
     + '<input type="text" value="' + escapeHtml(i.name) + '" data-injname="' + i.id + '" style="flex:1;padding:6px 9px;font-size:13.5px" placeholder="Name">'
@@ -1573,10 +1923,10 @@ function renderInjections(){
     + '<div class="depth-viz">' + depthViz(i) + '</div></div>').join("");
 }
 function addInjection(){
-  S.injections.push({ id:uid(), name:"New instruction", text:"", role:"system", pos:"depth", depth:0, enabled:true });
+  PS().injections.push({ id:uid(), name:"New instruction", text:"", role:"system", pos:"depth", depth:0, enabled:true });
   saveSettings(); renderInjections(); updateEmber();
 }
-function injById(id){ return S.injections.find(x=>x.id===id); }
+function injById(id){ return PS().injections.find(x=>x.id===id); }
 
 /* ---------- themes ---------- */
 function renderThemes(){
@@ -1639,7 +1989,9 @@ function exportMd(){
 
 function setToggle(el, on){ el.classList.toggle("on", !!on); el.setAttribute("aria-checked", on?"true":"false"); }
 function syncSettingsUI(){
-  $("#sysPrompt").value = S.system;
+  $("#sysPrompt").value = PS().system;
+  $("#chatSys").value = (current && current.sysExtra) || "";
+  renderPresetBar();
   $("#temp").value = S.temperature;
   $("#maxTok").value = S.maxTokens;
   $("#thinkTags").value = S.thinkTags;
@@ -1663,6 +2015,13 @@ function syncSettingsUI(){
 /* ==========================================================
    EVENTS
    ========================================================== */
+/* Bind safely: a renamed or removed element logs a warning instead of
+   throwing, which would otherwise abort every listener defined after it. */
+function on(sel, evt, fn, opts){
+  const el = $(sel);
+  if (!el){ console.warn("[cozy] no element for " + sel); return; }
+  el.addEventListener(evt, fn, opts);
+}
 const input = $("#input");
 function autoGrow(){ input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, 190) + "px"; }
 input.addEventListener("input", function(){ autoGrow(); $("#sendBtn").disabled = streaming ? false : !input.value.trim(); updateEmber(); });
@@ -1675,31 +2034,30 @@ function submit(){
   const t = input.value.trim(); if (!t) return;
   input.value = ""; autoGrow(); $("#sendBtn").disabled = true; pinned = true; send(t);
 }
-$("#sendBtn").addEventListener("click", submit);
-$("#searchToggle").addEventListener("click", function(){
+on("#sendBtn", "click", submit);
+on("#searchToggle", "click", function(){
   if (S.search.always){ toast("Search runs on every message — change it in Settings"); return; }
   searchArmed = !searchArmed; syncSearchBtn();
   toast(searchArmed ? "Next message will search the web" : "Search off for next message");
 });
-$("#thread").addEventListener("scroll", function(){ pinned = nearBottom(); });
-$("#menuBtn").addEventListener("click", openDrawer);
-$("#scrim").addEventListener("click", function(){ closeDrawer(); closeSettings(); });
-$("#settingsBtn").addEventListener("click", openSettings);
-$("#closeSettings").addEventListener("click", closeSettings);
-$("#newChatBtn").addEventListener("click", function(){ newConvo(); });
-$("#exportBtn").addEventListener("click", exportMd);
-$("#backupBtn").addEventListener("click", backup);
-$("#backupBtn2").addEventListener("click", backup);
-$("#restoreBtn").addEventListener("click", function(){ $("#filePicker").click(); });
-$("#restoreBtn2").addEventListener("click", function(){ $("#filePicker").click(); });
-$("#filePicker").addEventListener("change", function(e){ if (e.target.files[0]) handleRestore(e.target.files[0]); e.target.value=""; });
-$("#themeBtn").addEventListener("click", function(){
+on("#thread", "scroll", function(){ pinned = nearBottom(); });
+on("#menuBtn", "click", openDrawer);
+on("#scrim", "click", function(){ closeDrawer(); closeSettings(); });
+on("#settingsBtn", "click", openSettings);
+on("#closeSettings", "click", closeSettings);
+on("#newChatBtn", "click", function(){ newConvo(); });
+on("#exportBtn", "click", exportMd);
+on("#backupBtn", "click", backup);
+on("#backupBtn2", "click", backup);
+on("#restoreBtn2", "click", function(){ $("#filePicker").click(); });
+on("#filePicker", "change", function(e){ if (e.target.files[0]) handleRestore(e.target.files[0]); e.target.value=""; });
+on("#themeBtn", "click", function(){
   const keys = Object.keys(THEMES);
   S.theme = keys[(keys.indexOf(S.theme)+1) % keys.length];
   saveSettings(); applyTheme(); renderThemes(); toast(THEMES[S.theme].label);
 });
 
-$("#convoList").addEventListener("click", async function(e){
+on("#convoList", "click", async function(e){
   const del = e.target.closest("[data-del]");
   if (del){
     e.stopPropagation();
@@ -1713,7 +2071,7 @@ $("#convoList").addEventListener("click", async function(e){
   if (row){ current = convos.find(c=>c.id===row.dataset.id)||null; renderSidebar(); renderThread(); closeDrawer(); }
 });
 
-$("#threadInner").addEventListener("click", async function(e){
+on("#threadInner", "click", async function(e){
   if (e.target.closest("[data-open-settings]")){ openSettings(); return; }
   const st = e.target.closest("[data-starter]");
   if (st){ input.value = st.dataset.starter; autoGrow(); input.focus(); $("#sendBtn").disabled = false; return; }
@@ -1787,7 +2145,7 @@ function startEdit(id){
   node.querySelector("[data-canceledit]").onclick = function(){ renderThread(); };
 }
 
-$("#regenBtn").addEventListener("click", function(){
+on("#regenBtn", "click", function(){
   if (!current || !current.messages.length) return;
   let i = current.messages.length-1;
   while (i>=0 && current.messages[i].role!=="assistant" && current.messages[i].role!=="error") i--;
@@ -1795,7 +2153,7 @@ $("#regenBtn").addEventListener("click", function(){
   current.messages = current.messages.slice(0,i);
   renderThread(); persist(); pinned = true; send(null);
 });
-$("#clearBtn").addEventListener("click", async function(){
+on("#clearBtn", "click", async function(){
   if (!current || !confirm("Clear every message in this chat?")) return;
   current.messages = []; renderThread(); await persist();
 });
@@ -1805,17 +2163,17 @@ $$(".tab").forEach(function(t){ t.addEventListener("click", function(){
   $$("[data-panel]").forEach(function(p){ p.hidden = p.dataset.panel !== t.dataset.tab; });
 }); });
 
-$("#addProvBtn").addEventListener("click", function(){ editProv(null); });
-$("#provList").addEventListener("click", function(e){
+on("#addProvBtn", "click", function(){ editProv(null); });
+on("#provList", "click", function(e){
   const ed = e.target.closest("[data-editprov]"); if (ed){ editProv(ed.dataset.editprov); return; }
   const row = e.target.closest("[data-prov]");
   if (row){ S.activeProvider = row.dataset.prov; saveSettings(); renderProvList(); renderThread(); }
 });
-$("#pPreset").addEventListener("change", function(e){ applyPreset(e.target.value); });
-$("#saveProvBtn").addEventListener("click", saveProv);
-$("#testProvBtn").addEventListener("click", testProv);
-$("#cancelProvBtn").addEventListener("click", function(){ $("#provEditor").hidden = true; editingProv = null; });
-$("#delProvBtn").addEventListener("click", function(){
+on("#pPreset", "change", function(e){ applyPreset(e.target.value); });
+on("#saveProvBtn", "click", saveProv);
+on("#testProvBtn", "click", testProv);
+on("#cancelProvBtn", "click", function(){ $("#provEditor").hidden = true; editingProv = null; });
+on("#delProvBtn", "click", function(){
   if (!editingProv || !confirm("Delete this connection?")) return;
   S.providers = S.providers.filter(p=>p.id!==editingProv);
   if (S.activeProvider===editingProv) S.activeProvider = S.providers[0]?S.providers[0].id:null;
@@ -1823,14 +2181,14 @@ $("#delProvBtn").addEventListener("click", function(){
   $("#provEditor").hidden = true; editingProv = null;
 });
 
-$("#addInjBtn").addEventListener("click", addInjection);
-$("#injList").addEventListener("click", function(e){
+on("#addInjBtn", "click", addInjection);
+on("#injList", "click", function(e){
   const on = e.target.closest("[data-injon]");
   if (on){ const i = injById(on.dataset.injon); i.enabled = !i.enabled; saveSettings(); renderInjections(); updateEmber(); return; }
   const del = e.target.closest("[data-injdel]");
-  if (del){ S.injections = S.injections.filter(x=>x.id!==del.dataset.injdel); saveSettings(); renderInjections(); updateEmber(); }
+  if (del){ PS().injections = PS().injections.filter(x=>x.id!==del.dataset.injdel); saveSettings(); renderInjections(); updateEmber(); }
 });
-$("#injList").addEventListener("input", function(e){
+on("#injList", "input", function(e){
   const t = e.target;
   const id = t.dataset.injtext || t.dataset.injname || t.dataset.injdepth;
   if (!id) return;
@@ -1843,7 +2201,7 @@ $("#injList").addEventListener("input", function(e){
   }
   saveSettings(); updateEmber();
 });
-$("#injList").addEventListener("change", function(e){
+on("#injList", "change", function(e){
   const t = e.target;
   const id = t.dataset.injrole || t.dataset.injpos;
   if (!id) return;
@@ -1853,51 +2211,780 @@ $("#injList").addEventListener("change", function(e){
   saveSettings(); renderInjections();
 });
 
-$("#sysPrompt").addEventListener("change", function(e){ S.system = e.target.value; saveSettings(); updateEmber(); });
-$("#temp").addEventListener("change", function(e){ S.temperature = Number(e.target.value); saveSettings(); });
-$("#maxTok").addEventListener("change", function(e){ S.maxTokens = Number(e.target.value); saveSettings(); });
-$("#thinkTags").addEventListener("change", function(e){ S.thinkTags = e.target.value; saveSettings(); renderThread(); });
-$("#tgThink").addEventListener("click", function(e){ S.showThinking=!S.showThinking; setToggle(e.currentTarget,S.showThinking); saveSettings(); renderThread(); });
-$("#tgThinkTags").addEventListener("click", function(e){ S.catchThinkTags=!S.catchThinkTags; setToggle(e.currentTarget,S.catchThinkTags); saveSettings(); renderThread(); });
-$("#tgEnter").addEventListener("click", function(e){ S.enterSends=!S.enterSends; setToggle(e.currentTarget,S.enterSends); saveSettings(); });
-$("#tgTitle").addEventListener("click", function(e){ S.autoTitle=!S.autoTitle; setToggle(e.currentTarget,S.autoTitle); saveSettings(); });
-$("#tgSearch").addEventListener("click", function(e){
+on("#sysPrompt", "change", function(e){ PS().system = e.target.value; saveSettings(); updateEmber(); });
+on("#temp", "change", function(e){ S.temperature = Number(e.target.value); saveSettings(); });
+on("#maxTok", "change", function(e){ S.maxTokens = Number(e.target.value); saveSettings(); });
+on("#thinkTags", "change", function(e){ S.thinkTags = e.target.value; saveSettings(); renderThread(); });
+on("#tgThink", "click", function(e){ S.showThinking=!S.showThinking; setToggle(e.currentTarget,S.showThinking); saveSettings(); renderThread(); });
+on("#tgThinkTags", "click", function(e){ S.catchThinkTags=!S.catchThinkTags; setToggle(e.currentTarget,S.catchThinkTags); saveSettings(); renderThread(); });
+on("#tgEnter", "click", function(e){ S.enterSends=!S.enterSends; setToggle(e.currentTarget,S.enterSends); saveSettings(); });
+on("#tgTitle", "click", function(e){ S.autoTitle=!S.autoTitle; setToggle(e.currentTarget,S.autoTitle); saveSettings(); });
+on("#tgSearch", "click", function(e){
   S.search.on = !S.search.on; setToggle(e.currentTarget, S.search.on);
   $("#searchCfg").hidden = !S.search.on; saveSettings(); syncSearchBtn();
 });
-$("#tgAlwaysSearch").addEventListener("click", function(e){ S.search.always=!S.search.always; setToggle(e.currentTarget,S.search.always); saveSettings(); syncSearchBtn(); });
-$("#sProvider").addEventListener("change", function(e){
+on("#tgAlwaysSearch", "click", function(e){ S.search.always=!S.search.always; setToggle(e.currentTarget,S.search.always); saveSettings(); syncSearchBtn(); });
+on("#sProvider", "change", function(e){
   S.search.provider = e.target.value; saveSettings();
   $("#sHint").textContent = SEARCH_HINTS[e.target.value] || "";
   $("#sKeyField").hidden = e.target.value === "native";
 });
-$("#sKey").addEventListener("change", function(e){ S.search.key = e.target.value.trim(); saveSettings(); });
-$("#sCount").addEventListener("change", function(e){ S.search.count = Number(e.target.value)||5; saveSettings(); });
-$("#sRelay").addEventListener("change", function(e){ S.search.relay = e.target.value.trim(); saveSettings(); });
+on("#sKey", "change", function(e){ S.search.key = e.target.value.trim(); saveSettings(); });
+on("#sCount", "change", function(e){ S.search.count = Number(e.target.value)||5; saveSettings(); });
+on("#sRelay", "change", function(e){ S.search.relay = e.target.value.trim(); saveSettings(); });
 
-$("#themeGrid").addEventListener("click", function(e){
+on("#themeGrid", "click", function(e){
   const c = e.target.closest("[data-theme-pick]"); if (!c) return;
   S.theme = c.dataset.themePick; saveSettings(); applyTheme(); renderThemes();
 });
-$("#wipeBtn").addEventListener("click", async function(){
+on("#wipeBtn", "click", async function(){
   if (!confirm("Delete every conversation on this device? This cannot be undone.")) return;
   await DB.clear(); convos = []; current = null;
   renderSidebar(); renderThread(); refreshStorage(); toast("All conversations deleted");
 });
-$("#threadInner").addEventListener("touchstart", function(e){
+on("#threadInner", "touchstart", function(e){
   const m = e.target.closest(".msg");
   $$(".msg.touched").forEach(function(x){ if (x!==m) x.classList.remove("touched"); });
   if (m) m.classList.add("touched");
 }, { passive:true });
 
+</script>
+<script>
+"use strict";
+/* ==========================================================
+   FILE EDITING
+   The agent proposes surgical edits; you approve them card by
+   card. Matching is three-tier: exact, then punctuation-
+   normalised, then a fuzzy word-window that will only apply
+   when the difference is whitespace alone.
+   ========================================================== */
+const DOCEDIT_PROTOCOL =
+`You can edit the attached file "{{NAME}}". The full current contents are below.
+When the user asks for a change, reply with your normal prose plus at most ONE block:
+
+<docedits>
+[
+  {"find": "verbatim excerpt from the file", "replace": "new text", "reason": "why"},
+  {"insert_after": "verbatim anchor line", "replace": "text placed under the anchor", "reason": "why"},
+  {"append": true, "replace": "text added at the end", "reason": "why"},
+  {"replace_all": true, "replace": "entire new file", "reason": "only on an explicit full-rewrite request"}
+]
+</docedits>
+
+Rules:
+- "find" and "insert_after" MUST be copied character-for-character from the file. Do not paraphrase them.
+- Quote the smallest unique span that does the job.
+- Valid JSON only: escape newlines inside strings as \\n, no trailing commas.
+- Use replace_all only when explicitly asked to rewrite the whole file.
+- If the user is only chatting or asking a question, send no block at all.`;
+
+/* ---------- block + JSON tolerance ---------- */
+function findBlock(text, tag){
+  const src = String(text || ""), low = src.toLowerCase();
+  const openTag = "<" + tag + ">", closeTag = "</" + tag + ">";
+  const opens = [];
+  let oi = low.indexOf(openTag);
+  while (oi !== -1){ opens.push(oi); oi = low.indexOf(openTag, oi + 1); }
+  if (!opens.length) return null;
+  let fallback = null;
+  for (let k = opens.length - 1; k >= 0; k--){
+    const start = opens[k], innerStart = start + openTag.length;
+    const close = low.indexOf(closeTag, innerStart);
+    if (close === -1) continue;
+    const inner = src.slice(innerStart, close);
+    const cand = { inner:inner, start:start, end: close + closeTag.length };
+    if (/^\s*(\[|\{|```)/.test(inner)) return cand;
+    if (!fallback) fallback = cand;
+  }
+  return fallback;
+}
+// Models emit raw line breaks inside JSON strings constantly. Escape controls
+// that sit between unescaped quotes so the block still parses.
+function escapeRawControlsInStrings(s){
+  let out = "", inStr = false, esc = false;
+  for (let i = 0; i < s.length; i++){
+    const c = s[i];
+    if (esc){ out += c; esc = false; continue; }
+    if (c === "\\"){ out += c; esc = true; continue; }
+    if (c === '"'){ inStr = !inStr; out += c; continue; }
+    if (inStr){
+      if (c === "\n"){ out += "\\n"; continue; }
+      if (c === "\r"){ out += "\\r"; continue; }
+      if (c === "\t"){ out += "\\t"; continue; }
+      const code = c.charCodeAt(0);
+      if (code < 0x20){
+        if (c === "\b"){ out += "\\b"; continue; }
+        if (c === "\f"){ out += "\\f"; continue; }
+        out += "\\u" + code.toString(16).padStart(4, "0");
+        continue;
+      }
+    }
+    out += c;
+  }
+  return out;
+}
+// Drop trailing commas OUTSIDE string literals only — a blind regex would eat
+// a comma inside content like "Options: [a, b, ]".
+function stripTrailingCommasOutsideStrings(s){
+  let out = "", inStr = false, escd = false;
+  for (let i = 0; i < s.length; i++){
+    const c = s[i];
+    if (inStr){
+      out += c;
+      if (escd){ escd = false; continue; }
+      if (c === "\\"){ escd = true; continue; }
+      if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"'){ inStr = true; out += c; continue; }
+    if (c === ","){
+      let j = i + 1;
+      while (j < s.length && /\s/.test(s[j])) j++;
+      if (j < s.length && (s[j] === "]" || s[j] === "}")) continue;
+    }
+    out += c;
+  }
+  return out;
+}
+function parseDocEdits(text){
+  const b = findBlock(text, "docedits");
+  if (!b) return { edits: [] };
+  let raw = b.inner.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
+  let arr = null;
+  try { arr = JSON.parse(raw); }
+  catch (e1){
+    let repaired = stripTrailingCommasOutsideStrings(raw);
+    try { arr = JSON.parse(repaired); }
+    catch (e2){
+      repaired = escapeRawControlsInStrings(repaired);
+      try { arr = JSON.parse(repaired); }
+      catch (e3){ return { edits: [], error: "the edit block wasn't valid JSON — ask for it again" }; }
+    }
+  }
+  if (!Array.isArray(arr)) return { edits: [], error: "the edit block wasn't a list" };
+  const edits = [];
+  for (const e of arr){
+    if (!e || typeof e !== "object") continue;
+    const replace = String(e.replace == null ? "" : e.replace);
+    const reason  = String(e.reason  == null ? "" : e.reason);
+    if (e.replace_all === true){ edits.push({ id:uid(), type:"replace_all", find:null, replace:replace, reason:reason, status:"pending" }); continue; }
+    if (e.append === true){ edits.push({ id:uid(), type:"append", find:null, replace:replace, reason:reason, status:"pending" }); continue; }
+    if (typeof e.insert_after === "string" && e.insert_after.length){ edits.push({ id:uid(), type:"insert", find:e.insert_after, replace:replace, reason:reason, status:"pending" }); continue; }
+    if (typeof e.find === "string" && e.find.length){ edits.push({ id:uid(), type:"replace", find:e.find, replace:replace, reason:reason, status:"pending" }); continue; }
+  }
+  return { edits: edits };
+}
+function stripDocEdits(text){
+  let out = String(text || "");
+  const b = findBlock(out, "docedits");
+  if (b) out = out.slice(0, b.start) + out.slice(b.end);
+  return out.trim();
+}
+
+/* ---------- matching ---------- */
+// length-preserving, so indices stay valid against the original string
+function normChars(s){
+  return String(s)
+    .replace(/[\u2018\u2019\u201A\u201B\u02BC]/g, "'")
+    .replace(/[\u201C\u201D\u201E\u201F]/g, '"')
+    .replace(/[\u2013\u2014\u2010\u2011]/g, "-")
+    .replace(/\u00A0/g, " ");
+}
+function levenshtein(a, b, maxDist){
+  const m = a.length, n = b.length;
+  if (!m) return n;
+  if (!n) return m;
+  const bounded = Number.isFinite(maxDist);
+  if (bounded && Math.abs(m - n) > maxDist) return maxDist + 1;
+  let prev = new Array(n + 1), cur = new Array(n + 1);
+  for (let j = 0; j <= n; j++) prev[j] = j;
+  for (let i = 1; i <= m; i++){
+    cur[0] = i;
+    const ai = a[i - 1];
+    let rowMin = cur[0];
+    for (let j = 1; j <= n; j++){
+      const cost = ai === b[j - 1] ? 0 : 1;
+      const v = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+      cur[j] = v;
+      if (v < rowMin) rowMin = v;
+    }
+    if (bounded && rowMin > maxDist) return maxDist + 1;
+    const tmp = prev; prev = cur; cur = tmp;
+  }
+  return prev[n];
+}
+function locate(hay, needle){
+  hay = String(hay == null ? "" : hay);
+  needle = String(needle == null ? "" : needle);
+  if (!needle) return null;
+
+  // 1) exact, counting occurrences so an ambiguous match can be flagged
+  let idx = hay.indexOf(needle);
+  if (idx >= 0){
+    let count = 1, p = hay.indexOf(needle, idx + needle.length);
+    while (p !== -1 && count < 9){ count++; p = hay.indexOf(needle, p + needle.length); }
+    return { start:idx, end:idx + needle.length, fuzzy:false, safe:true, count:count };
+  }
+
+  // 2) punctuation-normalised exact (curly quotes, dashes, NBSP)
+  const hay2 = normChars(hay), needle2 = normChars(needle);
+  idx = hay2.indexOf(needle2);
+  if (idx >= 0){
+    let count = 1, p = hay2.indexOf(needle2, idx + needle2.length);
+    while (p !== -1 && count < 9){ count++; p = hay2.indexOf(needle2, p + needle2.length); }
+    return { start:idx, end:idx + needle2.length, fuzzy:false, safe:true, count:count };
+  }
+
+  // 3) fuzzy word window, candidate starts found by alignment voting
+  const tokens = Array.from(hay2.matchAll(/\S+/g));
+  const needleWords = needle2.split(/\s+/).filter(Boolean).map(w => w.toLowerCase());
+  const nw = needleWords.length;
+  if (!tokens.length || nw < 3 || nw > 150) return null;
+  const hayWords = tokens.map(t => t[0].toLowerCase());
+  const widths = Array.from(new Set([
+    Math.max(1, Math.round(nw * 0.85)), Math.max(1, nw - 1), nw, nw + 1, Math.round(nw * 1.15)
+  ])).filter(w => w >= 1 && w <= hayWords.length);
+
+  const posIndex = new Map();
+  for (let i = 0; i < hayWords.length; i++){
+    const w = hayWords[i];
+    let a = posIndex.get(w);
+    if (!a){ a = []; posIndex.set(w, a); }
+    a.push(i);
+  }
+  const votes = new Map();
+  for (let k = 0; k < nw; k++){
+    const arr = posIndex.get(needleWords[k]);
+    if (!arr || arr.length > 400) continue;
+    for (const p of arr){
+      const st = p - k;
+      if (st >= 0 && st < hayWords.length) votes.set(st, (votes.get(st) || 0) + 1);
+    }
+  }
+  const minVotes = Math.max(2, Math.ceil(nw * 0.3));
+  const ranked = Array.from(votes.entries()).filter(e => e[1] >= minVotes)
+                   .sort((a,b) => b[1] - a[1]).slice(0, 60);
+  const startSet = new Set();
+  for (const r of ranked){
+    for (let d = -2; d <= 2; d++){
+      const v = r[0] + d;
+      if (v >= 0 && v < hayWords.length) startSet.add(v);
+    }
+  }
+  if (!startSet.size){
+    if (hayWords.length > 4000) return null;
+    for (let st = 0; st < hayWords.length; st++) startSet.add(st);
+  }
+  let best = null;
+  for (const st of startSet){
+    for (const w of widths){
+      if (st + w > hayWords.length) continue;
+      const cand = hayWords.slice(st, st + w);
+      const simFloor = best ? Math.max(0.78, best.sim) : 0.78;
+      const bound = Math.floor((1 - simFloor) * Math.max(cand.length, nw));
+      const dist = levenshtein(cand, needleWords, bound);
+      if (dist > bound) continue;
+      const sim = 1 - dist / Math.max(cand.length, nw);
+      if (!best || sim > best.sim) best = { sim:sim, s:st, w:w };
+    }
+  }
+  if (best && best.sim >= 0.78){
+    const st = tokens[best.s], en = tokens[best.s + best.w - 1];
+    // A fuzzy hit is only SAFE to write when it differs by whitespace alone.
+    // Same words, same order, different spacing — then the replacement cannot
+    // change anything unintended. Any real word difference means the model
+    // misquoted, and we refuse rather than write an approximation into a file.
+    const nWS = x => x.replace(/\s+/g, " ").trim();
+    const safe = nWS(hay2.slice(st.index, en.index + en[0].length)) === nWS(needle2);
+    return { start:st.index, end:en.index + en[0].length, fuzzy:true, safe:safe, sim:best.sim, count:1 };
+  }
+  return null;
+}
+function applyEditToText(text, edit){
+  const t = String(text == null ? "" : text);
+  if (edit.type === "replace_all") return { text: edit.replace, note: "whole file replaced" };
+  if (edit.type === "append")      return { text: t + (t.endsWith("\n") ? "" : "\n") + edit.replace, note: "added at the end" };
+  const hit = locate(t, edit.find);
+  if (!hit) return { text: null, note: "couldn't find that text in the file" };
+  if (hit.fuzzy && !hit.safe)
+    return { text: null, note: "close match only (" + Math.round(hit.sim * 100) + "%) — ask for an exact quote" };
+  let note = hit.fuzzy ? "matched apart from spacing" : "";
+  if (hit.count > 1) note = "appears " + hit.count + " times — used the first";
+  if (edit.type === "insert"){
+    // place the new text on its own line directly under the anchor's line
+    const head = t.slice(0, hit.end);
+    const tail = t.slice(hit.end);
+    const nl = tail.indexOf("\n");
+    if (nl === -1) return { text: head + tail + "\n" + edit.replace, note: note || "inserted" };
+    return { text: head + tail.slice(0, nl) + "\n" + edit.replace + "\n" + tail.slice(nl + 1), note: note || "inserted" };
+  }
+  return { text: t.slice(0, hit.start) + edit.replace + t.slice(hit.end), note: note || "" };
+}
+
+/* ---------- edit cards ---------- */
+function editKindLabel(e){
+  return e.type === "replace_all" ? "Rewrite whole file"
+       : e.type === "append" ? "Add at the end"
+       : e.type === "insert" ? "Insert after" : "Replace";
+}
+function clip(s, n){
+  s = String(s == null ? "" : s);
+  return s.length > n ? s.slice(0, n) + "…" : s;
+}
+function editCardsHtml(m){
+  if (m.editError) return '<div class="edits"><div class="edit-card"><div class="why">' + escapeHtml(m.editError) + '</div></div></div>';
+  if (!m.edits || !m.edits.length) return "";
+  const left = m.edits.filter(e => e.status === "pending").length;
+  const cards = m.edits.map(e => {
+    const del = (e.type === "replace" || e.type === "insert")
+      ? '<div class="del">' + escapeHtml(clip(e.find, 700)) + '</div>' : "";
+    const add = e.replace ? '<div class="add">' + escapeHtml(clip(e.replace, 900)) + '</div>' : "";
+    const stCls = e.status === "applied" ? "ok" : (e.status === "failed" ? "bad" : "");
+    const stTxt = e.status === "applied" ? ("Applied" + (e.note ? " · " + e.note : ""))
+                : e.status === "failed"  ? ("Failed · " + (e.note || ""))
+                : e.status === "skipped" ? "Skipped" : "";
+    return '<div class="edit-card' + (e.status !== "pending" ? " done" : "") + '" data-eid="' + e.id + '">'
+      + '<div class="kind">' + escapeHtml(editKindLabel(e))
+      + '<span class="st ' + stCls + '">' + escapeHtml(stTxt) + '</span></div>'
+      + (e.reason ? '<div class="why">' + escapeHtml(e.reason) + '</div>' : "")
+      + '<div class="diff">' + del + add + '</div>'
+      + '<div class="row"><button class="go" data-apply="' + m.id + '|' + e.id + '">Apply</button>'
+      + '<button data-skip="' + m.id + '|' + e.id + '">Skip</button></div></div>';
+  }).join("");
+  return '<div class="edits"><div class="edits-head"><span class="t">'
+    + m.edits.length + ' proposed change' + (m.edits.length === 1 ? "" : "s") + '</span>'
+    + (left ? '<button data-applyall="' + m.id + '">Apply all</button>' : "")
+    + '<button data-dismiss="' + m.id + '">Dismiss</button></div>' + cards + '</div>';
+}
+async function applyEdit(msgId, editId){
+  const m = current.messages.find(x => x.id === msgId);
+  const e = m && m.edits && m.edits.find(x => x.id === editId);
+  const doc = docs.find(d => d.id === current.docId);
+  if (!m || !e || !doc || e.status !== "pending") return;
+  const before = doc.text;
+  const r = applyEditToText(doc.text, e);
+  if (r.text === null){ e.status = "failed"; e.note = r.note; }
+  else {
+    doc.undo = doc.undo || [];
+    doc.undo.push({ text: before, at: Date.now() });
+    if (doc.undo.length > 8) doc.undo.shift();
+    doc.text = r.text; doc.updatedAt = Date.now();
+    e.status = "applied"; e.note = r.note;
+    await DB.docPut(JSON.parse(JSON.stringify(doc)));
+  }
+  renderThread(); renderDocBar(); await persist();
+}
+async function applyAll(msgId){
+  const m = current.messages.find(x => x.id === msgId);
+  if (!m || !m.edits) return;
+  for (const e of m.edits) if (e.status === "pending") await applyEdit(msgId, e.id);
+  const done = m.edits.filter(e => e.status === "applied").length;
+  const bad  = m.edits.filter(e => e.status === "failed").length;
+  toast(done + " applied" + (bad ? ", " + bad + " couldn't be matched" : ""));
+}
+async function undoDoc(){
+  const doc = docs.find(d => d.id === current.docId);
+  if (!doc || !doc.undo || !doc.undo.length){ toast("Nothing to undo"); return; }
+  doc.text = doc.undo.pop().text;
+  doc.updatedAt = Date.now();
+  await DB.docPut(JSON.parse(JSON.stringify(doc)));
+  renderDocBar(); updateEmber();
+  if (openDocId === doc.id) $("#docEditArea").value = doc.text;
+  toast("Undone");
+}
+
+/* ==========================================================
+   DOCUMENTS
+   ========================================================== */
+async function loadDocs(){
+  docs = (await DB.docAll()) || [];
+  docs.sort((a,b) => b.updatedAt - a.updatedAt);
+}
+async function saveDoc(d){
+  d.updatedAt = Date.now();
+  await DB.docPut(JSON.parse(JSON.stringify(d)));
+  docs.sort((a,b) => b.updatedAt - a.updatedAt);
+}
+function renderDocList(){
+  const el = $("#docList");
+  if (!docs.length){ el.innerHTML = '<div class="hint">No files yet.</div>'; return; }
+  el.innerHTML = docs.map(d =>
+    '<div class="doc-row' + (current && current.docId === d.id ? " active" : "") + '" data-doc="' + d.id + '">'
+    + '<div class="info"><div class="nm">' + escapeHtml(d.name) + '</div>'
+    + '<div class="meta">' + d.text.length.toLocaleString() + ' chars · ~' + estTokens(d.text).toLocaleString() + ' tokens'
+    + (current && current.docId === d.id ? " · attached" : "") + '</div></div></div>').join("");
+}
+function openDocEditor(id){
+  const d = docs.find(x => x.id === id);
+  if (!d) return;
+  openDocId = id;
+  $("#docEditTitle").textContent = d.name;
+  $("#docEditArea").value = d.text;
+  updateDocStat();
+  $("#docsModal").classList.remove("show");
+  $("#docEditModal").classList.add("show");
+  $("#scrim").classList.add("show");
+}
+function updateDocStat(){
+  const v = $("#docEditArea").value;
+  $("#docEditStat").textContent = v.length.toLocaleString() + " chars · ~" + estTokens(v).toLocaleString() + " tokens";
+}
+async function newDoc(name, text){
+  const d = { id:uid(), name: name || "untitled.md", text: text || "", updatedAt: Date.now(), undo: [] };
+  docs.unshift(d);
+  await saveDoc(d);
+  renderDocList();
+  return d;
+}
+async function attachDoc(id){
+  if (!current) newConvo();
+  current.docId = id;
+  await persist(); renderThread(); renderDocList();
+  const d = docs.find(x => x.id === id);
+  toast(d ? ("Attached " + d.name) : "Attached");
+}
+
+/* ==========================================================
+   INSTRUCTION SETS (presets)
+   ========================================================== */
+function renderPresetBar(){
+  const sel = $("#presetSel");
+  if (!sel) return;
+  sel.innerHTML = S.presets.map(p =>
+    '<option value="' + p.id + '"' + (p.id === S.activePreset ? " selected" : "") + '>' + escapeHtml(p.name) + '</option>').join("");
+  $("#presetDelBtn").disabled = S.presets.length < 2;
+  $("#presetDelBtn").style.opacity = S.presets.length < 2 ? ".4" : "1";
+}
+function switchPreset(id){
+  S.activePreset = id; saveSettings();
+  $("#sysPrompt").value = PS().system;
+  renderInjections(); renderPresetBar(); updateEmber();
+}
+
+/* ==========================================================
+   PROMPT LIBRARY
+   ========================================================== */
+function renderPromptList(){
+  const el = $("#promptList");
+  if (!S.prompts.length){ el.innerHTML = '<div class="hint">Nothing saved yet.</div>'; return; }
+  el.innerHTML = S.prompts.map(p =>
+    '<div class="prompt-row" data-prompt="' + p.id + '">'
+    + '<div class="info" data-use="' + p.id + '"><div class="nm">' + escapeHtml(p.title) + '</div>'
+    + '<div class="pv">' + escapeHtml(clip(p.text, 90)) + '</div></div>'
+    + '<button class="icon-btn" data-promptedit="' + p.id + '" aria-label="Rename">'
+    + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">'
+    + '<path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>'
+    + '<button class="icon-btn" data-promptdel="' + p.id + '" aria-label="Delete">'
+    + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">'
+    + '<path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M7 7l1 13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-13"/></svg></button></div>').join("");
+}
+
+/* ==========================================================
+   ATTACHMENTS
+   ========================================================== */
+function attsHtml(list){
+  if (!list || !list.length) return "";
+  return '<div class="msg-atts">' + list.map(a => a.kind === "image"
+    ? '<img src="data:' + a.mime + ';base64,' + a.data + '" alt="' + escapeHtml(a.name) + '">'
+    : '<span class="chip"><span>' + escapeHtml(a.name) + '</span></span>').join("") + '</div>';
+}
+function renderAttachTray(){
+  const tray = $("#attachTray");
+  tray.hidden = !pendingAtts.length;
+  tray.innerHTML = pendingAtts.map((a,i) =>
+    '<span class="chip">'
+    + (a.kind === "image" ? '<img src="data:' + a.mime + ';base64,' + a.data + '" alt="">' : "")
+    + '<span>' + escapeHtml(a.name) + '</span>'
+    + '<button data-unattach="' + i + '" aria-label="Remove">'
+    + '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">'
+    + '<path d="M18 6 6 18M6 6l12 12"/></svg></button></span>').join("");
+  updateEmber();
+}
+function readFileAsBase64(file){
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(String(r.result).split(",")[1]);
+    r.onerror = () => rej(new Error("couldn't read that file"));
+    r.readAsDataURL(file);
+  });
+}
+async function addAttachments(files){
+  for (const f of files){
+    try {
+      if (f.size > 6 * 1024 * 1024){ toast(f.name + " is too big (6 MB limit)"); continue; }
+      if (/^image\//.test(f.type)){
+        pendingAtts.push({ kind:"image", name:f.name, mime:f.type, data: await readFileAsBase64(f) });
+      } else {
+        pendingAtts.push({ kind:"text", name:f.name, text: await f.text() });
+      }
+    } catch(err){ toast(String(err.message || err)); }
+  }
+  renderAttachTray();
+}
+
+/* ==========================================================
+   WIRING
+   ========================================================== */
+/* --- search --- */
+on("#convoSearch", "input", function(e){ convoQuery = e.target.value; renderSidebar(); });
+on("#clearSearch", "click", function(){
+  convoQuery = ""; $("#convoSearch").value = ""; renderSidebar(); $("#convoSearch").focus();
+});
+
+/* --- per-chat system --- */
+on("#chatSys", "change", async function(e){
+  if (!current) return;
+  current.sysExtra = e.target.value; await persist(); updateEmber();
+});
+
+/* --- presets --- */
+on("#presetSel", "change", function(e){ switchPreset(e.target.value); });
+on("#presetNewBtn", "click", function(){
+  const n = prompt("Name this instruction set", "New set");
+  if (!n) return;
+  const p = { id:uid(), name:n.trim(), system:"", injections:[] };
+  S.presets.push(p); switchPreset(p.id); toast("Created");
+});
+on("#presetDupBtn", "click", function(){
+  const src = PS();
+  const p = JSON.parse(JSON.stringify(src));
+  p.id = uid(); p.name = src.name + " copy";
+  p.injections.forEach(function(i){ i.id = uid(); });
+  S.presets.push(p); switchPreset(p.id); toast("Copied");
+});
+on("#presetRenameBtn", "click", function(){
+  const n = prompt("Rename this set", PS().name);
+  if (!n) return;
+  PS().name = n.trim(); saveSettings(); renderPresetBar();
+});
+on("#presetDelBtn", "click", function(){
+  if (S.presets.length < 2){ toast("Keep at least one set"); return; }
+  if (!confirm('Delete "' + PS().name + '"?')) return;
+  const id = S.activePreset;
+  S.presets = S.presets.filter(p => p.id !== id);
+  switchPreset(S.presets[0].id); toast("Deleted");
+});
+on("#presetExportBtn", "click", function(){
+  const p = PS();
+  download("instruction-set-" + p.name.replace(/[^\w-]/g, "_") + ".json",
+    JSON.stringify({ app:"cozy-chat", kind:"instruction-set", preset:p }, null, 2), "application/json");
+  toast("Saved to Downloads");
+});
+on("#presetImportBtn", "click", function(){ $("#presetPicker").click(); });
+on("#presetPicker", "change", async function(e){
+  const f = e.target.files[0]; e.target.value = "";
+  if (!f) return;
+  try {
+    const j = JSON.parse(await f.text());
+    const p = j.preset || j;
+    if (!p || typeof p.system !== "string") throw new Error("bad");
+    p.id = uid(); p.name = p.name || "Imported set";
+    p.injections = (p.injections || []).map(function(i){ i.id = uid(); return i; });
+    S.presets.push(p); switchPreset(p.id); toast("Imported " + p.name);
+  } catch(_) { toast("That wasn't an instruction set file"); }
+});
+
+/* --- documents --- */
+function openDocs(){ renderDocList(); $("#docsModal").classList.add("show"); $("#scrim").classList.add("show"); }
+function closeDocs(){ $("#docsModal").classList.remove("show"); if (!$("#docEditModal").classList.contains("show")) $("#scrim").classList.remove("show"); }
+function closeDocEdit(){ $("#docEditModal").classList.remove("show"); $("#scrim").classList.remove("show"); openDocId = null; }
+on("#docsBtn", "click", function(){ closeDrawer(); openDocs(); });
+on("#closeDocs", "click", closeDocs);
+on("#closeDocEdit", "click", closeDocEdit);
+on("#docList", "click", function(e){
+  const row = e.target.closest("[data-doc]");
+  if (row) openDocEditor(row.dataset.doc);
+});
+on("#docNewBtn", "click", async function(){
+  const n = prompt("File name", "notes.md");
+  if (!n) return;
+  const d = await newDoc(n.trim(), "");
+  openDocEditor(d.id);
+});
+on("#docImportBtn", "click", function(){ $("#docPicker").click(); });
+on("#docPicker", "change", async function(e){
+  const f = e.target.files[0]; e.target.value = "";
+  if (!f) return;
+  const d = await newDoc(f.name, await f.text());
+  openDocEditor(d.id);
+  toast("Imported " + f.name);
+});
+on("#docEditArea", "input", updateDocStat);
+on("#docSaveBtn", "click", async function(){
+  const d = docs.find(x => x.id === openDocId);
+  if (!d) return;
+  if (d.text !== $("#docEditArea").value){
+    d.undo = d.undo || [];
+    d.undo.push({ text: d.text, at: Date.now() });
+    if (d.undo.length > 8) d.undo.shift();
+  }
+  d.text = $("#docEditArea").value;
+  await saveDoc(d); renderDocBar(); updateEmber(); toast("Saved");
+});
+on("#docAttachBtn", "click", async function(){
+  if (!openDocId) return;
+  await attachDoc(openDocId); closeDocEdit();
+});
+on("#docExportBtn", "click", function(){
+  const d = docs.find(x => x.id === openDocId);
+  if (!d) return;
+  download(d.name, $("#docEditArea").value, "text/plain;charset=utf-8");
+  toast("Saved to Downloads");
+});
+on("#docCopyBtn", "click", function(){
+  navigator.clipboard.writeText($("#docEditArea").value).then(function(){ toast("Copied"); },
+    function(){ toast("Couldn't copy"); });
+});
+on("#docRenameBtn", "click", async function(){
+  const d = docs.find(x => x.id === openDocId);
+  if (!d) return;
+  const n = prompt("File name", d.name);
+  if (!n) return;
+  d.name = n.trim(); await saveDoc(d);
+  $("#docEditTitle").textContent = d.name; renderDocBar(); renderDocList();
+});
+on("#docDelBtn", "click", async function(){
+  const d = docs.find(x => x.id === openDocId);
+  if (!d || !confirm('Delete "' + d.name + '"?')) return;
+  await DB.docDel(d.id);
+  docs = docs.filter(x => x.id !== d.id);
+  for (const c of convos) if (c.docId === d.id){ delete c.docId; await DB.put(JSON.parse(JSON.stringify(c))); }
+  closeDocEdit(); renderDocList(); renderThread(); toast("Deleted");
+});
+on("#docViewBtn", "click", function(){ if (current && current.docId) openDocEditor(current.docId); });
+on("#docUndoBtn", "click", undoDoc);
+on("#docDetachBtn", "click", async function(){
+  if (!current) return;
+  delete current.docId; await persist(); renderThread(); toast("Detached");
+});
+
+/* --- edit cards --- */
+on("#threadInner", "click", async function(e){
+  const ap = e.target.closest("[data-apply]");
+  if (ap){ const parts = ap.dataset.apply.split("|"); await applyEdit(parts[0], parts[1]); return; }
+  const sk = e.target.closest("[data-skip]");
+  if (sk){
+    const parts = sk.dataset.skip.split("|");
+    const m = current.messages.find(x => x.id === parts[0]);
+    const ed = m && m.edits && m.edits.find(x => x.id === parts[1]);
+    if (ed){ ed.status = "skipped"; renderThread(); await persist(); }
+    return;
+  }
+  const aa = e.target.closest("[data-applyall]");
+  if (aa){ await applyAll(aa.dataset.applyall); return; }
+  const ds = e.target.closest("[data-dismiss]");
+  if (ds){
+    const m = current.messages.find(x => x.id === ds.dataset.dismiss);
+    if (m){ delete m.edits; delete m.editError; renderThread(); await persist(); }
+    return;
+  }
+});
+
+/* --- prompts --- */
+function openPrompts(){ renderPromptList(); $("#promptsModal").classList.add("show"); $("#scrim").classList.add("show"); }
+function closePrompts(){ $("#promptsModal").classList.remove("show"); $("#scrim").classList.remove("show"); }
+on("#promptsBtn", "click", function(){ closeDrawer(); openPrompts(); });
+on("#quickPromptBtn", "click", openPrompts);
+on("#closePrompts", "click", closePrompts);
+on("#promptNewBtn", "click", function(){
+  const t = prompt("Name it");
+  if (!t) return;
+  const b = prompt("The prompt text");
+  if (!b) return;
+  S.prompts.push({ id:uid(), title:t.trim(), text:b });
+  saveSettings(); renderPromptList();
+});
+on("#promptFromInputBtn", "click", function(){
+  const v = $("#input").value.trim();
+  if (!v){ toast("Type something first"); return; }
+  const t = prompt("Name it", v.slice(0, 30));
+  if (!t) return;
+  S.prompts.push({ id:uid(), title:t.trim(), text:v });
+  saveSettings(); renderPromptList(); toast("Saved");
+});
+on("#promptList", "click", function(e){
+  const del = e.target.closest("[data-promptdel]");
+  if (del){
+    if (!confirm("Delete this prompt?")) return;
+    S.prompts = S.prompts.filter(p => p.id !== del.dataset.promptdel);
+    saveSettings(); renderPromptList(); return;
+  }
+  const ed = e.target.closest("[data-promptedit]");
+  if (ed){
+    const p = S.prompts.find(x => x.id === ed.dataset.promptedit);
+    const t = prompt("Name", p.title); if (!t) return;
+    const b = prompt("Text", p.text); if (b == null) return;
+    p.title = t.trim(); p.text = b; saveSettings(); renderPromptList(); return;
+  }
+  const use = e.target.closest("[data-use]");
+  if (use){
+    const p = S.prompts.find(x => x.id === use.dataset.use);
+    const box = $("#input");
+    box.value = box.value ? box.value + "\n\n" + p.text : p.text;
+    box.dispatchEvent(new Event("input", { bubbles:true }));
+    closePrompts(); box.focus();
+  }
+});
+
+/* --- attachments --- */
+on("#attachBtn", "click", function(){ $("#attachPicker").click(); });
+on("#attachPicker", "change", async function(e){
+  if (e.target.files && e.target.files.length) await addAttachments(Array.from(e.target.files));
+  e.target.value = "";
+});
+on("#attachTray", "click", function(e){
+  const b = e.target.closest("[data-unattach]");
+  if (b){ pendingAtts.splice(Number(b.dataset.unattach), 1); renderAttachTray(); }
+});
+on("#input", "paste", async function(e){
+  const items = (e.clipboardData && e.clipboardData.files) || [];
+  if (items.length){ e.preventDefault(); await addAttachments(Array.from(items)); }
+});
+
+/* --- pin / archive from the conversation list --- */
+on("#convoList", "contextmenu", async function(e){
+  const row = e.target.closest("[data-id]");
+  if (!row) return;
+  e.preventDefault();
+  const c = convos.find(x => x.id === row.dataset.id);
+  if (!c) return;
+  c.pinned = !c.pinned;
+  await DB.put(JSON.parse(JSON.stringify(c)));
+  renderSidebar(); toast(c.pinned ? "Pinned" : "Unpinned");
+});
+on("#chatTitle", "click", async function(){
+  if (!current) return;
+  const n = prompt("Rename this chat", current.title);
+  if (!n) return;
+  current.title = n.trim(); await persist(); renderThread();
+});
+
+/* extra chat actions live in the top bar's long-press */
+let titleHold;
+on("#chatTitle", "touchstart", function(){
+  titleHold = setTimeout(async function(){
+    if (!current) return;
+    current.pinned = !current.pinned;
+    await persist(); toast(current.pinned ? "Pinned" : "Unpinned");
+  }, 600);
+}, { passive:true });
+on("#chatTitle", "touchend", function(){ clearTimeout(titleHold); });
+
 /* ==========================================================
    BOOT
    ========================================================== */
 (async function init(){
-  applyTheme(); syncSettingsUI();
+  applyTheme();
   await loadConvos();
-  current = convos[0] || null;
-  renderSidebar(); renderThread(); autoGrow();
+  await loadDocs();
+  current = convos.filter(function(c){ return !c.archived; })[0] || convos[0] || null;
+  syncSettingsUI();
+  renderPresetBar();
+  renderInjections();
+  renderSidebar();
+  renderThread();
+  renderAttachTray();
+  autoGrow();
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function(){});
 })();
 </script>
