@@ -1,165 +1,185 @@
 /* ============================================================
    IMMERSIVE READING — SillyTavern
    Paste into: User Settings → Custom CSS
-   ------------------------------------------------------------
-   Strips the chat down to prose: no avatar column, no bubble
-   around every message, no timestamps or ID badges. Names shrink
-   to a small quiet label; buttons stay out of the way until you
-   want them.
 
-   Every block below is independent. Delete any one you don't
-   want — nothing else breaks.
+   Strips the chat down to prose: no avatar column, no card
+   around every message, no timestamps or ID badges. The name
+   becomes a small quiet label.
+
+   Written against SillyTavern's real message markup. Every
+   selector is scoped to #chat .mes[mesid] so it outranks a
+   theme's own rules — themes are where the card and the
+   justified text usually come from, not SillyTavern itself.
+
+   Blocks are numbered and independent. Delete any one you
+   don't want; nothing else changes.
    ============================================================ */
 
-/* ---- 1. the avatar column and the gap it leaves ------------- */
-#chat .mes .mesAvatarWrapper,
-#chat .mes .for_checkbox,
-#chat .mes .del_checkbox {
+/* ---- 1. avatar column, and the gap it leaves --------------- */
+#chat .mes[mesid] .mesAvatarWrapper,
+#chat .mes[mesid] .for_checkbox,
+#chat .mes[mesid] .del_checkbox {
   display: none !important;
 }
 
-/* ---- 2. the bubble around every message --------------------- */
-#chat .mes {
+/* ---- 2. the card, wherever the theme draws it -------------- */
+/* Base SillyTavern draws nothing here, so anything you see is  */
+/* your theme. Cleared on all three levels to be sure.          */
+#chat .mes[mesid],
+#chat .mes[mesid] .mes_block,
+#chat .mes[mesid] > .mes_block > .mes_text {
   background: none !important;
+  background-color: transparent !important;
   border: 0 !important;
   border-radius: 0 !important;
   box-shadow: none !important;
-  padding: 0 0 1.6em 0 !important;
-  margin: 0 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
-#chat .mes_block {
-  margin: 0 !important;
-  padding: 0 !important;
-  max-width: 100% !important;
+#chat .mes[mesid]::before,
+#chat .mes[mesid]::after,
+#chat .mes[mesid] > .mes_block::before,
+#chat .mes[mesid] > .mes_block::after {
+  content: none !important;
+  display: none !important;
 }
 
-/* ---- 3. comfortable measure, centred ------------------------ */
-#chat {
-  padding-left: 16px !important;
-  padding-right: 16px !important;
+/* ---- 3. one measure for the whole message ------------------ */
+/* The side padding is the reading gutter — keep it, or the text */
+/* runs into the edge of the screen.                             */
+#chat .mes[mesid] {
+  width: 100% !important;
+  max-width: 46rem;
+  margin: 0 auto !important;
+  padding: 0 16px 1.7em 16px !important;
 }
-#chat .mes_text {
-  max-width: 46em;
-  margin-left: auto !important;
-  margin-right: auto !important;
-  font-size: 1.02em;
+#chat .mes[mesid] > .mes_block {
+  padding: 0 !important;
+  margin: 0 !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+/* ---- 4. the text itself ------------------------------------ */
+#chat .mes[mesid] > .mes_block > .mes_text {
+  padding: 0 !important;
+  margin: 0 !important;
   line-height: 1.72 !important;
-  text-align: left !important;   /* justified text on a phone leaves rivers */
+  /* justified text on a phone tears white rivers down the column */
+  text-align: left !important;
 }
-#chat .mes_text p {
+#chat .mes[mesid] > .mes_block > .mes_text > p {
+  text-align: left !important;
   margin: 0 0 0.85em !important;
 }
-#chat .mes_text p:last-child { margin-bottom: 0 !important; }
+#chat .mes[mesid] > .mes_block > .mes_text > p:last-child {
+  margin-bottom: 0 !important;
+}
 
-/* ---- 4. name row: a small quiet label, not a headline -------- */
-#chat .ch_name {
-  max-width: 46em;
-  margin: 0 auto 0.35em !important;
+/* ---- 5. name: a small quiet label, not a headline ---------- */
+#chat .mes[mesid] > .mes_block > .ch_name {
+  margin: 0 0 0.3em 0 !important;
   padding: 0 !important;
   min-height: 0 !important;
-  align-items: center !important;
+  font-weight: normal !important;
 }
-#chat .ch_name .name_text {
+#chat .mes[mesid] .ch_name .name_text {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
   font-size: 10.5px !important;
   font-weight: 600 !important;
   letter-spacing: 0.09em !important;
   text-transform: uppercase !important;
-  opacity: 0.5;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
+  opacity: 0.45 !important;
 }
 
-/* ---- 5. metadata that adds nothing while reading ------------- */
-#chat .mes .timestamp,
-#chat .mes .mesIDDisplay,
-#chat .mes .mes_timer,
-#chat .mes .tokenCounterDisplay {
+/* ---- 6. metadata that adds nothing while reading ----------- */
+#chat .mes[mesid] .timestamp,
+#chat .mes[mesid] .mesIDDisplay,
+#chat .mes[mesid] .mes_timer,
+#chat .mes[mesid] .tokenCounterDisplay,
+#chat .mes[mesid] .mes_ghost {
   display: none !important;
 }
 
-/* ---- 6. per-message buttons: out of the way until wanted ----- */
-#chat .mes .mes_buttons {
+/* ---- 7. your turns: a rule, not a box ---------------------- */
+#chat .mes[mesid][is_user="true"] > .mes_block > .mes_text {
+  border-left: 2px solid currentColor !important;
+  padding-left: 14px !important;
+  opacity: 0.72;
+}
+#chat .mes[mesid][is_user="true"] .ch_name .name_text {
+  opacity: 0.32 !important;
+}
+
+/* ---- 8. reasoning: present, not loud ----------------------- */
+#chat .mes[mesid] .mes_reasoning_details {
+  margin: 0 0 0.7em 0 !important;
+  opacity: 0.55;
+  font-size: 0.9em;
+}
+#chat .mes[mesid] .mes_reasoning_details:hover { opacity: 0.9; }
+
+/* ---- 9. buttons and swipes: there when wanted -------------- */
+#chat .mes[mesid] .mes_buttons {
   opacity: 0;
   transition: opacity 0.15s;
 }
-#chat .mes:hover .mes_buttons,
-#chat .mes.mes_focus .mes_buttons,
-#chat .mes:focus-within .mes_buttons {
-  opacity: 0.75;
+#chat .mes[mesid]:hover .mes_buttons,
+#chat .mes[mesid]:focus-within .mes_buttons {
+  opacity: 0.7;
 }
-/* on a touchscreen there is no hover — show them only on the newest message */
+/* touchscreens have no hover — show them on the newest message only */
 @media (hover: none) {
-  #chat .mes .mes_buttons { opacity: 0 !important; }
-  #chat .mes.last_mes .mes_buttons { opacity: 0.55 !important; }
+  #chat .mes[mesid] .mes_buttons { opacity: 0 !important; }
+  #chat .mes[mesid].last_mes .mes_buttons { opacity: 0.5 !important; }
 }
+#chat .mes[mesid] .swipe_left,
+#chat .mes[mesid] .swipeRightBlock { opacity: 0.2; }
+#chat .mes[mesid].last_mes .swipe_left,
+#chat .mes[mesid].last_mes .swipeRightBlock { opacity: 0.55; }
 
-/* ---- 7. user turns: a rule, not a box ----------------------- */
-#chat .mes[is_user="true"] .mes_text {
-  border-left: 2px solid rgba(255, 255, 255, 0.22);
-  padding-left: 14px;
-  opacity: 0.82;
-}
-#chat .mes[is_user="true"] .ch_name { opacity: 0.55; }
-
-/* ---- 8. reasoning block: present, not loud ------------------ */
-#chat .mes_reasoning_details {
-  max-width: 46em;
-  margin: 0 auto 0.7em !important;
+/* ---- 10. narration / system lines -------------------------- */
+#chat .mes[mesid][is_system="true"] > .mes_block > .mes_text {
   opacity: 0.6;
-  font-size: 0.9em;
-}
-#chat .mes_reasoning_details:hover { opacity: 0.9; }
-#chat .mes_reasoning_details summary { padding: 2px 0 !important; }
-
-/* ---- 9. swipe arrows: keep them, quiet them ----------------- */
-#chat .mes .swipe_left,
-#chat .mes .swipeRightBlock {
-  opacity: 0.25;
-  transition: opacity 0.15s;
-}
-#chat .mes:hover .swipe_left,
-#chat .mes:hover .swipeRightBlock,
-#chat .mes.last_mes .swipe_left,
-#chat .mes.last_mes .swipeRightBlock {
-  opacity: 0.6;
-}
-#chat .mes .swipes-counter { font-size: 10px; opacity: 0.7; }
-
-/* ---- 10. system / narrator lines --------------------------- */
-#chat .mes[is_system="true"] .mes_text {
-  opacity: 0.62;
   font-style: italic;
 }
 
 /* ============================================================
-   OPTIONAL — uncomment what you want
+   OPTIONAL EXTRAS
+   Each block below is switched off. To switch one on, delete the
+   comment markers that wrap it.
    ============================================================ */
 
-/* Hide names entirely. Only sensible when two speakers alternate
-   and you can always tell who is talking. */
+/* Hide names entirely. Fine when two speakers alternate. */
 /*
-#chat .ch_name .name_text { display: none !important; }
-#chat .ch_name { margin-bottom: 0 !important; }
+#chat .mes[mesid] .ch_name .name_text { display: none !important; }
+#chat .mes[mesid] > .mes_block > .ch_name { margin-bottom: 0 !important; }
 */
 
-/* Wider measure for a tablet or landscape. */
+/* Dim everything except the newest message. The single biggest
+   change for immersion on a long scene. Hover restores it. */
 /*
-#chat .mes_text, #chat .ch_name, #chat .mes_reasoning_details { max-width: 60em; }
+#chat .mes[mesid]:not(.last_mes) > .mes_block > .mes_text {
+  opacity: 0.5; transition: opacity 0.25s;
+}
+#chat .mes[mesid]:not(.last_mes):hover > .mes_block > .mes_text { opacity: 1; }
 */
 
 /* Serif body, for a book-like feel. */
 /*
-#chat .mes_text { font-family: Georgia, "Times New Roman", serif !important; font-size: 1.08em; }
+#chat .mes[mesid] > .mes_block > .mes_text {
+  font-family: Georgia, "Times New Roman", serif !important;
+  font-size: 1.06em;
+}
 */
 
-/* Dim every message except the newest, so the eye lands on the
-   new text first. Reading back up still works — hover restores it. */
+/* Wider measure for landscape or a tablet. */
 /*
-#chat .mes:not(.last_mes) .mes_text { opacity: 0.55; transition: opacity 0.2s; }
-#chat .mes:not(.last_mes):hover .mes_text { opacity: 1; }
+#chat .mes[mesid] { max-width: 60rem; }
 */
 
-/* Hide the top icon row until you tap the area near it. */
+/* Fade the top icon row until you reach for it. */
 /*
-#top-settings-holder { opacity: 0.12; transition: opacity 0.2s; }
+#top-settings-holder { opacity: 0.1; transition: opacity 0.2s; }
 #top-settings-holder:hover, #top-settings-holder:focus-within { opacity: 1; }
 */
