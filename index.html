@@ -696,6 +696,20 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 .model-pick button:hover{border-color:var(--ember);color:var(--text)}
 
 
+/* which chat these settings belong to */
+.scope-note{
+  display:flex;align-items:center;gap:10px;flex:none;
+  padding:9px 18px;background:var(--surface);border-bottom:1px solid var(--border-soft);
+  font-size:12px;color:var(--muted);line-height:1.4;
+}
+.scope-note span{flex:1;min-width:0}
+.scope-note b{color:var(--text-2);font-weight:600}
+.scope-note button{
+  flex:none;padding:5px 10px;border:1px solid var(--border);border-radius:7px;
+  font-size:11.5px;color:var(--text-2);white-space:nowrap;
+}
+.scope-note button:hover{border-color:var(--ember);color:var(--text)}
+
 /* ---------- ordered prompt list ---------- */
 .ord-row{
   display:flex;align-items:center;gap:8px;padding:9px 10px;margin-bottom:6px;
@@ -925,6 +939,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
     </div>
 
     <!-- CONNECTION -->
+    <div class="scope-note" id="scopeNote">
+      <span>These settings belong to <b id="scopeChat">this chat</b>. Other chats keep their own.</span>
+      <button id="useEverywhereBtn">Use for new chats</button>
+    </div>
     <div class="sheet-body" data-panel="conn">
       <div class="field">
         <label class="lbl">Saved connections</label>
@@ -1289,10 +1307,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v4.5.0
+   COZY CHAT v5.0.0
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "4.5.0";
+const VERSION = "5.0.0";
 
 const PRESETS = {
   anthropic:  { name:"Claude",     kind:"anthropic", url:"https://api.anthropic.com/v1", model:"claude-sonnet-4-6", ctx:200000, hint:"e.g. claude-sonnet-4-6, claude-opus-4-5" },
@@ -1344,7 +1362,7 @@ const EFFORT_HINTS = {
   none: "Nothing extra is sent — the model decides on its own."
 };
 function applyReasoning(body, p){
-  const eff = S.effort || "off";
+  const eff = chatEffort();
   const style = reasonStyle(p);
   if (style === "none") return;
   if (style === "anthropic"){
@@ -1356,7 +1374,7 @@ function applyReasoning(body, p){
   if (style === "anthropic-budget"){
     if (eff === "off") return;
     const budget = { low:2048, medium:8192, high:24576 }[eff];
-    const max = Number(S.maxTokens) || 4096;
+    const max = chatMaxTok();
     body.thinking = { type:"enabled", budget_tokens: Math.max(1024, Math.min(budget, max - 512)) };
     if (body.max_tokens <= body.thinking.budget_tokens) body.max_tokens = body.thinking.budget_tokens + 1024;
     return;
@@ -1497,14 +1515,62 @@ function orderMoveTo(order, id, index){
 
 // the active instruction set — every read of system/injections goes through here
 function PS(){
-  let p = S.presets.find(x => x.id === S.activePreset);
+  const want = (current && current.cfg && current.cfg.presetId) || S.activePreset;
+  let p = S.presets.find(x => x.id === want) || S.presets.find(x => x.id === S.activePreset);
   if (!p){ p = S.presets[0]; S.activePreset = p ? p.id : null; }
   if (!p){ p = { id:"default", name:"Default", system:"", injections:[] }; S.presets = [p]; S.activePreset = p.id; }
   if (!p.injections) p.injections = [];
   return ensureOrder(p);
 }
 function saveSettings(){ localStorage.setItem("cozychat:settings", JSON.stringify(S)); }
-function activeProv(){ return S.providers.find(p => p.id === S.activeProvider) || S.providers[0] || null; }
+/* Every conversation keeps its own connection, model, instruction set and
+   sampling. Globals in S are only the starting point for a new chat, so
+   opening an old one brings back exactly how it was set up, and changing
+   anything while it is open belongs to that chat alone. */
+const CHAT_KEYS = ["providerId","model","presetId","temperature","maxTokens","effort","squashSystem"];
+function chatCfg(){
+  if (!current) return {};
+  if (!current.cfg) current.cfg = {};
+  return current.cfg;
+}
+function cfgGet(key, fallback){
+  const c = chatCfg();
+  const v = c[key];
+  return (v === undefined || v === null || v === "") ? fallback : v;
+}
+function cfgSet(key, val){
+  if (!current) { S[key === "providerId" ? "activeProvider" : key === "presetId" ? "activePreset" : key] = val; saveSettings(); return; }
+  chatCfg()[key] = val;
+  persist();
+}
+// what a brand-new chat inherits, and what an older chat is pinned to on first sight
+function defaultCfg(){
+  return { providerId:S.activeProvider, model:null, presetId:S.activePreset,
+           temperature:S.temperature, maxTokens:S.maxTokens,
+           effort:S.effort, squashSystem:S.squashSystem !== false };
+}
+function pushCfgToGlobals(){
+  const c = chatCfg();
+  if (c.providerId) S.activeProvider = c.providerId;
+  if (c.presetId)   S.activePreset   = c.presetId;
+  if (c.temperature != null) S.temperature = c.temperature;
+  if (c.maxTokens   != null) S.maxTokens   = c.maxTokens;
+  if (c.effort)     S.effort = c.effort;
+  if (c.squashSystem != null) S.squashSystem = c.squashSystem;
+  saveSettings();
+}
+
+function activeProv(){
+  const id = cfgGet("providerId", S.activeProvider);
+  const p = S.providers.find(x => x.id === id) || S.providers.find(x => x.id === S.activeProvider) || S.providers[0] || null;
+  if (!p) return null;
+  const m = cfgGet("model", null);
+  return m && m !== p.model ? Object.assign({}, p, { model:m }) : p;
+}
+function chatTemp(){ return Number(cfgGet("temperature", S.temperature)); }
+function chatMaxTok(){ return Number(cfgGet("maxTokens", S.maxTokens)) || 4096; }
+function chatEffort(){ return cfgGet("effort", S.effort) || "off"; }
+function chatSquash(){ return cfgGet("squashSystem", S.squashSystem !== false) !== false; }
 
 /* ---------- state ---------- */
 let convos = [], current = null, streaming = null, editingProv = null;
@@ -1650,9 +1716,15 @@ function lastAssistantIdx(){
 async function loadConvos(){
   convos = (await DB.all()) || [];
   convos.sort((a,b) => b.updatedAt - a.updatedAt);
+  // Chats from before per-chat settings are pinned to today's globals once,
+  // so they stop drifting when the defaults change later.
+  let changed = [];
+  for (const c of convos) if (!c.cfg){ c.cfg = defaultCfg(); changed.push(c); }
+  for (const c of changed) await DB.put(JSON.parse(JSON.stringify(c)));
 }
 function newConvo(seed){
-  const c = { id:uid(), title:"New chat", createdAt:Date.now(), updatedAt:Date.now(), messages: seed || [] };
+  const c = { id:uid(), title:"New chat", createdAt:Date.now(), updatedAt:Date.now(),
+              messages: seed || [], cfg: defaultCfg() };
   convos.unshift(c); current = c;
   renderSidebar(); renderThread(); closeDrawer(); $("#input").focus();
   return c;
@@ -1924,7 +1996,7 @@ function assembleMessages(kind){
   // single system message far better than a run of them, and it costs fewer
   // delimiter tokens. Off keeps every block as its own message, which some
   // models follow more literally.
-  const squash = S.squashSystem !== false;
+  const squash = chatSquash();
   const merged = [];
   for (const m of out){
     const prev = merged[merged.length - 1];
@@ -1955,8 +2027,8 @@ function buildPayload(opts){
 
   if (p.kind === "anthropic"){
     const body = {
-      model:p.model, max_tokens:Number(S.maxTokens)||4096,
-      temperature:Number(S.temperature), stream:true, messages: asm.messages
+      model:p.model, max_tokens:chatMaxTok(),
+      temperature:chatTemp(), stream:true, messages: asm.messages
     };
     if (asm.system) body.system = asm.system;
     if (useNative) body.tools = [{ type:"web_search_20250305", name:"web_search", max_uses:Number(S.search.count)||5 }];
@@ -1969,8 +2041,8 @@ function buildPayload(opts){
     };
   }
   const body = {
-    model:p.model, max_tokens:Number(S.maxTokens)||4096,
-    temperature:Number(S.temperature), stream:true,
+    model:p.model, max_tokens:chatMaxTok(),
+    temperature:chatTemp(), stream:true,
     messages: asm.system ? [{ role:"system", content:asm.system }].concat(asm.messages) : asm.messages
   };
   applyReasoning(body, p);
@@ -2214,7 +2286,7 @@ function renderProvList(){
   const el = $("#provList");
   if (!S.providers.length){ el.innerHTML = '<div class="hint">None yet. Add one below.</div>'; return; }
   el.innerHTML = S.providers.map(p =>
-    '<div class="prov' + (p.id===S.activeProvider?" active":"") + '" data-prov="' + p.id + '">'
+    '<div class="prov' + (p.id===((activeProv()||{}).id)?" active":"") + '" data-prov="' + p.id + '">'
     + '<div class="prov-info"><div class="prov-name">' + escapeHtml(p.name) + '</div>'
     + '<div class="prov-sub">' + escapeHtml(p.model||"no model") + ' · ' + (p.apiKey?"key saved":"no key") + '</div></div>'
     + '<button class="icon-btn" data-editprov="' + p.id + '" aria-label="Edit">'
@@ -2439,10 +2511,14 @@ function syncSettingsUI(){
   $("#sysPrompt").value = PS().system;
   $("#chatSys").value = (current && current.sysExtra) || "";
   renderPresetBar();
-  $("#temp").value = S.temperature;
-  $("#maxTok").value = S.maxTokens;
+  const sc = $("#scopeChat");
+  if (sc) sc.textContent = current ? (current.title || "this chat") : "new chats";
+  const sn = $("#scopeNote");
+  if (sn) sn.hidden = !current;
+  $("#temp").value = chatTemp();
+  $("#maxTok").value = chatMaxTok();
   $("#thinkTags").value = S.thinkTags;
-  setToggle($("#tgSquash"), S.squashSystem !== false);
+  setToggle($("#tgSquash"), chatSquash());
   renderEffort();
   setToggle($("#tgThink"), S.showThinking);
   setToggle($("#tgThinkTags"), S.catchThinkTags);
@@ -2648,7 +2724,7 @@ on("#addProvBtn", "click", function(){ editProv(null); });
 on("#provList", "click", function(e){
   const ed = e.target.closest("[data-editprov]"); if (ed){ editProv(ed.dataset.editprov); return; }
   const row = e.target.closest("[data-prov]");
-  if (row){ S.activeProvider = row.dataset.prov; saveSettings(); renderProvList(); renderThread(); }
+  if (row){ cfgSet("providerId", row.dataset.prov); cfgSet("model", null); renderProvList(); renderThread(); }
 });
 on("#pPreset", "change", function(e){ applyPreset(e.target.value); });
 on("#saveProvBtn", "click", saveProv);
@@ -2697,8 +2773,8 @@ on("#injList", "change", function(e){
 });
 
 on("#sysPrompt", "change", function(e){ PS().system = e.target.value; saveSettings(); updateEmber(); });
-on("#temp", "change", function(e){ S.temperature = Number(e.target.value); saveSettings(); });
-on("#maxTok", "change", function(e){ S.maxTokens = Number(e.target.value); saveSettings(); });
+on("#temp", "change", function(e){ cfgSet("temperature", Number(e.target.value)); });
+on("#maxTok", "change", function(e){ cfgSet("maxTokens", Number(e.target.value)); });
 on("#thinkTags", "change", function(e){ S.thinkTags = e.target.value; saveSettings(); renderThread(); });
 on("#tgThink", "click", function(e){ S.showThinking=!S.showThinking; setToggle(e.currentTarget,S.showThinking); saveSettings(); renderThread(); });
 on("#tgThinkTags", "click", function(e){ S.catchThinkTags=!S.catchThinkTags; setToggle(e.currentTarget,S.catchThinkTags); saveSettings(); renderThread(); });
@@ -3170,7 +3246,9 @@ function renderPresetBar(){
   $("#presetDelBtn").style.opacity = S.presets.length < 2 ? ".4" : "1";
 }
 function switchPreset(id){
-  S.activePreset = id; saveSettings();
+  cfgSet("presetId", id);
+  if (!current) S.activePreset = id;
+  saveSettings();
   $("#sysPrompt").value = PS().system;
   renderInjections(); renderPresetBar(); updateEmber();
 }
@@ -3280,9 +3358,14 @@ async function loadModels(){
 }
 on("#loadModelsBtn", "click", loadModels);
 on("#pModelSel", "change", function(e){ if (e.target.value) $("#pModel").value = e.target.value; });
+// use this chat's settings for new chats from now on
+on("#useEverywhereBtn", "click", function(){
+  pushCfgToGlobals();
+  toast("New chats will start with these settings");
+});
 
 function renderEffort(){
-  const cur = S.effort || "off";
+  const cur = chatEffort();
   Array.prototype.forEach.call(document.querySelectorAll("#effortSeg button"), function(b){
     b.classList.toggle("on", b.dataset.effort === cur);
   });
@@ -3308,14 +3391,15 @@ on("#bigSave",  "click", saveBigText);
 on("#bigCancel","click", closeBigText);
 on("#bigClose", "click", closeBigText);
 on("#tgSquash", "click", function(){
-  S.squashSystem = !(S.squashSystem !== false);
-  setToggle($("#tgSquash"), S.squashSystem);
-  saveSettings(); updateEmber();
+  const next = !chatSquash();
+  cfgSet("squashSystem", next);
+  setToggle($("#tgSquash"), next);
+  updateEmber();
 });
 on("#effortSeg", "click", function(e){
   const b = e.target.closest("[data-effort]");
   if (!b) return;
-  S.effort = b.dataset.effort; saveSettings(); renderEffort();
+  cfgSet("effort", b.dataset.effort); renderEffort();
 });
 
 /* the attached file is one icon in the top bar; tapping opens a small card */

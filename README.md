@@ -83,6 +83,19 @@ Tap **Test** before saving.
   (trailing commas, raw newlines inside strings) and reported plainly when it isn't.
 - Open, save, rename, export, or copy the file at any time.
 
+**Every chat keeps its own settings**
+Connection, model, instruction set, temperature, token cap, thinking effort and
+squash all belong to the conversation you have open. Set a chat up once and it
+stays that way — opening it later brings back exactly how you left it, and
+changing something in another chat doesn't touch it.
+
+A new chat starts from whatever the last one used. The banner at the top of
+Settings says which chat you're editing, and **Use for new chats** promotes the
+current setup to be the starting point for future ones.
+
+Chats made before this update are pinned to your current settings the first time
+they load, so they stop drifting when defaults change.
+
 **Instruction sets** (Settings → Instructions)
 - Save any number of named sets and switch between them instantly
 - Each holds its own system prompt, its own blocks, **and their order**
@@ -239,8 +252,8 @@ network-first, so a refresh always gets the newest version.
 | `send()` | Sends and reads the streaming reply |
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
-**Tests.** `v41test.js`, `v4test.js`, `v32test.js`, `v31test.js`, `v3test.js`, `v2test.js`, `domtest.js`, `migtest.js` and
-`negtest.js` and `csstest.js` run under Node with jsdom (`npm i jsdom fake-indexeddb`). 351 checks across the
+**Tests.** `v5test.js`, `v41test.js`, `v4test.js`, `v32test.js`, `v31test.js`, `v3test.js`, `v2test.js`, `domtest.js`, `migtest.js` and
+`negtest.js` and `csstest.js` run under Node with jsdom (`npm i jsdom fake-indexeddb`). 437 checks across the
 matching engine, JSON tolerance, prompt assembly, streaming, migration, and a
 negative test that deliberately reintroduces a fixed bug to prove the guard fires.
 

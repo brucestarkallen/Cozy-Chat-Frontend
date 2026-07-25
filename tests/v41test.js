@@ -140,7 +140,12 @@ console.log('\n=== 4b. SQUASH SYSTEM MESSAGES ===');
   ck('there is a toggle for it', !!d.querySelector('#tgSquash'));
   ck('the toggle reflects the setting', d.querySelector('#tgSquash').classList.contains('on')===false);
   ev(w,d.querySelector('#tgSquash'),'click');
-  ck('tapping it turns squashing back on', w.eval('S.squashSystem')===true);
+  // settings belong to the open chat now, so check the effective value
+  ck('tapping it turns squashing back on for this chat', w.eval('chatSquash()')===true,
+     String(w.eval('chatSquash()')));
+  ck('and it was stored on the chat, not the global default',
+     w.eval('current.cfg && current.cfg.squashSystem')===true && w.eval('S.squashSystem')===false,
+     'chat='+w.eval('current.cfg&&current.cfg.squashSystem')+' global='+w.eval('S.squashSystem'));
 }
 
 console.log('\n=== 4c. THE PANEL CAN ACTUALLY BE SCROLLED ===');
