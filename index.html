@@ -1330,10 +1330,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v5.1.1
+   COZY CHAT v5.1.2
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "5.1.1";
+const VERSION = "5.1.2";
 
 const PRESETS = {
   anthropic:  { name:"Claude",     kind:"anthropic", url:"https://api.anthropic.com/v1", model:"claude-sonnet-4-6", ctx:200000, hint:"e.g. claude-sonnet-4-6, claude-opus-4-5" },
@@ -2379,6 +2379,7 @@ function saveProv(){
   const i = S.providers.findIndex(p=>p.id===data.id);
   if (i>=0) S.providers[i]=data; else S.providers.push(data);
   S.activeProvider = data.id;
+  if (current) cfgSet("providerId", data.id);
   saveSettings(); renderProvList(); renderThread();
   $("#provEditor").hidden = true; editingProv = null; toast("Connection saved");
 }
@@ -2786,6 +2787,10 @@ on("#delProvBtn", "click", function(){
   if (!editingProv || !confirm("Delete this connection?")) return;
   S.providers = S.providers.filter(p=>p.id!==editingProv);
   if (S.activeProvider===editingProv) S.activeProvider = S.providers[0]?S.providers[0].id:null;
+  for (const c of convos) if (c.cfg && c.cfg.providerId === editingProv){
+    c.cfg.providerId = S.activeProvider;
+    DB.put(JSON.parse(JSON.stringify(c)));
+  }
   saveSettings(); renderProvList(); renderThread();
   $("#provEditor").hidden = true; editingProv = null;
 });
@@ -3326,7 +3331,7 @@ function renderPresetBar(){
   const sel = $("#presetSel");
   if (!sel) return;
   sel.innerHTML = S.presets.map(p =>
-    '<option value="' + p.id + '"' + (p.id === S.activePreset ? " selected" : "") + '>' + escapeHtml(p.name) + '</option>').join("");
+    '<option value="' + p.id + '"' + (p.id === PS().id ? " selected" : "") + '>' + escapeHtml(p.name) + '</option>').join("");
   $("#presetDelBtn").disabled = S.presets.length < 2;
   $("#presetDelBtn").style.opacity = S.presets.length < 2 ? ".4" : "1";
 }
@@ -3334,8 +3339,10 @@ function switchPreset(id){
   cfgSet("presetId", id);
   if (!current) S.activePreset = id;
   saveSettings();
-  $("#sysPrompt").value = PS().system;
-  renderInjections(); renderPresetBar(); updateEmber();
+  // one refresh path, so the dropdown, the prompt and the order can never
+  // disagree about which set is in use
+  syncSettingsUI();
+  renderInjections(); updateEmber();
 }
 
 /* ==========================================================
@@ -3690,8 +3697,14 @@ on("#presetRenameBtn", "click", function(){
 on("#presetDelBtn", "click", function(){
   if (S.presets.length < 2){ toast("Keep at least one set"); return; }
   if (!confirm('Delete "' + PS().name + '"?')) return;
-  const id = S.activePreset;
+  const id = PS().id;
   S.presets = S.presets.filter(p => p.id !== id);
+  if (S.activePreset === id) S.activePreset = S.presets[0].id;
+  // any chat pointing at the deleted set falls back rather than breaking
+  for (const c of convos) if (c.cfg && c.cfg.presetId === id){
+    c.cfg.presetId = S.presets[0].id;
+    DB.put(JSON.parse(JSON.stringify(c)));
+  }
   switchPreset(S.presets[0].id); toast("Deleted");
 });
 on("#presetExportBtn", "click", function(){
