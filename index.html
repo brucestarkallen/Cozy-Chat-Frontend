@@ -650,6 +650,48 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 }
 .model-pick button:hover{border-color:var(--ember);color:var(--text)}
 
+
+/* ---------- ordered prompt list ---------- */
+.ord-row{
+  display:flex;align-items:center;gap:8px;padding:9px 10px;margin-bottom:6px;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+  transition:border-color .15s,opacity .15s,transform .12s;
+}
+.ord-row.fixed{background:var(--bg-2);border-style:dashed}
+.ord-row.chat-row{border-color:var(--ember)}
+.ord-row.dragging{opacity:.5;border-color:var(--ember)}
+.ord-row.drop-target{transform:translateY(2px);border-color:var(--ember)}
+.ord-row.off .ord-name{opacity:.4}
+.ord-grip{
+  flex:none;display:grid;place-items:center;width:26px;height:30px;color:var(--muted);
+  cursor:grab;touch-action:none;border-radius:6px;
+}
+.ord-grip:active{cursor:grabbing;background:var(--surface-2)}
+.ord-main{flex:1;min-width:0}
+.ord-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ord-sub{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted);margin-top:2px;
+}
+.ord-sub .at-depth{color:var(--ember)}
+.ord-acts{flex:none;display:flex;align-items:center;gap:2px}
+.ord-acts button{
+  width:28px;height:28px;display:grid;place-items:center;border-radius:6px;color:var(--muted);
+}
+.ord-acts button:hover:not(:disabled){background:var(--surface-2);color:var(--text)}
+.ord-acts button:disabled{opacity:.25}
+.ord-row .toggle{flex:none}
+.ord-editor{
+  margin:-2px 0 10px;padding:11px 12px;background:var(--bg-2);
+  border:1px solid var(--border);border-top:0;border-radius:0 0 var(--r) var(--r);
+}
+.ord-editor textarea{min-height:96px;font-family:var(--mono);font-size:12.5px;line-height:1.55}
+.ord-open{border-radius:var(--r) var(--r) 0 0;margin-bottom:0}
+.ord-hint{
+  font-size:12px;color:var(--muted);line-height:1.5;margin:2px 0 12px;
+  padding:9px 11px;background:var(--surface);border-radius:var(--r);border:1px solid var(--border-soft);
+}
+
 /* ---------- mobile ---------- */
 @media (max-width:900px){
   .menu-btn{display:grid}
@@ -975,7 +1017,7 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
           <button class="btn" id="presetImportBtn">Import</button>
           <button class="btn" id="presetDelBtn" style="margin-left:auto">Delete</button>
         </div>
-        <div class="hint" style="margin-top:9px">Each set holds its own system prompt and instruction blocks. Switching is instant and applies to your next message.</div>
+        <div class="hint" style="margin-top:9px">Each set holds its own system prompt, instruction blocks, and their order. Switching is instant and applies to your next message.</div>
       </div>
       <hr style="border:0;border-top:1px solid var(--border-soft);margin:18px 0">
       <div class="field">
@@ -985,11 +1027,14 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
       </div>
       <hr style="border:0;border-top:1px solid var(--border-soft);margin:18px 0">
       <div class="field">
-        <label class="lbl">Extra instructions</label>
-        <div class="hint" style="margin-bottom:10px">
-          Blocks you can drop anywhere in the conversation. "Depth" counts back from the newest
-          message — depth 0 sits right before the reply, depth 4 sits four messages up.
-          Shallow depths stay in the model's attention; deep ones fade like older context.
+        <label class="lbl">Prompt order</label>
+        <div class="ord-hint">
+          Everything the model receives, in the order it receives it. Drag by the handle, or use
+          the arrows. <b>The conversation is an item in this list</b> — anything above it comes
+          before the chat, anything below it comes after, right before the reply.
+          <br><br>
+          A block set to <b>In-chat</b> ignores this order and slots into the conversation itself
+          at a depth counted back from the newest message.
         </div>
         <div id="injList"></div>
         <button class="btn wide" id="addInjBtn">Add an instruction</button>
@@ -1149,10 +1194,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v3.2.0
+   COZY CHAT v4.0.0
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "3.2.0";
+const VERSION = "4.0.0";
 
 const PRESETS = {
   anthropic:  { name:"Claude",     kind:"anthropic", url:"https://api.anthropic.com/v1", model:"claude-sonnet-4-6", ctx:200000, hint:"e.g. claude-sonnet-4-6, claude-opus-4-5" },
@@ -1291,10 +1336,14 @@ function loadSettings(){
     out.search = Object.assign({}, DEFAULTS.search, raw.search || {});
     out.injections = raw.injections || [];
     out.presets = raw.presets || [];
+    for (const p of out.presets) for (const i of (p.injections || []))
+      if (i.pos === "top" || i.pos === "bottom" || i.pos === "depth") i.__oldPos = i.pos;
     out.prompts = raw.prompts || [];
     // migrate a pre-v3 config: the loose system prompt becomes the first set
     if (!out.presets.length){
-      out.presets = [{ id:"default", name:"Default", system: out.system || "", injections: out.injections || [] }];
+      const legacy = (out.injections || []);
+      for (const i of legacy) if (!i.__oldPos) i.__oldPos = i.pos;
+      out.presets = [{ id:"default", name:"Default", system: out.system || "", injections: legacy }];
       out.activePreset = "default";
     }
     if (!out.presets.some(p => p.id === out.activePreset)) out.activePreset = out.presets[0].id;
@@ -1302,13 +1351,62 @@ function loadSettings(){
   } catch { const d = JSON.parse(JSON.stringify(DEFAULTS));
     d.presets = [{ id:"default", name:"Default", system:"", injections:[] }]; d.activePreset = "default"; return d; }
 }
+/* The order list holds instruction ids plus two fixed items: the main system
+   prompt and the conversation itself. Dragging a block above or below the
+   conversation is what decides whether it lands before or after the chat —
+   the same idea as SillyTavern's prompt manager. */
+const MAIN = "__main__", CHAT = "__chat__";
+function ensureOrder(p){
+  p.injections = p.injections || [];
+  for (const i of p.injections){
+    if (i.pos === "top" || i.pos === "bottom") i.pos = "relative";
+    else if (i.pos === "depth") i.pos = "chat";
+    if (i.pos !== "relative" && i.pos !== "chat") i.pos = "relative";
+  }
+  const ids = p.injections.map(i => i.id);
+  const known = id => id === MAIN || id === CHAT || ids.indexOf(id) >= 0;
+  let o = Array.isArray(p.order) ? p.order.filter(known) : null;
+  if (!o){
+    // first run on a pre-v4 set: rebuild the order from the old position field
+    const was = {};
+    for (const i of p.injections) was[i.id] = i.__oldPos || null;
+    const top = p.injections.filter(i => was[i.id] === "top").map(i => i.id);
+    const bot = p.injections.filter(i => was[i.id] === "bottom").map(i => i.id);
+    const other = p.injections.filter(i => was[i.id] !== "top" && was[i.id] !== "bottom").map(i => i.id);
+    o = [MAIN].concat(top, [CHAT], bot, other);
+  }
+  o = o.filter(function(x,k){ return o.indexOf(x) === k; });
+  if (o.indexOf(MAIN) < 0) o.unshift(MAIN);
+  if (o.indexOf(CHAT) < 0) o.push(CHAT);
+  for (const id of ids) if (o.indexOf(id) < 0) o.push(id);
+  p.order = o;
+  return p;
+}
+function orderMove(order, id, delta){
+  const from = order.indexOf(id);
+  if (from < 0) return order;
+  const to = Math.max(0, Math.min(order.length - 1, from + delta));
+  if (to === from) return order;
+  const out = order.slice();
+  out.splice(to, 0, out.splice(from, 1)[0]);
+  return out;
+}
+function orderMoveTo(order, id, index){
+  const from = order.indexOf(id);
+  if (from < 0) return order;
+  const out = order.slice();
+  const [item] = out.splice(from, 1);
+  out.splice(Math.max(0, Math.min(out.length, index)), 0, item);
+  return out;
+}
+
 // the active instruction set — every read of system/injections goes through here
 function PS(){
   let p = S.presets.find(x => x.id === S.activePreset);
   if (!p){ p = S.presets[0]; S.activePreset = p ? p.id : null; }
   if (!p){ p = { id:"default", name:"Default", system:"", injections:[] }; S.presets = [p]; S.activePreset = p.id; }
   if (!p.injections) p.injections = [];
-  return p;
+  return ensureOrder(p);
 }
 function saveSettings(){ localStorage.setItem("cozychat:settings", JSON.stringify(S)); }
 function activeProv(){ return S.providers.find(p => p.id === S.activeProvider) || S.providers[0] || null; }
@@ -1660,23 +1758,48 @@ function assembleMessages(kind){
       return { role:m.role, content:c };
     });
 
-  const live = PS().injections.filter(i => i.enabled && i.text.trim());
-  const topSys = live.filter(i => i.pos === "top" && i.role === "system").map(i => i.text);
-  const rest   = live.filter(i => !(i.pos === "top" && i.role === "system"));
+  const p = PS();
+  const live = p.injections.filter(i => i.enabled && i.text.trim());
+  const byId = {};
+  for (const i of live) byId[i.id] = i;
 
+  // in-chat blocks weave into the conversation by depth, counted from newest
   const n = base.length, slots = {};
-  for (const i of rest){
-    const at = i.pos === "top" ? 0 : i.pos === "bottom" ? n : Math.max(0, n - (Number(i.depth)||0));
+  for (const i of live) if (i.pos === "chat"){
+    const at = Math.max(0, n - (Number(i.depth) || 0));
     (slots[at] = slots[at] || []).push(i);
   }
-  let out = [];
+  const convo = [];
   for (let k = 0; k <= n; k++){
-    if (slots[k]) for (const i of slots[k]){
-      const role = (kind === "anthropic" && i.role === "system") ? "user" : i.role;
-      out.push({ role:role, content:i.text });
-    }
-    if (k < n) out.push(base[k]);
+    if (slots[k]) for (const i of slots[k]) convo.push({ role:i.role, content:i.text });
+    if (k < n) convo.push(base[k]);
   }
+
+  // walk the order: everything before the conversation marker leads, everything
+  // after trails. Leading system blocks fold into the system parameter, but only
+  // while nothing else has come first — otherwise folding would reorder them.
+  const topSys = [];
+  const pre = [], post = [];
+  let seenChat = false, folding = true;
+  for (const id of p.order){
+    if (id === CHAT){ seenChat = true; continue; }
+    let role, text;
+    if (id === MAIN){ role = "system"; text = p.system || ""; }
+    else {
+      const i = byId[id];
+      if (!i || i.pos !== "relative") continue;
+      role = i.role; text = i.text;
+    }
+    if (!text || !text.trim()) continue;
+    if (!seenChat && folding && role === "system"){ topSys.push(text); continue; }
+    if (!seenChat) folding = false;
+    (seenChat ? post : pre).push({ role:role, content:text });
+  }
+
+  let out = pre.concat(convo, post).map(m => ({
+    role: (kind === "anthropic" && m.role === "system") ? "user" : m.role,
+    content: m.content
+  }));
   const merged = [];
   for (const m of out){
     const prev = merged[merged.length - 1];
@@ -1688,7 +1811,7 @@ function assembleMessages(kind){
   const tail = merged[merged.length - 1];
   if (tail && tail.role === "assistant" && typeof tail.content === "string")
     tail.content = tail.content.replace(/\s+$/, "");
-  let sysParts = [PS().system].concat(topSys);
+  let sysParts = topSys.slice();
   if (current && current.sysExtra && current.sysExtra.trim()) sysParts.push(current.sysExtra);
   const doc = (current && current.docId) ? docs.find(d => d.id === current.docId) : null;
   if (doc) sysParts.push(DOCEDIT_PROTOCOL.replace("{{NAME}}", doc.name) + "\n\n[DOCUMENT: " + doc.name + "]\n" + doc.text);
@@ -2019,43 +2142,100 @@ async function testProv(){
 }
 
 /* ---------- injections ---------- */
+function ordApply(newOrder){
+  PS().order = newOrder; saveSettings(); renderInjections(); updateEmber();
+}
 function depthViz(i){
-  if (i.pos === "top")    return "Sits <b>before the whole conversation</b>, next to the main system prompt.";
-  if (i.pos === "bottom") return "Sits <b>after the newest message</b>, right before the reply.";
+  if (i.pos === "relative"){
+    const o = PS().order;
+    return o.indexOf(i.id) < o.indexOf(CHAT)
+      ? "Sits <b>before the conversation</b>, in the order shown above."
+      : "Sits <b>after the conversation</b>, right before the reply.";
+  }
   const d = Number(i.depth) || 0;
   if (d === 0) return "Depth <b>0</b> — right before the reply. Strongest position.";
   return "Depth <b>" + d + "</b> — slots in <b>" + d + "</b> message" + (d===1?"":"s") + " up from the newest.";
 }
+function ordRowIcon(kind){
+  if (kind === "main") return '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>';
+  return '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3.2-6.9L21 8"/><path d="M21 4v4h-4"/></svg>';
+}
+function ordSub(i, order){
+  if (i.pos === "chat") return '<span class="at-depth">In-chat &middot; depth ' + (Number(i.depth)||0) + '</span>';
+  const ci = order.indexOf(CHAT), mi = order.indexOf(i.id);
+  return mi < ci ? "Before the conversation" : "After the conversation";
+}
 function renderInjections(){
   const el = $("#injList");
-  if (!PS().injections.length){ el.innerHTML = '<div class="hint" style="margin-bottom:10px">None yet.</div>'; return; }
-  el.innerHTML = PS().injections.map(i =>
-    '<div class="inj" data-inj="' + i.id + '">'
-    + '<div class="inj-top">'
-    + '<input type="text" value="' + escapeHtml(i.name) + '" data-injname="' + i.id + '" style="flex:1;padding:6px 9px;font-size:13.5px" placeholder="Name">'
-    + '<button class="toggle' + (i.enabled?" on":"") + '" data-injon="' + i.id + '" role="switch" aria-checked="' + i.enabled + '"></button>'
-    + '<button class="icon-btn" data-injdel="' + i.id + '" aria-label="Delete">'
-    + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">'
-    + '<path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M7 7l1 13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-13"/></svg></button></div>'
-    + '<textarea data-injtext="' + i.id + '" placeholder="What this instruction says">' + escapeHtml(i.text) + '</textarea>'
-    + '<div class="inj-ctl">'
-    + '<div><span class="mini-lbl">Sent as</span><select data-injrole="' + i.id + '">'
-    + '<option value="system"' + (i.role==="system"?" selected":"") + '>System</option>'
-    + '<option value="user"' + (i.role==="user"?" selected":"") + '>You</option>'
-    + '<option value="assistant"' + (i.role==="assistant"?" selected":"") + '>Assistant</option></select></div>'
-    + '<div><span class="mini-lbl">Position</span><select data-injpos="' + i.id + '">'
-    + '<option value="top"' + (i.pos==="top"?" selected":"") + '>Very top</option>'
-    + '<option value="depth"' + (i.pos==="depth"?" selected":"") + '>At depth…</option>'
-    + '<option value="bottom"' + (i.pos==="bottom"?" selected":"") + '>Very bottom</option></select></div></div>'
-    + (i.pos === "depth"
-        ? '<div style="margin-top:8px"><span class="mini-lbl">Depth — messages up from the newest</span>'
-          + '<input type="number" min="0" max="50" value="' + (Number(i.depth)||0) + '" data-injdepth="' + i.id + '"></div>'
-        : "")
-    + '<div class="depth-viz">' + depthViz(i) + '</div></div>').join("");
+  const p = PS();
+  const order = p.order;
+  const openId = el.getAttribute("data-open") || "";
+  const grip = '<span class="ord-grip" data-grip="ID" aria-label="Drag to reorder">'
+    + '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">'
+    + '<path d="M9 6h.01M9 12h.01M9 18h.01M15 6h.01M15 12h.01M15 18h.01"/></svg></span>';
+
+  const rows = order.map(function(id, idx){
+    const first = idx === 0, last = idx === order.length - 1;
+    const arrows = '<div class="ord-acts">'
+      + '<button data-up="' + id + '"' + (first?" disabled":"") + ' aria-label="Move up">'
+      + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m6 15 6-6 6 6"/></svg></button>'
+      + '<button data-down="' + id + '"' + (last?" disabled":"") + ' aria-label="Move down">'
+      + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></button>';
+
+    if (id === MAIN){
+      return '<div class="ord-row fixed" data-row="' + id + '">' + grip.replace("ID", id)
+        + '<div class="ord-main"><div class="ord-name">' + ordRowIcon("main") + ' Main system prompt</div>'
+        + '<div class="ord-sub">' + (String(p.system||"").trim() ? estTokens(p.system).toLocaleString() + " tokens" : "empty") + '</div></div>'
+        + arrows + '</div></div>';
+    }
+    if (id === CHAT){
+      return '<div class="ord-row fixed chat-row" data-row="' + id + '">' + grip.replace("ID", id)
+        + '<div class="ord-main"><div class="ord-name">' + ordRowIcon("chat") + ' The conversation</div>'
+        + '<div class="ord-sub">every message so far</div></div>'
+        + arrows + '</div></div>';
+    }
+    const i = injById(id);
+    if (!i) return "";
+    const open = openId === id;
+    const head = '<div class="ord-row' + (open?" ord-open":"") + (i.enabled?"":" off") + '" data-row="' + id + '">'
+      + grip.replace("ID", id)
+      + '<div class="ord-main" data-edit="' + id + '"><div class="ord-name">' + escapeHtml(i.name || "Untitled") + '</div>'
+      + '<div class="ord-sub">' + ordSub(i, order) + '</div></div>'
+      + '<button class="toggle' + (i.enabled?" on":"") + '" data-injon="' + id + '" role="switch" aria-checked="' + i.enabled + '"></button>'
+      + arrows + '</div></div>';
+    if (!open) return head;
+    return head + '<div class="ord-editor">'
+      + '<input type="text" value="' + escapeHtml(i.name) + '" data-injname="' + id + '" placeholder="Name" style="padding:7px 9px;font-size:13.5px;margin-bottom:8px">'
+      + '<textarea data-injtext="' + id + '" placeholder="What this instruction says">' + escapeHtml(i.text) + '</textarea>'
+      + '<div class="inj-ctl" style="margin-top:9px">'
+      + '<div><span class="mini-lbl">Sent as</span><select data-injrole="' + id + '">'
+      + '<option value="system"' + (i.role==="system"?" selected":"") + '>System</option>'
+      + '<option value="user"' + (i.role==="user"?" selected":"") + '>You</option>'
+      + '<option value="assistant"' + (i.role==="assistant"?" selected":"") + '>Assistant</option></select></div>'
+      + '<div><span class="mini-lbl">Position</span><select data-injpos="' + id + '">'
+      + '<option value="relative"' + (i.pos==="relative"?" selected":"") + '>Relative — use the order above</option>'
+      + '<option value="chat"' + (i.pos==="chat"?" selected":"") + '>In-chat at a depth</option></select></div></div>'
+      + (i.pos === "chat"
+          ? '<div style="margin-top:9px"><span class="mini-lbl">Depth — messages up from the newest</span>'
+            + '<input type="number" min="0" max="50" value="' + (Number(i.depth)||0) + '" data-injdepth="' + id + '"></div>'
+          : "")
+      + '<div class="depth-viz">' + depthViz(i) + '</div>'
+      + '<div class="btn-row" style="margin-top:10px"><button class="btn" data-injdel="' + id + '">Delete this block</button></div>'
+      + '</div>';
+  }).join("");
+  el.innerHTML = rows;
 }
 function addInjection(){
-  PS().injections.push({ id:uid(), name:"New instruction", text:"", role:"system", pos:"depth", depth:0, enabled:true });
-  saveSettings(); renderInjections(); updateEmber();
+  const p = PS();
+  const b = { id:uid(), name:"New instruction", text:"", role:"system", pos:"relative", depth:0, enabled:true };
+  p.injections.push(b);
+  // a new block lands just before the conversation, which is where an
+  // instruction is wanted far more often than after it
+  const ci = p.order.indexOf(CHAT);
+  p.order.splice(ci < 0 ? p.order.length : ci, 0, b.id);
+  saveSettings();
+  $("#injList").setAttribute("data-open", b.id);
+  renderInjections(); updateEmber();
 }
 function injById(id){ return PS().injections.find(x=>x.id===id); }
 
@@ -2315,10 +2495,9 @@ on("#delProvBtn", "click", function(){
 
 on("#addInjBtn", "click", addInjection);
 on("#injList", "click", function(e){
-  const on = e.target.closest("[data-injon]");
-  if (on){ const i = injById(on.dataset.injon); i.enabled = !i.enabled; saveSettings(); renderInjections(); updateEmber(); return; }
-  const del = e.target.closest("[data-injdel]");
-  if (del){ PS().injections = PS().injections.filter(x=>x.id!==del.dataset.injdel); saveSettings(); renderInjections(); updateEmber(); }
+  const t = e.target.closest("[data-injon]");
+  if (t){ const i = injById(t.dataset.injon); if (i){ i.enabled = !i.enabled; saveSettings(); renderInjections(); updateEmber(); } }
+  // delete, reorder, and expand live in the prompt-order wiring
 });
 on("#injList", "input", function(e){
   const t = e.target;
@@ -2326,10 +2505,15 @@ on("#injList", "input", function(e){
   if (!id) return;
   const i = injById(id); if (!i) return;
   if (t.dataset.injtext  != null) i.text = t.value;
-  if (t.dataset.injname  != null) i.name = t.value;
+  if (t.dataset.injname  != null){
+    i.name = t.value;
+    const row = $("#injList").querySelector('[data-row="' + id + '"] .ord-name');
+    if (row) row.textContent = t.value || "Untitled";
+  }
   if (t.dataset.injdepth != null){
     i.depth = Number(t.value)||0;
-    const viz = t.closest(".inj").querySelector(".depth-viz"); if (viz) viz.innerHTML = depthViz(i);
+    const box = t.closest(".ord-editor");
+    const viz = box && box.querySelector(".depth-viz"); if (viz) viz.innerHTML = depthViz(i);
   }
   saveSettings(); updateEmber();
 });
@@ -2931,6 +3115,84 @@ on("#fileBtn", "click", function(e){
 document.addEventListener("click", function(e){
   if (!e.target.closest("#filePop") && !e.target.closest("#fileBtn")) closeFilePop();
 });
+
+
+/* ==========================================================
+   PROMPT ORDER — drag, arrows, inline editing
+   ========================================================== */
+/* Arrows are the reliable path on a touchscreen; dragging inside a
+   scrolling sheet is fiddly on any phone. Both call the same pure
+   reorder helpers, so they can never disagree. */
+on("#injList", "click", function(e){
+  const up = e.target.closest("[data-up]");
+  if (up){ ordApply(orderMove(PS().order, up.dataset.up, -1)); return; }
+  const dn = e.target.closest("[data-down]");
+  if (dn){ ordApply(orderMove(PS().order, dn.dataset.down, 1)); return; }
+  const del = e.target.closest("[data-injdel]");
+  if (del){
+    const id = del.dataset.injdel;
+    const p = PS();
+    p.injections = p.injections.filter(x => x.id !== id);
+    p.order = p.order.filter(x => x !== id);
+    if ($("#injList").getAttribute("data-open") === id) $("#injList").removeAttribute("data-open");
+    saveSettings(); renderInjections(); updateEmber(); return;
+  }
+  const ed = e.target.closest("[data-edit]");
+  if (ed){
+    const el = $("#injList");
+    const id = ed.dataset.edit;
+    if (el.getAttribute("data-open") === id) el.removeAttribute("data-open");
+    else el.setAttribute("data-open", id);
+    renderInjections(); return;
+  }
+});
+
+/* Pointer-based drag: works with a finger and a mouse alike. The row under
+   the pointer is found by comparing midpoints rather than elementFromPoint,
+   so a dragged row being semi-transparent can't confuse the hit test. */
+(function dragOrder(){
+  const list = $("#injList");
+  if (!list) return;
+  let dragId = null, rows = [], startY = 0, moved = false;
+
+  function rowRects(){
+    return Array.prototype.map.call(list.querySelectorAll("[data-row]"), function(el){
+      const r = el.getBoundingClientRect();
+      return { id: el.getAttribute("data-row"), el: el, mid: r.top + r.height / 2 };
+    });
+  }
+  list.addEventListener("pointerdown", function(e){
+    const g = e.target.closest("[data-grip]");
+    if (!g) return;
+    dragId = g.dataset.grip; startY = e.clientY; moved = false;
+    rows = rowRects();
+    const me = list.querySelector('[data-row="' + dragId + '"]');
+    if (me) me.classList.add("dragging");
+    g.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  list.addEventListener("pointermove", function(e){
+    if (!dragId) return;
+    if (Math.abs(e.clientY - startY) > 4) moved = true;
+    let target = null;
+    for (const r of rows){ if (r.id !== dragId && e.clientY > r.mid) target = r; }
+    for (const r of rows) r.el.classList.remove("drop-target");
+    if (target) target.el.classList.add("drop-target");
+  });
+  function finish(e){
+    if (!dragId) return;
+    const order = PS().order;
+    if (moved){
+      let index = 0;
+      for (const r of rows){ if (r.id !== dragId && e.clientY > r.mid) index++; }
+      const from = order.indexOf(dragId);
+      ordApply(orderMoveTo(order, dragId, from < index ? index : index));
+    } else renderInjections();
+    dragId = null; rows = [];
+  }
+  list.addEventListener("pointerup", finish);
+  list.addEventListener("pointercancel", function(){ dragId = null; rows = []; renderInjections(); });
+})();
 
 /* ==========================================================
    WIRING

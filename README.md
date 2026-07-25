@@ -84,15 +84,28 @@ Tap **Test** before saving.
 
 **Instruction sets** (Settings → Instructions)
 - Save any number of named sets and switch between them instantly
-- Each holds its own system prompt and its own instruction blocks
-- **Copy** an existing set, **Export** one to a file, **Import** one back
-- Each block can sit at:
-  - **Very top** — before the conversation
-  - **At depth N** — counts back from the newest message. Depth 0 sits right
-    before the reply (strongest); depth 4 sits four messages up
-  - **Very bottom** — after everything
-- Blocks can be sent as System, You, or Assistant, and toggled on/off
-- Settings → Chat also has an extra system box that applies to **the open chat only**
+- Each holds its own system prompt, its own blocks, **and their order**
+- **Copy** a set, **Export** one to a file, **Import** one back
+
+**Prompt order**
+Everything the model receives, shown as one list in the order it receives it.
+Drag by the handle, or use the arrows.
+
+**The conversation is an item in that list.** Anything above it is sent before
+the chat; anything below it is sent after, right before the reply. The main
+system prompt is an item too, so it can be moved like anything else.
+
+A block set to **In-chat** ignores the list and slots into the conversation
+itself, at a depth counted back from the newest message — depth 0 sits right
+before the reply, depth 4 sits four messages up. Shallow depths stay in the
+model's attention; deep ones fade like older context.
+
+Leading system-role blocks fold into the API's system parameter, in order, and
+stop folding as soon as something non-system comes first — so folding can never
+silently reorder what you arranged.
+
+Blocks can be sent as System, You, or Assistant, and toggled on and off.
+Settings → Chat also has an extra system box that applies to **the open chat only**.
 
 **Saved prompts**
 - Sidebar → **Prompts**, or the Prompts button under the message box
@@ -195,6 +208,8 @@ network-first, so a refresh always gets the newest version.
 | `THEMES` | Registers a theme in the picker |
 | `PRESETS` | The service dropdown |
 | `PS()` | The active instruction set — all prompt reads go through it |
+| `ensureOrder()` | Builds and repairs the prompt order, migrating old positions |
+| `orderMove()` / `orderMoveTo()` | Pure reorder helpers — arrows and drag both call these |
 | `splitReasoning()` | Pulls `<think>` blocks out of replies |
 | `assembleMessages()` | System prompt + depth blocks + file + attachments → final message list |
 | `DOCEDIT_PROTOCOL` | What the assistant is told about editing files |
@@ -208,8 +223,8 @@ network-first, so a refresh always gets the newest version.
 | `send()` | Sends and reads the streaming reply |
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
-**Tests.** `v32test.js`, `v31test.js`, `v3test.js`, `v2test.js`, `domtest.js`, `migtest.js` and
-`negtest.js` and `csstest.js` run under Node with jsdom (`npm i jsdom fake-indexeddb`). 269 checks across the
+**Tests.** `v4test.js`, `v32test.js`, `v31test.js`, `v3test.js`, `v2test.js`, `domtest.js`, `migtest.js` and
+`negtest.js` and `csstest.js` run under Node with jsdom (`npm i jsdom fake-indexeddb`). 297 checks across the
 matching engine, JSON tolerance, prompt assembly, streaming, migration, and a
 negative test that deliberately reintroduces a fixed bug to prove the guard fires.
 

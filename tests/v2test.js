@@ -1,4 +1,3 @@
-// TEST FILE - not for pasting into SillyTavern. Run with: node tests/v2test.js
 const fs=require('fs');
 const {JSDOM}=require('jsdom');
 require('fake-indexeddb/auto');
@@ -224,9 +223,14 @@ console.log('\n=== 8. REGRESSION: v1 features still work ===');
   d.querySelector('#settingsBtn').dispatchEvent(new w.Event('click',{bubbles:true}));
   ck('five settings tabs', d.querySelectorAll('.tab').length===5, '→ '+d.querySelectorAll('.tab').length);
   ck('instructions panel exists', !!d.querySelector('[data-panel="inst"]'));
+  const rowsBefore=d.querySelectorAll('#injList [data-row]').length;
   d.querySelector('#addInjBtn').dispatchEvent(new w.Event('click',{bubbles:true}));
-  ck('can add an instruction', d.querySelectorAll('.inj').length===1);
-  ck('depth explainer rendered', d.querySelector('.depth-viz').textContent.includes('Depth'));
+  ck('can add an instruction',
+     d.querySelectorAll('#injList [data-row]').length===rowsBefore+1,
+     rowsBefore+' -> '+d.querySelectorAll('#injList [data-row]').length);
+  ck('placement explainer rendered',
+     /conversation/i.test(d.querySelector('.depth-viz').textContent),
+     d.querySelector('.depth-viz').textContent.slice(0,60));
   // window left open; closing mid-async trips jsdom
 }
 
