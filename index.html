@@ -375,7 +375,9 @@ input[type=text],input[type=password],input[type=number],textarea.f,select{
   transition:border-color .15s;
 }
 input:focus,textarea.f:focus,select:focus{border-color:var(--ember)}
-textarea.f{resize:vertical;min-height:88px;line-height:1.55;font-size:14.5px}
+/* Grown to fit by autoSize(), so the panel is the only scroll container.
+   No resize handle: dragging it on a phone fights the panel scroll. */
+textarea.f{resize:none;min-height:88px;line-height:1.55;font-size:14.5px;overflow-y:hidden}
 select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 17px) 51%,calc(100% - 12px) 51%;background-size:5px 5px;background-repeat:no-repeat}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .btn{
@@ -1240,10 +1242,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v4.3.0
+   COZY CHAT v4.4.0
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "4.3.0";
+const VERSION = "4.4.0";
 
 const PRESETS = {
   anthropic:  { name:"Claude",     kind:"anthropic", url:"https://api.anthropic.com/v1", model:"claude-sonnet-4-6", ctx:200000, hint:"e.g. claude-sonnet-4-6, claude-opus-4-5" },
@@ -2311,6 +2313,7 @@ function renderInjections(){
       + '</div>';
   }).join("");
   el.innerHTML = rows;
+  autoSizeAll(el);
 }
 function addInjection(){
   const p = PS();
@@ -2389,6 +2392,7 @@ function setToggle(el, on){ el.classList.toggle("on", !!on); el.setAttribute("ar
 function syncSettingsUI(){
   $("#sysPrompt").value = PS().system;
   $("#chatSys").value = (current && current.sysExtra) || "";
+  autoSize($("#sysPrompt")); autoSize($("#chatSys"));
   renderPresetBar();
   $("#temp").value = S.temperature;
   $("#maxTok").value = S.maxTokens;
@@ -2423,6 +2427,21 @@ function on(sel, evt, fn, opts){
   el.addEventListener(evt, fn, opts);
 }
 const input = $("#input");
+/* A textarea with more text than height becomes its own scroll container,
+   nested inside the panel's scroll. On a phone that is almost impossible to
+   drive: you cannot reliably grab the inner one, and grabbing it stops the
+   outer one. So text boxes in settings grow to fit their contents instead,
+   leaving exactly one thing that scrolls — the panel. */
+function autoSize(el){
+  if (!el) return;
+  el.style.height = "auto";
+  el.style.height = Math.max(el.scrollHeight, 60) + "px";
+  el.style.overflowY = "hidden";
+}
+function autoSizeAll(root){
+  const scope = root || document;
+  Array.prototype.forEach.call(scope.querySelectorAll("textarea.f"), autoSize);
+}
 function autoGrow(){ input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, 190) + "px"; }
 input.addEventListener("input", function(){ autoGrow(); $("#sendBtn").disabled = streaming ? false : !input.value.trim(); updateEmber(); });
 input.addEventListener("keydown", function(e){
@@ -2592,7 +2611,7 @@ on("#injList", "input", function(e){
   const id = t.dataset.injtext || t.dataset.injname || t.dataset.injdepth;
   if (!id) return;
   const i = injById(id); if (!i) return;
-  if (t.dataset.injtext  != null) i.text = t.value;
+  if (t.dataset.injtext  != null){ i.text = t.value; autoSize(t); }
   if (t.dataset.injname  != null){
     i.name = t.value;
     const row = $("#injList").querySelector('[data-row="' + id + '"] .ord-name');
@@ -3212,6 +3231,9 @@ function renderEffort(){
   hint.textContent = (cur === "off" ? "" : "") + (EFFORT_HINTS[style] || "");
 }
 on("#jumpBtn", "click", function(){ pinned = true; scrollDown(true); });
+// the main prompt and the per-chat box grow the same way as the block editors
+on("#sysPrompt", "input", function(e){ autoSize(e.target); });
+on("#chatSys", "input", function(e){ autoSize(e.target); });
 on("#tgSquash", "click", function(){
   S.squashSystem = !(S.squashSystem !== false);
   setToggle($("#tgSquash"), S.squashSystem);
