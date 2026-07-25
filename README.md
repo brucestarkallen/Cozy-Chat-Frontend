@@ -112,6 +112,21 @@ Settings → Chat also has an extra system box that applies to **the open chat o
 - Sidebar → **Prompts**, or the Prompts button under the message box
 - Save what you've typed with one tap, then drop it back in whenever
 
+**Squash system messages** (Settings → Chat, on by default)
+Sends neighbouring system blocks as one message instead of several.
+
+Say three system blocks sit next to each other. With squash on, the model
+receives one system message containing all three, separated by blank lines.
+With it off, it receives three separate system messages.
+
+Most APIs follow a single system message more reliably, and one message costs
+fewer delimiter tokens. Turn it off when you want each block treated as a
+distinct instruction — some models weigh separate messages more literally, and
+it makes the boundaries between blocks explicit.
+
+It only affects blocks that end up adjacent. Anything separated by a user or
+assistant turn is never merged.
+
 **Thinking**
 - Shown in a collapsible block
 - Handles models with a separate reasoning field *and* models that write
@@ -225,7 +240,7 @@ network-first, so a refresh always gets the newest version.
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
 **Tests.** `v41test.js`, `v4test.js`, `v32test.js`, `v31test.js`, `v3test.js`, `v2test.js`, `domtest.js`, `migtest.js` and
-`negtest.js` and `csstest.js` run under Node with jsdom (`npm i jsdom fake-indexeddb`). 335 checks across the
+`negtest.js` and `csstest.js` run under Node with jsdom (`npm i jsdom fake-indexeddb`). 351 checks across the
 matching engine, JSON tolerance, prompt assembly, streaming, migration, and a
 negative test that deliberately reintroduces a fixed bug to prove the guard fires.
 

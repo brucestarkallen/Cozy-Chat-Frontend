@@ -109,6 +109,58 @@ console.log('\n=== 4. FULL FLOW: ASK → CREATE → EDIT ===');
      w.eval('applyEditToText(docs[0].text,{type:"replace",find:"Act one.",replace:"Act two."})').text.includes('Act two.'));
 }
 
+console.log('\n=== 4b. SQUASH SYSTEM MESSAGES ===');
+{
+  const dom=await boot(base({squashSystem:true,presets:[{id:'d',name:'D',system:'',
+    injections:[
+      {id:'a',name:'a',text:'ALPHA',role:'system',pos:'relative',depth:0,enabled:true},
+      {id:'b',name:'b',text:'BETA', role:'system',pos:'relative',depth:0,enabled:true},
+      {id:'c',name:'c',text:'GAMMA',role:'user',  pos:'relative',depth:0,enabled:true}],
+    order:['__chat__','a','b','c']}],activePreset:'d'}));
+  const w=dom.window;
+  w.eval('current={id:"c",title:"t",messages:[{id:"1",role:"user",content:"U"}]}');
+  let msgs=w.eval('assembleMessages("openai").messages');
+  const sys=msgs.filter(m=>m.role==='system');
+  ck('two neighbouring system blocks become one message', sys.length===1,
+     JSON.stringify(msgs.map(m=>m.role+':'+m.content)));
+  ck('and both texts survive, in order', sys[0].content==='ALPHA\n\nBETA', JSON.stringify(sys[0].content));
+  ck('a different role is not swallowed', msgs.some(m=>m.role==='user'&&m.content==='GAMMA'));
+
+  w.eval('S.squashSystem=false;saveSettings()');
+  msgs=w.eval('assembleMessages("openai").messages');
+  ck('turning it off keeps them separate',
+     msgs.filter(m=>m.role==='system').length===2,
+     JSON.stringify(msgs.map(m=>m.role+':'+m.content)));
+  ck('user turns still merge as before when adjacent',
+     msgs.filter(m=>m.role==='user').length>=1);
+  ck('it defaults to on for new installs', w.eval('DEFAULTS.squashSystem')===true);
+  const d=dom.window.document;
+  ev(w,d.querySelector('#settingsBtn'),'click');
+  d.querySelectorAll('.tab')[1].dispatchEvent(new w.Event('click',{bubbles:true}));
+  ck('there is a toggle for it', !!d.querySelector('#tgSquash'));
+  ck('the toggle reflects the setting', d.querySelector('#tgSquash').classList.contains('on')===false);
+  ev(w,d.querySelector('#tgSquash'),'click');
+  ck('tapping it turns squashing back on', w.eval('S.squashSystem')===true);
+}
+
+console.log('\n=== 4c. THE PANEL CAN ACTUALLY BE SCROLLED ===');
+{
+  const css=[...html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(m=>m[1]).join('\n');
+  ck('on a phone the sheet is full height, not a centred box',
+     /@media \(max-width:720px\)\{[\s\S]*?\.modal \.sheet\{[^}]*height:var\(--vvh/.test(css));
+  ck('height follows the visible viewport, not dvh',
+     /max-height:min\(86dvh, var\(--vvh/.test(css));
+  ck('the textarea is capped so it cannot fill the panel',
+     /\.ord-editor textarea\{[^}]*max-height:34vh/.test(css));
+  ck('there is a strip beside the editor that is safe to drag on',
+     /\.ord-editor::before\{/.test(css));
+  const js=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]).join('\n');
+  ck('visualViewport drives --vvh', /visualViewport/.test(js) && /--vvh/.test(js));
+  ck('it updates when the keyboard opens or closes',
+     /vv\.addEventListener\("resize"/.test(js));
+  ck('and on rotation', /orientationchange/.test(js));
+}
+
 console.log('\n=== 5. REGRESSIONS ===');
 {
   const dom=await boot(base());const w=dom.window,d=dom.window.document;

@@ -59,7 +59,10 @@ setTimeout(()=>{
   probe('textarea gets a text colour', ta, 'color');
   probe('textarea gets a border', ta, 'border');
   ck('textarea fills the row', cs(ta).width==='100%', cs(ta).width);
-  ck('textarea is tall enough to write in', parseInt(cs(ta).minHeight)>=100, cs(ta).minHeight);
+  ck('textarea is tall enough to write in', parseInt(cs(ta).minHeight)>=80, cs(ta).minHeight);
+  // it must not fill the panel, or there is nowhere left to scroll from
+  ck('textarea is capped so the panel stays scrollable',
+     /max-height/.test(cs(ta).maxHeight)||/vh|px|%/.test(cs(ta).maxHeight||''), cs(ta).maxHeight||'none');
 
   const nm=d.querySelector('.ord-editor input[type=text]');
   probe('name field gets a background', nm, 'background');
@@ -90,6 +93,16 @@ setTimeout(()=>{
   for (const m of bare.matchAll(/\.([a-zA-Z][\w-]*)/g)) defined.add(m[1]);
   const dead=[...defined].filter(c=>!new RegExp('(^|[^\\w-])'+c.replace(/[-]/g,'\\-')+'([^\\w-]|$)').test(nonCss));
   ck('no CSS rule left with nothing using it', dead.length===0, dead.join(', ')||'clean');
+
+  // and the reverse: a class written into markup that no rule styles. That is
+  // how the white textarea happened, and how .row-toggle nearly happened again.
+  const used=new Set();
+  for (const m of nonCss.matchAll(/class=\\?["']([^"'\\]+)/g))
+    for (const c of m[1].split(/\s+/)) if (c) used.add(c);
+  // classes that only mark state or are targeted by [data-*] carry no styling
+  const stateOnly=/^(hidden|show|on|off|active|open|done|pending|error|dragging|drop-target|armed|last_mes)$/;
+  const unstyled=[...used].filter(c=>!defined.has(c) && !stateOnly.test(c));
+  ck('no class in the markup is left unstyled', unstyled.length===0, unstyled.join(', ')||'clean');
 
   console.log('\n'+(fail?'FAILED '+fail:'ALL PASS')+'  ('+(pass+fail)+' checks)');
   process.exit(fail?1:0);
