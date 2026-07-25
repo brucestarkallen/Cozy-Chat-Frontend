@@ -1333,10 +1333,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v5.2.1
+   COZY CHAT v5.2.2
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "5.2.1";
+const VERSION = "5.2.2";
 
 const PRESETS = {
   anthropic:  { name:"Claude",     kind:"anthropic", url:"https://api.anthropic.com/v1", model:"claude-sonnet-4-6", ctx:200000, hint:"e.g. claude-sonnet-4-6, claude-opus-4-5" },
@@ -1605,6 +1605,9 @@ function chatSquash(c){ return cfgGet("squashSystem", S.squashSystem !== false, 
 let convos = [], current = null, streaming = null, editingProv = null;
 let docs = [], openDocId = null, convoQuery = "", pendingAtts = [];
 let searchArmed = false, pinned = true;
+/* The finger owns the thread while it is down; program scrolls are counted
+   so their echo events can be told apart from the user's own. */
+let userTouching = false, progScrolls = 0, repaintHook = null;
 
 const $  = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
@@ -1755,6 +1758,7 @@ function newConvo(seed){
   const c = { id:uid(), title:"New chat", createdAt:Date.now(), updatedAt:Date.now(),
               messages: seed || [], cfg: defaultCfg() };
   convos.unshift(c); current = c;
+  pinned = true;
   renderSidebar(); renderThread(); closeDrawer(); $("#input").focus();
   return c;
 }
@@ -1842,9 +1846,20 @@ function renderThread(){
     $("#regenBtn").hidden = true; $("#clearBtn").hidden = true; updateEmber(); return;
   }
   const lastA = lastAssistantIdx();
+  /* A rebuild recreates every code block; any the user has swiped sideways
+     keeps its place, matched per message so edits elsewhere cannot shift it. */
+  const keepX = {};
+  Array.prototype.forEach.call(el.querySelectorAll(".msg[data-mid]"), function(mEl){
+    const a = Array.prototype.map.call(mEl.querySelectorAll("pre"), function(p){ return p.scrollLeft; });
+    if (a.some(function(v){ return v; })) keepX[mEl.getAttribute("data-mid")] = a;
+  });
   el.innerHTML = current.messages.map((m,i) => msgHtml(m, i === lastA)).join("");
+  Array.prototype.forEach.call(el.querySelectorAll(".msg[data-mid]"), function(mEl){
+    const a = keepX[mEl.getAttribute("data-mid")];
+    if (a) Array.prototype.forEach.call(mEl.querySelectorAll("pre"), function(p, i){ if (a[i]) p.scrollLeft = a[i]; });
+  });
   $("#regenBtn").hidden = false; $("#clearBtn").hidden = false;
-  updateEmber(); scrollDown(true);
+  updateEmber(); scrollDown();
 }
 /* A conversation attaches any number of files. docId was the single-file
    field; it is read once and folded into docIds so older chats carry over. */
@@ -1957,7 +1972,11 @@ function msgHtml(m, isLastAssistant){
 }
 function nearBottom(){ const t = $("#thread"); return t.scrollHeight - t.scrollTop - t.clientHeight < 120; }
 function scrollDown(force){
-  if (force || pinned){ const t = $("#thread"); t.scrollTop = t.scrollHeight; }
+  if (!userTouching && (force || pinned)){
+    const t = $("#thread");
+    const max = t.scrollHeight - t.clientHeight;
+    if (t.scrollTop < max){ progScrolls++; t.scrollTop = max; }
+  }
   updateJump();
 }
 // Once you scroll up, nothing drags you back down — but there is a way back.
@@ -1968,7 +1987,7 @@ function updateJump(){
 }
 // A growing box only follows its own tail while you are already at that tail.
 function stickScroll(el){
-  if (!el) return;
+  if (!el || userTouching) return;
   if (el.scrollHeight - el.scrollTop - el.clientHeight < 40) el.scrollTop = el.scrollHeight;
 }
 
@@ -2246,9 +2265,14 @@ async function send(userText, mode, forConvo){
       if (done) return;
       const sr = splitReasoning(raw);
       asst.thinking = sr.think || asst.thinking; asst.content = sr.text;
+      if (userTouching) return;
       const node = document.querySelector('[data-mid="' + asst.id + '"] .msg-body');
       if (!node) return;
+      /* Replacing innerHTML rebuilds every code block; one the user has
+         swiped sideways must not snap back to the left edge each token. */
+      const keep = Array.prototype.map.call(node.querySelectorAll("pre"), function(p){ return p.scrollLeft; });
       node.innerHTML = renderMarkdown(trimPartialTag(sr.text)) + '<span class="caret"></span>';
+      Array.prototype.forEach.call(node.querySelectorAll("pre"), function(p, i){ if (keep[i]) p.scrollLeft = keep[i]; });
       if (asst.thinking && S.showThinking){
         let tw = document.querySelector('[data-mid="' + asst.id + '"] .think-body');
         if (!tw){
@@ -2264,6 +2288,7 @@ async function send(userText, mode, forConvo){
     });
   };
 
+  repaintHook = paint;
   const sources = [];
   try {
     const req = buildPayload({ search: wantSearch }, convo);
@@ -2335,6 +2360,7 @@ async function send(userText, mode, forConvo){
   } finally {
     // a newer send may own the controls by now — only the owner releases them
     if (streaming === ctrl){ streaming = null; setSending(false); }
+    if (repaintHook === paint) repaintHook = null;
     if (asst) delete asst.pending;
     if (asst && asst.role === "assistant"){
       asst.variants = asst.variants || [];
@@ -2708,7 +2734,27 @@ on("#searchToggle", "click", function(){
   searchArmed = !searchArmed; syncSearchBtn();
   toast(searchArmed ? "Next message will search the web" : "Search off for next message");
 });
-on("#thread", "scroll", function(){ pinned = nearBottom(); updateJump(); });
+/* The user's own scrolling is the only thing that may unpin, and their own
+   return to the bottom the only thing that re-pins. Program scrolls are
+   counted and their echoes change nothing; while a finger is down the pin is
+   not resampled at all — the gesture's END decides, so mid-drag paints and
+   momentum can never fight the hand. */
+on("#thread", "scroll", function(){
+  if (progScrolls > 0){ progScrolls--; return; }
+  if (!userTouching) pinned = nearBottom();
+  updateJump();
+});
+on("#thread", "touchstart", function(){ userTouching = true; }, { passive:true });
+function threadTouchDone(e){
+  if (e.touches && e.touches.length) return;
+  userTouching = false;
+  pinned = nearBottom();
+  updateJump();
+  if (repaintHook) repaintHook();
+  scrollDown();
+}
+on("#thread", "touchend", threadTouchDone, { passive:true });
+on("#thread", "touchcancel", threadTouchDone, { passive:true });
 on("#menuBtn", "click", openDrawer);
 on("#scrim", "click", function(){ closeDrawer(); closeSettings(); });
 on("#settingsBtn", "click", openSettings);
@@ -2749,7 +2795,7 @@ on("#convoList", "click", async function(e){
     renderSidebar(); renderThread(); return;
   }
   const row = e.target.closest("[data-id]");
-  if (row){ current = convos.find(c=>c.id===row.dataset.id)||null; renderSidebar(); renderThread(); collapseDocBar(); closeDrawer(); }
+  if (row){ current = convos.find(c=>c.id===row.dataset.id)||null; pinned = true; renderSidebar(); renderThread(); collapseDocBar(); closeDrawer(); }
 });
 
 on("#threadInner", "click", async function(e){

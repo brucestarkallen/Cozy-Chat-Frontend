@@ -251,8 +251,8 @@ network-first, so a refresh always gets the newest version.
 `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`, `swtest.js`,
 `scrolltest.js`, `styletest.js`, `hiddentest.js`, `coherencetest.js` and
 `installtest.sh` — runs under Node with jsdom (`npm i jsdom fake-indexeddb`).
-671 checks across the matching engine, JSON tolerance, prompt assembly,
-streaming, stream/chat binding, touch reorder, backup round-trips, migration, and negative
+699 checks across the matching engine, JSON tolerance, prompt assembly,
+streaming, stream/chat binding, touch reorder, reader-owned scrolling, backup round-trips, migration, and negative
 tests that deliberately reintroduce fixed bugs to prove the guards fire.
 
 ---
