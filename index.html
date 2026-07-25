@@ -1121,6 +1121,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
       <div class="field" style="margin-bottom:0">
         <label class="lbl">Version</label>
         <div class="hint" id="verInfo">Cozy Chat v1.0.0</div>
+        <div class="btn-row" style="margin-top:10px">
+          <button class="btn" id="updateBtn">Check for an update</button>
+        </div>
+        <div class="hint" id="updateMsg" style="margin-top:6px"></div>
       </div>
     </div>
   </div>
@@ -1202,10 +1206,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v4.0.0
+   COZY CHAT v4.0.2
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "4.0.0";
+const VERSION = "4.0.2";
 
 const PRESETS = {
   anthropic:  { name:"Claude",     kind:"anthropic", url:"https://api.anthropic.com/v1", model:"claude-sonnet-4-6", ctx:200000, hint:"e.g. claude-sonnet-4-6, claude-opus-4-5" },
@@ -3201,6 +3205,40 @@ on("#injList", "click", function(e){
   list.addEventListener("pointerup", finish);
   list.addEventListener("pointercancel", function(){ dragId = null; rows = []; renderInjections(); });
 })();
+
+
+/* ==========================================================
+   UPDATE CHECK
+   The version stamp is the only reliable way to know which code is
+   running — appearance is not, because a stale copy still looks like
+   an app. This fetches the deployed file past every cache and
+   compares stamps.
+   ========================================================== */
+async function checkForUpdate(){
+  const msg = $("#updateMsg");
+  msg.textContent = "Checking…";
+  try {
+    const res = await fetch("index.html?v=" + Date.now(), { cache: "no-store" });
+    if (!res.ok) throw new Error("server replied " + res.status);
+    const text = await res.text();
+    const m = text.match(/const VERSION = "([\d.]+)"/);
+    if (!m) throw new Error("could not read the version");
+    if (m[1] === VERSION){
+      msg.textContent = "You're on the newest version (" + VERSION + ").";
+      return;
+    }
+    msg.innerHTML = "Version " + escapeHtml(m[1]) + " is available — you're on " + VERSION + ". Reloading…";
+    // drop the worker's cache so the reload cannot be served an old copy
+    if (window.caches && caches.keys) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+    setTimeout(function(){ location.reload(); }, 900);
+  } catch (err){
+    msg.textContent = "Couldn't check — " + String(err.message || err);
+  }
+}
+on("#updateBtn", "click", checkForUpdate);
 
 /* ==========================================================
    WIRING
