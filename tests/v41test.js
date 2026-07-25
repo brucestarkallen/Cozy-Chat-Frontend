@@ -76,7 +76,7 @@ console.log('\n=== 3. NO FILE ATTACHED — MODEL IS STILL TOLD IT CAN WRITE ONE 
   ck('the protocol advertises create_file', sys.includes('create_file'));
   ck('it says no file is attached yet', sys.includes('No file is attached yet'));
   ck('the toggle shows as on', d.querySelector('#filesOnBtn').getAttribute('aria-checked')==='true');
-  ck('open/undo/detach are disabled with no file', d.querySelector('#docViewBtn').disabled===true);
+  ck('no file rows are shown with nothing attached', d.querySelector('#fileList').hidden===true);
 }
 
 console.log('\n=== 4. FULL FLOW: ASK → CREATE → EDIT ===');
@@ -101,8 +101,10 @@ console.log('\n=== 4. FULL FLOW: ASK → CREATE → EDIT ===');
   ck('approving creates the file', w.eval('docs.length')===1, String(w.eval('docs.length')));
   ck('with the right name', w.eval('docs[0].name')==='plot-essential.md', w.eval('docs[0].name'));
   ck('with the right contents', w.eval('docs[0].text').includes('Act one.'));
-  ck('and it is attached to this chat', w.eval('current.docId')===w.eval('docs[0].id'));
-  ck('the top bar shows it', d.querySelector('#fileName').textContent==='plot-essential.md');
+  ck('and it is attached to this chat', w.eval('chatDocIds()[0]')===w.eval('docs[0].id'),
+     String(w.eval('chatDocIds().length'))+' attached');
+  ck('the top bar lists it', /plot-essential\.md/.test(d.querySelector('#fileList').textContent),
+     d.querySelector('#fileList').textContent.trim());
   ck('now the file contents go to the model',
      w.eval('assembleMessages("openai").system').includes('Act one.'));
   ck('and edits can target it',

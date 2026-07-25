@@ -1,4 +1,3 @@
-// TEST FILE - not for pasting into SillyTavern. Run with: node tests/v3test.js
 const fs=require('fs');const {JSDOM}=require('jsdom');require('fake-indexeddb/auto');
 const html=fs.readFileSync('./out/index.html','utf8');
 function sse(cs){let i=0;return{getReader(){return{read(){
@@ -102,7 +101,7 @@ console.log('\n=== 5. LIVE EDIT FLOW (attach → propose → apply → undo) ===
   ck('file icon visible when attached', d2.querySelector('#fileBtn').hidden===false);
   const sys=w2.eval('assembleMessages("openai").system');
   ck('protocol sent to model', sys.includes('<docedits>'));
-  ck('file contents sent to model', sys.includes('old value')&&sys.includes('[DOCUMENT: spec.md]'));
+  ck('file contents sent to model', sys.includes('old value')&&sys.includes('[FILE: spec.md]'));
   d2.querySelector('#input').value='fix it'; ev(w2,d2.querySelector('#input'),'input');
   ev(w2,d2.querySelector('#sendBtn'),'click');
   await new Promise(r=>setTimeout(r,1000));

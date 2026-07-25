@@ -631,6 +631,24 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 }
 .file-pop .pop-toggle.on::after{background:var(--ember);border-color:var(--ember)}
 .file-pop .pop-toggle.on{color:var(--text)}
+.file-list{margin:2px 0 5px;border-bottom:1px solid var(--border-soft);padding-bottom:5px}
+.fl-row{display:flex;align-items:center;gap:5px;padding:1px 0}
+.fl-name{
+  flex:1;min-width:0;padding:6px 8px;border-radius:6px;cursor:pointer;
+  font-size:13px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.fl-name:hover{background:var(--surface);color:var(--text)}
+.fl-row button{
+  flex:none;width:auto;padding:5px 7px;border-radius:6px;
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);
+}
+.fl-row button:hover:not(:disabled){background:var(--surface);color:var(--text)}
+.fl-row button:disabled{opacity:.3}
+.file-count{
+  position:absolute;top:1px;right:1px;min-width:14px;height:14px;padding:0 3px;
+  display:grid;place-items:center;border-radius:7px;
+  background:var(--ember);color:#191106;font-size:9px;font-weight:700;line-height:1;
+}
 .doc-row{
   display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:7px;
   border:1px solid var(--border);border-radius:var(--r);background:var(--surface);cursor:pointer;
@@ -848,6 +866,7 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
           <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/>
         </svg>
+        <span class="file-count" id="fileCount" hidden></span>
       </button>
       <button class="icon-btn" id="exportBtn" title="Save as Markdown" aria-label="Save as Markdown">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
@@ -864,12 +883,12 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 
     <div class="file-pop" id="filePop">
       <div class="fname" id="fileName"></div>
+      <div class="file-list" id="fileList" hidden></div>
       <button id="filesOnBtn" class="pop-toggle" role="switch" aria-checked="false">
         Let the assistant write files
       </button>
-      <button id="docViewBtn">Open the file</button>
-      <button id="docUndoBtn">Undo last change</button>
-      <button class="danger" id="docDetachBtn">Stop using it here</button>
+      <button id="attachMoreBtn">Attach a file…</button>
+      <button class="danger" id="docDetachBtn">Use no files here</button>
     </div>
 
     <button class="jump-btn" id="jumpBtn">
@@ -1307,10 +1326,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v5.0.0
+   COZY CHAT v5.1.0
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "5.0.0";
+const VERSION = "5.1.0";
 
 const PRESETS = {
   anthropic:  { name:"Claude",     kind:"anthropic", url:"https://api.anthropic.com/v1", model:"claude-sonnet-4-6", ctx:200000, hint:"e.g. claude-sonnet-4-6, claude-opus-4-5" },
@@ -1806,22 +1825,48 @@ function renderThread(){
   $("#regenBtn").hidden = false; $("#clearBtn").hidden = false;
   updateEmber(); scrollDown(true);
 }
+/* A conversation attaches any number of files. docId was the single-file
+   field; it is read once and folded into docIds so older chats carry over. */
+function chatDocIds(){
+  if (!current) return [];
+  if (!Array.isArray(current.docIds)){
+    current.docIds = current.docId ? [current.docId] : [];
+    delete current.docId;
+  }
+  // drop ids whose file has since been deleted
+  current.docIds = current.docIds.filter(id => docs.some(d => d.id === id));
+  return current.docIds;
+}
+function chatDocs(){ return chatDocIds().map(id => docs.find(d => d.id === id)).filter(Boolean); }
+function isAttached(id){ return chatDocIds().indexOf(id) >= 0; }
+
 function renderFileBtn(){
   const btn = $("#fileBtn");
   if (!btn) return;
-  const d = (current && current.docId) ? docs.find(x => x.id === current.docId) : null;
+  const list = chatDocs();
   const on = !!(current && current.filesOn);
-  // always reachable, otherwise there is no way to let the model start a file
-  btn.hidden = false;
-  btn.classList.toggle("on", !!d || on);
-  $("#fileName").textContent = d ? ((d.name || "").trim() || "untitled")
-                                 : (on ? "no file yet — the assistant can make one" : "files are off");
-  $("#docViewBtn").disabled = !d;
-  $("#docUndoBtn").disabled = !d || !(d.undo && d.undo.length);
-  $("#docDetachBtn").disabled = !d;
+  btn.hidden = false;                      // always reachable, so files can be started
+  btn.classList.toggle("on", list.length > 0 || on);
+  const badge = $("#fileCount");
+  if (badge){ badge.textContent = list.length > 1 ? String(list.length) : ""; badge.hidden = list.length < 2; }
+
+  $("#fileName").textContent = list.length === 0
+    ? (on ? "no files yet — the assistant can make one" : "files are off")
+    : list.length + (list.length === 1 ? " file attached" : " files attached");
+
+  const box = $("#fileList");
+  if (box){
+    box.innerHTML = list.map(function(d){
+      const un = (d.undo && d.undo.length) ? "" : " disabled";
+      return '<div class="fl-row"><span class="fl-name" data-fopen="' + d.id + '">' + escapeHtml((d.name || "").trim() || "untitled") + '</span>'
+        + '<button data-fundo="' + d.id + '"' + un + ' title="Undo last change">undo</button>'
+        + '<button data-fdetach="' + d.id + '" title="Stop using it here">remove</button></div>';
+    }).join("");
+    box.hidden = !list.length;
+  }
   const t = $("#filesOnBtn");
   if (t){
-    const active = !!d || on;
+    const active = list.length > 0 || on;
     t.classList.toggle("on", active);
     t.setAttribute("aria-checked", active ? "true" : "false");
   }
@@ -1910,8 +1955,9 @@ function updateEmber(){
   let used = estTokens(PS().system);
   for (const i of PS().injections) if (i.enabled) used += estTokens(i.text);
   if (current && current.sysExtra) used += estTokens(current.sysExtra);
-  if (current && current.docId){ const dd = docs.find(x=>x.id===current.docId); if (dd) used += estTokens(dd.text) + 300; }
-  else if (current && current.filesOn) used += 300;
+  const att = chatDocs();
+  if (att.length){ used += 320; for (const d of att) used += estTokens(d.text) + 12; }
+  else if (current && current.filesOn) used += 320;
   if (current) for (const m of current.messages) used += estTokens(m.content) + 4;
   used += estTokens($("#input").value);
   const pct = Math.min(100, (used/limit)*100);
@@ -2012,9 +2058,11 @@ function assembleMessages(kind){
     tail.content = tail.content.replace(/\s+$/, "");
   let sysParts = topSys.slice();
   if (current && current.sysExtra && current.sysExtra.trim()) sysParts.push(current.sysExtra);
-  const doc = (current && current.docId) ? docs.find(d => d.id === current.docId) : null;
-  if (doc) sysParts.push(doceditProtocol(doc) + "\n\n[DOCUMENT: " + doc.name + "]\n" + doc.text);
-  else if (current && current.filesOn) sysParts.push(doceditProtocol(null));
+  const attached = chatDocs();
+  if (attached.length){
+    sysParts.push(doceditProtocol(attached));
+    for (const d of attached) sysParts.push("[FILE: " + d.name + "]\n" + d.text);
+  } else if (current && current.filesOn) sysParts.push(doceditProtocol([]));
   const system = sysParts.filter(t => t && t.trim()).join("\n\n");
   return { messages: merged, system: system };
 }
@@ -2223,7 +2271,7 @@ async function send(userText, mode){
     asst.content = fin.text || raw;
     if (fin.think) asst.thinking = fin.think;
     if (sources.length) asst.sources = sources;
-    if (current.docId || current.filesOn){
+    if (chatDocIds().length || current.filesOn){
       const pd = parseDocEdits(asst.content);
       if (pd.edits.length){ asst.edits = pd.edits; asst.content = stripDocEdits(asst.content); }
       else if (pd.error){ asst.editError = pd.error; asst.content = stripDocEdits(asst.content); }
@@ -2820,7 +2868,8 @@ on("#threadInner", "touchstart", function(e){
    when the difference is whitespace alone.
    ========================================================== */
 const DOCEDIT_HEAD_FILE =
-`You can edit the attached file "{{NAME}}". The full current contents are below.`;
+`You can edit these attached files: {{NAMES}}. Their full contents are below,
+each under a [FILE: name] heading.`;
 const DOCEDIT_HEAD_NONE =
 `You can write files for the user. No file is attached yet — create one when asked
 to draft, generate, or maintain a document, rather than only printing it in chat.`;
@@ -2830,14 +2879,16 @@ const DOCEDIT_BODY =
 <docedits>
 [
   {"create_file": "name.md", "replace": "the complete contents", "reason": "why"},
-  {"find": "verbatim excerpt from the file", "replace": "new text", "reason": "why"},
-  {"insert_after": "verbatim anchor line", "replace": "text placed under the anchor", "reason": "why"},
-  {"append": true, "replace": "text added at the end", "reason": "why"},
-  {"replace_all": true, "replace": "entire new file", "reason": "only on an explicit full-rewrite request"}
+  {"file": "which.md", "find": "verbatim excerpt", "replace": "new text", "reason": "why"},
+  {"file": "which.md", "insert_after": "verbatim anchor line", "replace": "text under the anchor", "reason": "why"},
+  {"file": "which.md", "append": true, "replace": "text added at the end", "reason": "why"},
+  {"file": "which.md", "replace_all": true, "replace": "entire new file", "reason": "only on an explicit full-rewrite request"}
 ]
 </docedits>
 
 Rules:
+- "file" names which attached file an action changes. With one file attached it
+  may be left out; with several it is required.
 - create_file makes a new file and attaches it, so later edits can target it.
   Give the whole contents. Use it when the user wants a document produced.
 - "find" and "insert_after" MUST be copied character-for-character from the file.
@@ -2845,9 +2896,15 @@ Rules:
 - Valid JSON only: escape newlines inside strings as \\n, no trailing commas.
 - Use replace_all only when explicitly asked to rewrite the whole file.
 - If the user is only chatting or asking a question, send no block at all.`;
-function doceditProtocol(doc){
-  return (doc ? DOCEDIT_HEAD_FILE.replace("{{NAME}}", doc.name) : DOCEDIT_HEAD_NONE)
-    + "\n\n" + DOCEDIT_BODY;
+function doceditProtocol(list){
+  const arr = Array.isArray(list) ? list : (list ? [list] : []);
+  const head = arr.length
+    ? DOCEDIT_HEAD_FILE.replace("{{NAMES}}", arr.map(d => '"' + d.name + '"').join(", "))
+    : DOCEDIT_HEAD_NONE;
+  const multi = arr.length > 1
+    ? "\n\nMore than one file is attached, so every action MUST carry a \"file\" naming\nwhich one it changes. An action without it will be refused."
+    : "";
+  return head + "\n\n" + DOCEDIT_BODY + multi;
 }
 
 /* ---------- block + JSON tolerance ---------- */
@@ -2939,14 +2996,15 @@ function parseDocEdits(text){
     if (!e || typeof e !== "object") continue;
     const replace = String(e.replace == null ? "" : e.replace);
     const reason  = String(e.reason  == null ? "" : e.reason);
+    const file    = typeof e.file === "string" ? e.file.trim() : "";
     if (typeof e.create_file === "string" && e.create_file.trim()){
       edits.push({ id:uid(), type:"create", find:null, name:e.create_file.trim(),
                    replace:replace, reason:reason, status:"pending" }); continue;
     }
-    if (e.replace_all === true){ edits.push({ id:uid(), type:"replace_all", find:null, replace:replace, reason:reason, status:"pending" }); continue; }
-    if (e.append === true){ edits.push({ id:uid(), type:"append", find:null, replace:replace, reason:reason, status:"pending" }); continue; }
-    if (typeof e.insert_after === "string" && e.insert_after.length){ edits.push({ id:uid(), type:"insert", find:e.insert_after, replace:replace, reason:reason, status:"pending" }); continue; }
-    if (typeof e.find === "string" && e.find.length){ edits.push({ id:uid(), type:"replace", find:e.find, replace:replace, reason:reason, status:"pending" }); continue; }
+    if (e.replace_all === true){ edits.push({ id:uid(), type:"replace_all", find:null, file:file, replace:replace, reason:reason, status:"pending" }); continue; }
+    if (e.append === true){ edits.push({ id:uid(), type:"append", find:null, file:file, replace:replace, reason:reason, status:"pending" }); continue; }
+    if (typeof e.insert_after === "string" && e.insert_after.length){ edits.push({ id:uid(), type:"insert", find:e.insert_after, file:file, replace:replace, reason:reason, status:"pending" }); continue; }
+    if (typeof e.find === "string" && e.find.length){ edits.push({ id:uid(), type:"replace", find:e.find, file:file, replace:replace, reason:reason, status:"pending" }); continue; }
   }
   return { edits: edits };
 }
@@ -3100,9 +3158,10 @@ function applyEditToText(text, edit){
 /* ---------- edit cards ---------- */
 function editKindLabel(e){
   if (e.type === "create") return "Create file — " + (e.name || "untitled");
-  return e.type === "replace_all" ? "Rewrite whole file"
+  const where = e.file ? " — " + e.file : "";
+  return (e.type === "replace_all" ? "Rewrite whole file"
        : e.type === "append" ? "Add at the end"
-       : e.type === "insert" ? "Insert after" : "Replace";
+       : e.type === "insert" ? "Insert after" : "Replace") + where;
 }
 function clip(s, n){
   s = String(s == null ? "" : s);
@@ -3133,6 +3192,20 @@ function editCardsHtml(m){
     + (left ? '<button data-applyall="' + m.id + '">Apply all</button>' : "")
     + '<button data-dismiss="' + m.id + '">Dismiss</button></div>' + cards + '</div>';
 }
+/* Which attached file does this action change? With one attached it is
+   unambiguous. With several the model must name it, and a wrong name is
+   refused rather than guessed — silently writing into the wrong document
+   would be far worse than a failed card. */
+function resolveTarget(e){
+  const list = chatDocs();
+  if (!list.length) return null;
+  const want = (e.file || "").trim().toLowerCase();
+  if (!want) return list.length === 1 ? list[0] : null;
+  const base = x => String(x || "").toLowerCase().replace(/^.*[\\/]/, "");
+  return list.find(d => (d.name || "").toLowerCase() === want)
+      || list.find(d => base(d.name) === base(want))
+      || null;
+}
 async function applyEdit(msgId, editId){
   const m = current.messages.find(x => x.id === msgId);
   const e = m && m.edits && m.edits.find(x => x.id === editId);
@@ -3140,7 +3213,7 @@ async function applyEdit(msgId, editId){
 
   if (e.type === "create"){
     const d = await newDoc(e.name || "untitled.md", e.replace || "");
-    current.docId = d.id;
+    chatDocIds().push(d.id);
     current.filesOn = true;
     e.status = "applied"; e.note = "created and attached";
     await persist(); renderThread(); renderFileBtn(); renderDocList(); updateEmber();
@@ -3148,8 +3221,14 @@ async function applyEdit(msgId, editId){
     return;
   }
 
-  const doc = docs.find(d => d.id === current.docId);
-  if (!doc){ e.status = "failed"; e.note = "no file is attached"; renderThread(); return; }
+  const doc = resolveTarget(e);
+  if (!doc){
+    e.status = "failed";
+    e.note = chatDocs().length > 1
+      ? (e.file ? 'no attached file called "' + e.file + '"' : "didn't say which file to change")
+      : "no file is attached";
+    renderThread(); return;
+  }
   const before = doc.text;
   const r = applyEditToText(doc.text, e);
   if (r.text === null){ e.status = "failed"; e.note = r.note; }
@@ -3171,8 +3250,8 @@ async function applyAll(msgId){
   const bad  = m.edits.filter(e => e.status === "failed").length;
   toast(done + " applied" + (bad ? ", " + bad + " couldn't be matched" : ""));
 }
-async function undoDoc(){
-  const doc = docs.find(d => d.id === current.docId);
+async function undoDoc(id){
+  const doc = id ? docs.find(d => d.id === id) : chatDocs()[0];
   if (!doc || !doc.undo || !doc.undo.length){ toast("Nothing to undo"); return; }
   doc.text = doc.undo.pop().text;
   doc.updatedAt = Date.now();
@@ -3199,10 +3278,10 @@ function renderDocList(){
   const el = $("#docList");
   if (!docs.length){ el.innerHTML = '<div class="hint">No files yet.</div>'; return; }
   el.innerHTML = docs.map(d =>
-    '<div class="doc-row' + (current && current.docId === d.id ? " active" : "") + '" data-doc="' + d.id + '">'
+    '<div class="doc-row' + (isAttached(d.id) ? " active" : "") + '" data-doc="' + d.id + '">'
     + '<div class="info"><div class="nm">' + escapeHtml(d.name) + '</div>'
     + '<div class="meta">' + d.text.length.toLocaleString() + ' chars · ~' + estTokens(d.text).toLocaleString() + ' tokens'
-    + (current && current.docId === d.id ? " · attached" : "") + '</div></div></div>').join("");
+    + (isAttached(d.id) ? " · attached" : "") + '</div></div></div>').join("");
 }
 function openDocEditor(id){
   const d = docs.find(x => x.id === id);
@@ -3228,8 +3307,10 @@ async function newDoc(name, text){
 }
 async function attachDoc(id){
   if (!current) newConvo();
-  current.docId = id;
-  await persist(); renderThread(); renderDocList(); collapseDocBar();
+  const ids = chatDocIds();
+  if (ids.indexOf(id) < 0) ids.push(id);
+  current.filesOn = true;
+  await persist(); renderThread(); renderFileBtn(); renderDocList(); collapseDocBar();
   const d = docs.find(x => x.id === id);
   toast(d ? ("Attached " + d.name) : "Attached");
 }
@@ -3695,15 +3776,35 @@ on("#docDelBtn", "click", async function(){
   if (!d || !confirm('Delete "' + d.name + '"?')) return;
   await DB.docDel(d.id);
   docs = docs.filter(x => x.id !== d.id);
-  for (const c of convos) if (c.docId === d.id){ delete c.docId; await DB.put(JSON.parse(JSON.stringify(c))); }
+  for (const c of convos){
+    let touched = false;
+    if (Array.isArray(c.docIds) && c.docIds.indexOf(d.id) >= 0){ c.docIds = c.docIds.filter(x => x !== d.id); touched = true; }
+    if (c.docId === d.id){ delete c.docId; touched = true; }
+    if (touched) await DB.put(JSON.parse(JSON.stringify(c)));
+  }
   closeDocEdit(); renderDocList(); renderThread(); toast("Deleted");
 });
-on("#docViewBtn", "click", function(){ closeFilePop(); if (current && current.docId) openDocEditor(current.docId); });
-on("#docUndoBtn", "click", function(){ closeFilePop(); undoDoc(); });
+on("#fileList", "click", function(e){
+  const o = e.target.closest("[data-fopen]");
+  if (o){ closeFilePop(); openDocEditor(o.dataset.fopen); return; }
+  const u = e.target.closest("[data-fundo]");
+  if (u){ undoDoc(u.dataset.fundo); return; }
+  const x = e.target.closest("[data-fdetach]");
+  if (x){
+    const id = x.dataset.fdetach;
+    const d = docs.find(y => y.id === id);
+    current.docIds = chatDocIds().filter(y => y !== id);
+    persist().then(function(){
+      renderThread(); renderFileBtn(); renderDocList();
+      toast(d ? (d.name + " is no longer part of this chat — the file is still saved") : "Removed");
+    });
+  }
+});
+on("#attachMoreBtn", "click", function(){ closeFilePop(); openDocs(); });
 on("#filesOnBtn", "click", async function(){
   if (!current) newConvo();
-  current.filesOn = !(current.filesOn || current.docId);
-  if (!current.filesOn) delete current.docId;
+  current.filesOn = !(current.filesOn || chatDocIds().length);
+  if (!current.filesOn){ current.docIds = []; delete current.docId; }
   await persist(); renderThread(); renderFileBtn(); updateEmber();
   toast(current.filesOn ? "The assistant can write files in this chat"
                         : "File writing is off for this chat");
@@ -3711,9 +3812,10 @@ on("#filesOnBtn", "click", async function(){
 on("#docDetachBtn", "click", async function(){
   if (!current) return;
   closeFilePop();
-  const d = docs.find(x => x.id === current.docId);
-  delete current.docId; await persist(); renderThread();
-  toast(d ? (d.name + " is no longer part of this chat — the file is still saved") : "Removed from this chat");
+  // "use no files here" turns the whole capability off, not just the list
+  current.docIds = []; delete current.docId; current.filesOn = false;
+  await persist(); renderThread(); renderFileBtn(); renderDocList();
+  toast("No files are used in this chat any more — they are still saved");
 });
 
 /* --- edit cards --- */

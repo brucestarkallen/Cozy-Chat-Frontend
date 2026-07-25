@@ -61,11 +61,14 @@ console.log('\n=== 3. ATTACHED FILE LIVES IN THE TOP BAR ===');
   ck('popover starts closed', !d.querySelector('#filePop').classList.contains('show'));
   ev(w,d.querySelector('#fileBtn'),'click');
   ck('tapping opens it', d.querySelector('#filePop').classList.contains('show'));
-  ck('shows the file name', d.querySelector('#fileName').textContent==='spec.md');
+  ck('names the attached file in the list',
+     /spec\.md/.test(d.querySelector('#fileList').textContent), d.querySelector('#fileList').textContent.trim());
+  ck('and summarises the count', /1 file attached/.test(d.querySelector('#fileName').textContent),
+     d.querySelector('#fileName').textContent);
   const labels=Array.from(d.querySelectorAll('#filePop button')).map(b=>b.textContent.trim());
   ck('actions are worded plainly, no "Detach"',
      !labels.join(' ').toLowerCase().includes('detach'), labels.join(' | '));
-  ck('undo disabled with nothing to undo', d.querySelector('#docUndoBtn').disabled===true);
+  ck('undo disabled with nothing to undo', d.querySelector('[data-fundo]').disabled===true);
   d.body.dispatchEvent(new w.Event('click',{bubbles:true}));
   ck('tapping elsewhere closes it', !d.querySelector('#filePop').classList.contains('show'));
   // removing explains the file is kept
@@ -75,8 +78,9 @@ console.log('\n=== 3. ATTACHED FILE LIVES IN THE TOP BAR ===');
   ck('removing tells you the file is still saved',
      d.querySelector('#toast').textContent.includes('still saved'), d.querySelector('#toast').textContent);
   ck('the file itself was not deleted', w.eval('docs.length')===1);
-  ck('icon goes inactive again', !d.querySelector('#fileBtn').classList.contains('on'));
-  ck('and its file actions are disabled', d.querySelector('#docViewBtn').disabled===true);
+  ck('icon goes inactive again', !d.querySelector('#fileBtn').classList.contains('on'),
+     d.querySelector('#fileBtn').className);
+  ck('and no files are listed', d.querySelector('#fileList').hidden===true);
   ck('popover closed too', !d.querySelector('#filePop').classList.contains('show'));
 }
 console.log('\n=== 4. BLANK NAMES CAN NEVER RENDER EMPTY ===');
@@ -86,7 +90,9 @@ console.log('\n=== 4. BLANK NAMES CAN NEVER RENDER EMPTY ===');
   await new Promise(r=>setTimeout(r,250));
   for(const bad of ['', '   ', '\t', '\n ']){
     w.eval('docs[0].name='+JSON.stringify(bad)); w.eval('renderFileBtn()');
-    ck('name '+JSON.stringify(bad)+' falls back', d.querySelector('#fileName').textContent==='untitled');
+    ck('name '+JSON.stringify(bad)+' falls back',
+       /untitled/.test(d.querySelector('#fileList').textContent),
+       d.querySelector('#fileList').textContent.trim());
   }
 }
 console.log('\n=== 5. REGRESSIONS ===');

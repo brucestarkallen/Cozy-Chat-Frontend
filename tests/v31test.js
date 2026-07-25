@@ -138,9 +138,10 @@ console.log('\n=== 6. ATTACHED FILE INDICATOR ===');
   await w.eval('(async()=>{const doc=await newDoc("spec.md","body");newConvo();await attachDoc(doc.id);})()');
   await new Promise(r=>setTimeout(r,300));
   ck('icon appears in the top bar', d.querySelector('#fileBtn').hidden===false);
-  ck('file name available in the popover', d.querySelector('#fileName').textContent==='spec.md');
+  ck('file name available in the popover', /spec\.md/.test(d.querySelector('#fileList').textContent),
+     d.querySelector('#fileList').textContent.trim());
   ck('popover starts closed', !d.querySelector('#filePop').classList.contains('show'));
-  await w.eval('(async()=>{delete current.docId;await persist();renderThread();})()');
+  await w.eval('(async()=>{current.docIds=[];current.filesOn=false;await persist();renderThread();renderFileBtn();})()');
   await new Promise(r=>setTimeout(r,200));
   ck('icon inactive when nothing attached', !d.querySelector('#fileBtn').classList.contains('on'));
 }

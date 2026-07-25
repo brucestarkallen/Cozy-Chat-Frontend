@@ -67,34 +67,29 @@ Tap **Test** before saving.
 - Images go to the model as images; text files are inlined as code blocks
 - 6 MB per file
 
-**Files the assistant can edit — and now write**
+**Files the assistant can edit — and write**
 - Tap the file icon in the top bar → **Let the assistant write files**.
+- **Attach as many files as you like to one chat.** All of them are sent, each
+  under its own `[FILE: name]` heading, so you can ask for a comparison, or have
+  changes made across several documents in one reply.
 - Ask for a document and it creates one: the reply comes with a
   **Create file — name.md** card, and approving it makes the file and attaches
-  it, so every later edit targets it. No need to make an empty file first.
+  it. No need to make an empty file first.
 - Or make one yourself: sidebar → **Files** → create, or import from your device.
 - Changes arrive as red/green cards — **Apply**, **Skip**, or **Apply all** —
-  and every applied batch can be undone (8 deep).
+  and every applied batch can be undone (8 deep, per file).
+- With several files attached, each action must name the file it changes, and
+  the card shows it. An action that names no file, or names one that isn't
+  attached, is **refused** — writing into the wrong document silently would be
+  much worse than a failed card.
 - Matching is deliberately strict: exact first, then punctuation-normalised
   (curly quotes, em dashes), then a fuzzy word-window that **only applies when the
   difference is whitespace**. If the model misquotes a single word, the edit is
   refused rather than written approximately into your file.
 - Malformed JSON from the model is repaired where it's safely repairable
   (trailing commas, raw newlines inside strings) and reported plainly when it isn't.
-- Open, save, rename, export, or copy the file at any time.
-
-**Every chat keeps its own settings**
-Connection, model, instruction set, temperature, token cap, thinking effort and
-squash all belong to the conversation you have open. Set a chat up once and it
-stays that way — opening it later brings back exactly how you left it, and
-changing something in another chat doesn't touch it.
-
-A new chat starts from whatever the last one used. The banner at the top of
-Settings says which chat you're editing, and **Use for new chats** promotes the
-current setup to be the starting point for future ones.
-
-Chats made before this update are pinned to your current settings the first time
-they load, so they stop drifting when defaults change.
+- The file icon shows a count when more than one is attached; tap it to open,
+  undo, or remove any of them individually.
 
 **Instruction sets** (Settings → Instructions)
 - Save any number of named sets and switch between them instantly
@@ -252,8 +247,8 @@ network-first, so a refresh always gets the newest version.
 | `send()` | Sends and reads the streaming reply |
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
-**Tests.** `v5test.js`, `v41test.js`, `v4test.js`, `v32test.js`, `v31test.js`, `v3test.js`, `v2test.js`, `domtest.js`, `migtest.js` and
-`negtest.js` and `csstest.js` run under Node with jsdom (`npm i jsdom fake-indexeddb`). 437 checks across the
+**Tests.** `v51test.js`, `v5test.js`, `v41test.js`, `v4test.js`, `v32test.js`, `v31test.js`, `v3test.js`, `v2test.js`, `domtest.js`, `migtest.js` and
+`negtest.js` and `csstest.js` run under Node with jsdom (`npm i jsdom fake-indexeddb`). 472 checks across the
 matching engine, JSON tolerance, prompt assembly, streaming, migration, and a
 negative test that deliberately reintroduces a fixed bug to prove the guard fires.
 
