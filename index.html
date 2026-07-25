@@ -1333,10 +1333,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v5.2.2
+   COZY CHAT v5.2.3
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "5.2.2";
+const VERSION = "5.2.3";
 
 const PRESETS = {
   anthropic:  { name:"Claude",     kind:"anthropic", url:"https://api.anthropic.com/v1", model:"claude-sonnet-4-6", ctx:200000, hint:"e.g. claude-sonnet-4-6, claude-opus-4-5" },
@@ -1607,7 +1607,7 @@ let docs = [], openDocId = null, convoQuery = "", pendingAtts = [];
 let searchArmed = false, pinned = true;
 /* The finger owns the thread while it is down; program scrolls are counted
    so their echo events can be told apart from the user's own. */
-let userTouching = false, progScrolls = 0, repaintHook = null;
+let userTouching = false, coasting = false, coastTimer = null, progScrolls = 0, repaintHook = null;
 
 const $  = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
@@ -1972,7 +1972,8 @@ function msgHtml(m, isLastAssistant){
 }
 function nearBottom(){ const t = $("#thread"); return t.scrollHeight - t.scrollTop - t.clientHeight < 120; }
 function scrollDown(force){
-  if (!userTouching && (force || pinned)){
+  if (force && !userTouching){ coasting = false; if (coastTimer){ clearTimeout(coastTimer); coastTimer = null; } }
+  if (!userTouching && !coasting && (force || pinned)){
     const t = $("#thread");
     const max = t.scrollHeight - t.clientHeight;
     if (t.scrollTop < max){ progScrolls++; t.scrollTop = max; }
@@ -1987,7 +1988,7 @@ function updateJump(){
 }
 // A growing box only follows its own tail while you are already at that tail.
 function stickScroll(el){
-  if (!el || userTouching) return;
+  if (!el || userTouching || coasting) return;
   if (el.scrollHeight - el.scrollTop - el.clientHeight < 40) el.scrollTop = el.scrollHeight;
 }
 
@@ -2265,7 +2266,7 @@ async function send(userText, mode, forConvo){
       if (done) return;
       const sr = splitReasoning(raw);
       asst.thinking = sr.think || asst.thinking; asst.content = sr.text;
-      if (userTouching) return;
+      if (userTouching || coasting) return;
       const node = document.querySelector('[data-mid="' + asst.id + '"] .msg-body');
       if (!node) return;
       /* Replacing innerHTML rebuilds every code block; one the user has
@@ -2736,22 +2737,42 @@ on("#searchToggle", "click", function(){
 });
 /* The user's own scrolling is the only thing that may unpin, and their own
    return to the bottom the only thing that re-pins. Program scrolls are
-   counted and their echoes change nothing; while a finger is down the pin is
-   not resampled at all — the gesture's END decides, so mid-drag paints and
-   momentum can never fight the hand. */
-on("#thread", "scroll", function(){
-  if (progScrolls > 0){ progScrolls--; return; }
-  if (!userTouching) pinned = nearBottom();
-  updateJump();
-});
-on("#thread", "touchstart", function(){ userTouching = true; }, { passive:true });
-function threadTouchDone(e){
-  if (e.touches && e.touches.length) return;
-  userTouching = false;
+   counted and their echoes change nothing. A finger on the thread owns it
+   outright, and lifting the finger decides NOTHING: where a fling ends up is
+   in the momentum, not in where the finger let go — so the release starts a
+   coast, the coast runs untouched (no pin sampling, no repaints, no
+   following), and only the SETTLE — the scroll going quiet — reads the final
+   position and decides the pin. Anything else eats the fling. */
+function coastSettle(){
+  if (coastTimer){ clearTimeout(coastTimer); coastTimer = null; }
+  if (!coasting) return;
+  coasting = false;
   pinned = nearBottom();
   updateJump();
   if (repaintHook) repaintHook();
-  scrollDown();
+}
+function coastNudge(){
+  coasting = true;
+  if (coastTimer) clearTimeout(coastTimer);
+  coastTimer = setTimeout(coastSettle, 150);
+}
+on("#thread", "scroll", function(){
+  if (progScrolls > 0){ progScrolls--; return; }
+  if (userTouching){ updateJump(); return; }
+  if (coasting){ coastNudge(); return; }
+  pinned = nearBottom();
+  updateJump();
+});
+on("#thread", "scrollend", function(){ if (!userTouching) coastSettle(); }, { passive:true });
+on("#thread", "touchstart", function(){
+  userTouching = true;
+  coasting = false;
+  if (coastTimer){ clearTimeout(coastTimer); coastTimer = null; }
+}, { passive:true });
+function threadTouchDone(e){
+  if (e.touches && e.touches.length) return;
+  userTouching = false;
+  coastNudge();
 }
 on("#thread", "touchend", threadTouchDone, { passive:true });
 on("#thread", "touchcancel", threadTouchDone, { passive:true });

@@ -127,10 +127,11 @@ console.log('\n=== 4. A FINGER ON THE THREAD FREEZES THE WORLD ===');
   ck('mid-drag the pin is not resampled', w.eval('pinned')===true);
   r.grow(1200); w.eval('scrollDown()');
   ck('and following is suspended outright', r.at()===120, r.at());
-  ev(w,r.t,'touchend');                          // finger lifts, away from tail
-  ck('the gesture end decides: unpinned', w.eval('pinned')===false);
-  await sleep(30);                               // the catch-up paint is a queued frame
-  ck('the frozen paint catches up on release', /beta/.test(body().innerHTML));
+  ev(w,r.t,'touchend');                          // finger lifts; momentum may follow
+  ck('lift-off decides nothing', w.eval('pinned')===true && body().innerHTML===before);
+  await sleep(220);                              // no momentum: the coast settles
+  ck('the settle decides: unpinned', w.eval('pinned')===false);
+  ck('the frozen paint catches up at the settle', /beta/.test(body().innerHTML));
   ck('without moving the view', r.at()===120, r.at());
 }
 
@@ -144,7 +145,8 @@ console.log('\n=== 5. A GESTURE ENDING AT THE TAIL RE-PINS ===');
   ev(w,r.t,'touchstart');
   r.user(650);                                   // dragged back down
   ev(w,r.t,'touchend');
-  ck('lifting at the tail resumes following', w.eval('pinned')===true);
+  await sleep(220);                              // settle at the tail
+  ck('settling at the tail resumes following', w.eval('pinned')===true);
 }
 
 console.log('\n=== 6. A SWIPED CODE BLOCK KEEPS ITS PLACE ===');
