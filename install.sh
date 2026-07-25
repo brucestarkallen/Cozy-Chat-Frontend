@@ -9,6 +9,7 @@
 # ============================================================
 set -euo pipefail
 
+LAUNCHER_V=2
 REPO="${COZY_REPO:-https://github.com/brucestarkallen/Cozy-Chat-Frontend.git}"
 DIR="${COZY_DIR:-$HOME/cozy-chat}"
 PORT="${COZY_PORT:-8787}"
@@ -54,6 +55,7 @@ cat > "$BIN/cozy" <<LAUNCHER
 #!/usr/bin/env bash
 # Cozy Chat launcher — written by install.sh, safe to overwrite.
 set -euo pipefail
+LAUNCHER_V=$LAUNCHER_V
 DIR="\${COZY_DIR:-$DIR}"
 PORT="\${COZY_PORT:-$PORT}"
 BIND="\${COZY_BIND:-127.0.0.1}"
@@ -69,7 +71,7 @@ running() {
   p=\$(cat "\$PID" 2>/dev/null) || return 1
   [ -n "\$p" ] && kill -0 "\$p" 2>/dev/null || return 1
   if [ -r "/proc/\$p/cmdline" ]; then
-    tr '\\0' ' ' < "/proc/\$p/cmdline" | grep -q "http.server" || return 1
+    tr '\\0' ' ' < "/proc/\$p/cmdline" | grep -qE "serve\\.py|http\\.server" || return 1
   fi
   return 0
 }
@@ -98,7 +100,14 @@ start() {
   cd "\$DIR"
   # nohup + closed stdin so the server survives closing Termux and never
   # holds the terminal open. nohup execs directly, so \$! is the real pid.
-  nohup "\$PY" -m http.server "\$PORT" --bind "\$BIND" >"\$LOG" 2>&1 </dev/null &
+  # serve.py forbids caching. Plain http.server answers 304, which lets a
+  # browser keep showing files you already replaced — an update that pulls
+  # fine but changes nothing on screen.
+  if [ -f "\$DIR/serve.py" ]; then
+    nohup "\$PY" "\$DIR/serve.py" "\$PORT" "\$BIND" >"\$LOG" 2>&1 </dev/null &
+  else
+    nohup "\$PY" -m http.server "\$PORT" --bind "\$BIND" >"\$LOG" 2>&1 </dev/null &
+  fi
   echo \$! > "\$PID"
   n=0
   while [ \$n -lt 25 ]; do
@@ -127,10 +136,34 @@ open_url() {
   else echo "Open this in your browser:  \$URL"; fi
 }
 
+ver() { grep -o 'COZY CHAT v[0-9.]*' "\$DIR/index.html" 2>/dev/null | head -1 | sed 's/.*v//'; }
+
+# The launcher is written by install.sh, so a newer install.sh in the repo
+# means this script itself is out of date. Re-run it once and carry on.
+relaunch_if_stale() {
+  [ -f "\$DIR/install.sh" ] || return 0
+  want=\$(grep -m1 '^LAUNCHER_V=' "\$DIR/install.sh" | cut -d= -f2)
+  [ -n "\$want" ] || return 0
+  [ "\$want" = "\$LAUNCHER_V" ] && return 0
+  echo "Updating the cozy command itself (v\$LAUNCHER_V -> v\$want)…"
+  COZY_DIR="\$DIR" COZY_PORT="\$PORT" bash "\$DIR/install.sh" >/dev/null 2>&1 || true
+  exec "\$0" "\${1:-run}"
+}
+
 case "\${1:-run}" in
   run)
+    before=\$(ver)
     update
-    start
+    relaunch_if_stale run
+    after=\$(ver)
+    if [ "\$before" != "\$after" ]; then
+      echo "Updated \$before -> \$after"
+      stop            # serve the new files, and drop any old server
+      start
+    else
+      echo "Already on \$after"
+      start
+    fi
     echo "Cozy Chat is at \$URL"
     open_url
     ;;
@@ -140,7 +173,7 @@ case "\${1:-run}" in
   status)
     if running; then echo "Running at \$URL  (pid \$(cat "\$PID"))"
     else echo "Not running."; fi
-    grep -o 'COZY CHAT v[0-9.]*' "\$DIR/index.html" 2>/dev/null | head -1
+    echo "Files on disk: v\$(ver)"
     ;;
   log)     tail -n 40 "\$LOG" 2>/dev/null || echo "No log yet."; ;;
   path)    echo "\$DIR"; ;;

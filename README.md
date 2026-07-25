@@ -250,9 +250,20 @@ That sets up a `cozy` command:
 | `cozy log` | recent server output |
 | `cozy path` | where the files live |
 
+`cozy` prints what it did — `Updated 4.0.2 -> 4.1.0` or `Already on 4.1.0` —
+so you never have to guess whether an update landed.
+
+The local copy is served by `serve.py`, which forbids caching. Plain
+`python -m http.server` answers conditional requests with 304, which lets a
+browser keep showing files you have already replaced: the update pulls fine and
+the screen changes nothing.
+
 The server is detached, so it keeps running when you close Termux. Change the
 port with `COZY_PORT=8788 cozy` if something else is using 8787 — it tells you
 when that happens rather than failing quietly.
+
+`cozy` also updates itself: if a release ships a newer launcher, it reinstalls
+the command and carries on. You only ever run the install line once.
 
 **Your chats won't follow you here.** Browsers keep storage separate per
 address, so the local copy starts empty even if you have conversations on the
