@@ -493,29 +493,12 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 }
 
 /* injection rows */
-/* Controls inside an expanded prompt row. The page's base rule only styles
-   textarea.f, so an unclassed textarea here would fall back to the browser
-   default — white box, twenty characters wide, on a dark theme. */
-.ord-ctl{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
-.ord-editor textarea,
-.ord-editor input[type=text]{
-  width:100%;background:var(--code-bg);color:var(--text);
-  border:1px solid var(--border);border-radius:8px;
-  padding:10px 11px;outline:none;transition:border-color .15s;
-}
-.ord-editor textarea{
-  font-family:var(--mono);font-size:12.5px;line-height:1.6;
-  resize:vertical;min-height:88px;max-height:34vh;
-}
-.ord-editor input[type=text]{font-size:14px}
-.ord-editor textarea:focus,
-.ord-editor input[type=text]:focus{border-color:var(--ember)}
-.ord-editor select,.ord-editor input[type=number]{
-  width:100%;background:var(--surface);color:var(--text);
-  border:1px solid var(--border);border-radius:8px;
-  padding:9px 10px;font-size:13px;outline:none;
-}
-.ord-editor select:focus,.ord-editor input[type=number]:focus{border-color:var(--ember)}
+/* An expanded prompt row uses the app's standard .field markup, so its
+   controls are styled by the same rules as the main system prompt. Nothing
+   bespoke here — that is what left the textarea unstyled twice. */
+.ord-ctl{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:2px}
+.ord-editor .field{margin-bottom:12px}
+.ord-editor .field:last-of-type{margin-bottom:0}
 .mini-lbl{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;
   text-transform:uppercase;color:var(--muted);display:block;margin-bottom:3px}
 .depth-viz{
@@ -716,22 +699,25 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 .ord-acts button:disabled{opacity:.25}
 .ord-row .toggle{flex:none}
 .ord-editor{
-  position:relative;
-  margin:-2px 0 10px;padding:11px 12px 11px 20px;background:var(--bg-2);
+  margin:-2px 0 10px;padding:13px 12px;background:var(--bg-2);
   border:1px solid var(--border);border-top:0;border-radius:0 0 var(--r) var(--r);
-}
-/* Dragging inside a textarea selects text instead of scrolling its parent, and
-   the editor is mostly textarea. This strip down the left edge is always a
-   safe place to scroll from. */
-.ord-editor::before{
-  content:"";position:absolute;left:6px;top:10px;bottom:10px;width:4px;
-  border-radius:2px;background:var(--border);
 }
 .ord-open{border-radius:var(--r) var(--r) 0 0;margin-bottom:0}
 .ord-hint{
   font-size:12px;color:var(--muted);line-height:1.5;margin:2px 0 12px;
   padding:9px 11px;background:var(--surface);border-radius:var(--r);border:1px solid var(--border-soft);
 }
+
+/* jump back to the latest message */
+.jump-btn{
+  position:absolute;left:50%;bottom:14px;transform:translate(-50%,14px);
+  display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:20px;
+  background:var(--surface-2);border:1px solid var(--border);color:var(--text-2);
+  font-size:12.5px;box-shadow:var(--shadow);z-index:6;
+  opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;
+}
+.jump-btn.show{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+.jump-btn:hover{color:var(--text);border-color:var(--ember)}
 
 /* ---------- mobile ---------- */
 @media (max-width:900px){
@@ -843,6 +829,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
       <button class="danger" id="docDetachBtn">Stop using it here</button>
     </div>
 
+    <button class="jump-btn" id="jumpBtn">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg>
+      Latest
+    </button>
     <div class="thread" id="thread">
       <div class="thread-inner" id="threadInner"></div>
     </div>
@@ -1250,10 +1240,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v4.2.0
+   COZY CHAT v4.3.0
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "4.2.0";
+const VERSION = "4.3.0";
 
 const PRESETS = {
   anthropic:  { name:"Claude",     kind:"anthropic", url:"https://api.anthropic.com/v1", model:"claude-sonnet-4-6", ctx:200000, hint:"e.g. claude-sonnet-4-6, claude-opus-4-5" },
@@ -1778,7 +1768,21 @@ function msgHtml(m, isLastAssistant){
     + editCardsHtml(m) + '</div>';
 }
 function nearBottom(){ const t = $("#thread"); return t.scrollHeight - t.scrollTop - t.clientHeight < 120; }
-function scrollDown(force){ if (force || pinned){ const t = $("#thread"); t.scrollTop = t.scrollHeight; } }
+function scrollDown(force){
+  if (force || pinned){ const t = $("#thread"); t.scrollTop = t.scrollHeight; }
+  updateJump();
+}
+// Once you scroll up, nothing drags you back down — but there is a way back.
+function updateJump(){
+  const b = $("#jumpBtn");
+  if (!b) return;
+  b.classList.toggle("show", !pinned && !!(current && current.messages && current.messages.length));
+}
+// A growing box only follows its own tail while you are already at that tail.
+function stickScroll(el){
+  if (!el) return;
+  if (el.scrollHeight - el.scrollTop - el.clientHeight < 40) el.scrollTop = el.scrollHeight;
+}
 
 function updateEmber(){
   const p = activeProv(), limit = (p && p.ctx) || 128000;
@@ -2042,7 +2046,7 @@ async function send(userText, mode){
           node.parentNode.insertBefore(d, node);
           tw = d.querySelector(".think-body");
         }
-        tw.textContent = asst.thinking; tw.scrollTop = tw.scrollHeight;
+        tw.textContent = asst.thinking; stickScroll(tw);
       }
       scrollDown(); updateEmber();
     });
@@ -2286,9 +2290,11 @@ function renderInjections(){
       + arrows + '</div></div>';
     if (!open) return head;
     return head + '<div class="ord-editor">'
-      + '<input type="text" value="' + escapeHtml(i.name) + '" data-injname="' + id + '" placeholder="Name" style="padding:7px 9px;font-size:13.5px;margin-bottom:8px">'
-      + '<textarea data-injtext="' + id + '" placeholder="What this instruction says">' + escapeHtml(i.text) + '</textarea>'
-      + '<div class="ord-ctl" style="margin-top:9px">'
+      + '<div class="field"><label class="lbl">Name</label>'
+      + '<input type="text" value="' + escapeHtml(i.name) + '" data-injname="' + id + '" placeholder="Name"></div>'
+      + '<div class="field"><label class="lbl">What this instruction says</label>'
+      + '<textarea class="f" data-injtext="' + id + '" placeholder="Type it here, the same as the main system prompt">' + escapeHtml(i.text) + '</textarea></div>'
+      + '<div class="ord-ctl">'
       + '<div><span class="mini-lbl">Sent as</span><select data-injrole="' + id + '">'
       + '<option value="system"' + (i.role==="system"?" selected":"") + '>System</option>'
       + '<option value="user"' + (i.role==="user"?" selected":"") + '>You</option>'
@@ -2434,7 +2440,7 @@ on("#searchToggle", "click", function(){
   searchArmed = !searchArmed; syncSearchBtn();
   toast(searchArmed ? "Next message will search the web" : "Search off for next message");
 });
-on("#thread", "scroll", function(){ pinned = nearBottom(); });
+on("#thread", "scroll", function(){ pinned = nearBottom(); updateJump(); });
 on("#menuBtn", "click", openDrawer);
 on("#scrim", "click", function(){ closeDrawer(); closeSettings(); });
 on("#settingsBtn", "click", openSettings);
@@ -3205,6 +3211,7 @@ function renderEffort(){
   const style = reasonStyle(p);
   hint.textContent = (cur === "off" ? "" : "") + (EFFORT_HINTS[style] || "");
 }
+on("#jumpBtn", "click", function(){ pinned = true; scrollDown(true); });
 on("#tgSquash", "click", function(){
   S.squashSystem = !(S.squashSystem !== false);
   setToggle($("#tgSquash"), S.squashSystem);

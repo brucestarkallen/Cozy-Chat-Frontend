@@ -60,9 +60,18 @@ setTimeout(()=>{
   probe('textarea gets a border', ta, 'border');
   ck('textarea fills the row', cs(ta).width==='100%', cs(ta).width);
   ck('textarea is tall enough to write in', parseInt(cs(ta).minHeight)>=80, cs(ta).minHeight);
-  // it must not fill the panel, or there is nowhere left to scroll from
-  ck('textarea is capped so the panel stays scrollable',
-     /max-height/.test(cs(ta).maxHeight)||/vh|px|%/.test(cs(ta).maxHeight||''), cs(ta).maxHeight||'none');
+  // The real invariant: the block editor must be styled by the SAME rules as
+  // the main system prompt, not by bespoke ones. Inventing separate rules is
+  // what left it unstyled twice.
+  const mainTa=d.querySelector('#sysPrompt');
+  const rulesFor=el=>setsFor(el,'background').map(r=>r.sel).sort().join(' | ');
+  ck('block textarea shares the main prompt\'s rules',
+     rulesFor(ta)===rulesFor(mainTa), rulesFor(ta)+'   vs   '+rulesFor(mainTa));
+  ck('and its size rules too',
+     setsFor(ta,'min-height').map(r=>r.sel).join()===setsFor(mainTa,'min-height').map(r=>r.sel).join(),
+     setsFor(ta,'min-height').map(r=>r.sel).join()||'none');
+  ck('block textarea carries the standard class', ta.classList.contains('f'));
+  ck('it sits in a standard field', !!ta.closest('.field'));
 
   const nm=d.querySelector('.ord-editor input[type=text]');
   probe('name field gets a background', nm, 'background');

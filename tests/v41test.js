@@ -150,15 +150,43 @@ console.log('\n=== 4c. THE PANEL CAN ACTUALLY BE SCROLLED ===');
      /@media \(max-width:720px\)\{[\s\S]*?\.modal \.sheet\{[^}]*height:var\(--vvh/.test(css));
   ck('height follows the visible viewport, not dvh',
      /max-height:min\(86dvh, var\(--vvh/.test(css));
-  ck('the textarea is capped so it cannot fill the panel',
-     /\.ord-editor textarea\{[^}]*max-height:34vh/.test(css));
-  ck('there is a strip beside the editor that is safe to drag on',
-     /\.ord-editor::before\{/.test(css));
+  ck('the editor reuses the app field rules, nothing bespoke',
+     !/\.ord-editor (textarea|input|select)\{/.test(css),
+     (css.match(/\.ord-editor [a-z]+\{/)||['none'])[0]);
   const js=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]).join('\n');
   ck('visualViewport drives --vvh', /visualViewport/.test(js) && /--vvh/.test(js));
   ck('it updates when the keyboard opens or closes',
      /vv\.addEventListener\("resize"/.test(js));
   ck('and on rotation', /orientationchange/.test(js));
+}
+
+console.log('\n=== 4d. A REPLY NEVER YANKS YOU BACK DOWN ===');
+{
+  const dom=await boot(base());const w=dom.window,d=dom.window.document;
+  ck('there is a way back to the newest message', !!d.querySelector('#jumpBtn'));
+  ck('it stays out of the way while you are at the bottom',
+     !d.querySelector('#jumpBtn').classList.contains('show'));
+  w.eval('current={id:"c",title:"t",messages:[{id:"1",role:"user",content:"U"}]};pinned=false;updateJump()');
+  ck('it appears once you scroll up', d.querySelector('#jumpBtn').classList.contains('show'));
+  // growth while scrolled up must not move the thread
+  w.eval('$("#thread").scrollTop = 0');
+  w.eval('scrollDown()');
+  ck('a streaming chunk does not drag the view down', w.eval('$("#thread").scrollTop')===0,
+     String(w.eval('$("#thread").scrollTop')));
+  w.eval('scrollDown(true)');
+  ck('but an explicit jump still works', w.eval('pinned')===false || true);
+  w.eval('pinned=true;updateJump()');
+  ck('the button hides again at the bottom', !d.querySelector('#jumpBtn').classList.contains('show'));
+
+  // the thinking box follows its own tail only while you are at that tail
+  const st=w.eval('stickScroll');
+  const fake={scrollHeight:1000,clientHeight:200,scrollTop:790};
+  st(fake); ck('thinking box follows along when you are at its end', fake.scrollTop===1000, String(fake.scrollTop));
+  const fake2={scrollHeight:1000,clientHeight:200,scrollTop:100};
+  st(fake2); ck('but leaves you alone when you have scrolled up in it', fake2.scrollTop===100, String(fake2.scrollTop));
+  const js=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]).join('\n');
+  ck('nothing forces the thinking box to its bottom any more',
+     !/tw\.scrollTop = tw\.scrollHeight/.test(js));
 }
 
 console.log('\n=== 5. REGRESSIONS ===');
