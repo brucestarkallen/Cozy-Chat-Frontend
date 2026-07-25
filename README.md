@@ -247,12 +247,12 @@ network-first, so a refresh always gets the newest version.
 | `send()` | Sends and reads the streaming reply |
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
-**Tests.** Everything in `tests/` — `v52test.js` down to `v2test.js`, plus
+**Tests.** Everything in `tests/` — `v521test.js` down to `v2test.js`, plus
 `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`, `swtest.js`,
 `scrolltest.js`, `styletest.js`, `hiddentest.js`, `coherencetest.js` and
 `installtest.sh` — runs under Node with jsdom (`npm i jsdom fake-indexeddb`).
-654 checks across the matching engine, JSON tolerance, prompt assembly,
-streaming, stream/chat binding, backup round-trips, migration, and negative
+671 checks across the matching engine, JSON tolerance, prompt assembly,
+streaming, stream/chat binding, touch reorder, backup round-trips, migration, and negative
 tests that deliberately reintroduce fixed bugs to prove the guards fire.
 
 ---

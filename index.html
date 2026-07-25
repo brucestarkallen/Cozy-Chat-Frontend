@@ -747,9 +747,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 .ord-row.off .ord-name{opacity:.4}
 .ord-grip{
   flex:none;display:grid;place-items:center;width:30px;height:34px;color:var(--muted);
-  cursor:grab;border-radius:6px;touch-action:pan-y;
+  cursor:grab;border-radius:6px;touch-action:none;
+  user-select:none;-webkit-user-select:none;
 }
-.ord-grip.armed{background:var(--ember);color:#191106;touch-action:none}
+.ord-grip.armed{background:var(--ember);color:#191106}
 .ord-grip:active{cursor:grabbing;background:var(--surface-2)}
 .ord-main{flex:1;min-width:0}
 .ord-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1332,10 +1333,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v5.2.0
+   COZY CHAT v5.2.1
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "5.2.0";
+const VERSION = "5.2.1";
 
 const PRESETS = {
   anthropic:  { name:"Claude",     kind:"anthropic", url:"https://api.anthropic.com/v1", model:"claude-sonnet-4-6", ctx:200000, hint:"e.g. claude-sonnet-4-6, claude-opus-4-5" },
@@ -3607,9 +3608,9 @@ document.addEventListener("click", function(e){
 /* ==========================================================
    PROMPT ORDER — drag, arrows, inline editing
    ========================================================== */
-/* Arrows are the reliable path on a touchscreen; dragging inside a
-   scrolling sheet is fiddly on any phone. Both call the same pure
-   reorder helpers, so they can never disagree. */
+/* Arrows and drag call the same pure reorder helpers, so they can
+   never disagree. Arrows stay for one-step precision and for anyone
+   who prefers taps. */
 on("#injList", "click", function(e){
   const up = e.target.closest("[data-up]");
   if (up){ ordApply(orderMove(PS().order, up.dataset.up, -1)); return; }
@@ -3635,16 +3636,17 @@ on("#injList", "click", function(e){
 });
 
 /* Drag to reorder.
-   On a touchscreen a drag and a scroll start identically, so the drag arms on
-   a long press instead of on contact — until then the browser owns the gesture
-   and the panel scrolls normally. Moving before the press completes cancels
-   it, which is what a scroll looks like. Nothing here calls preventDefault on
-   pointerdown; doing that is what stopped the sheet scrolling at all. */
+   The browser decides who owns a touch when it STARTS, from the touch-action
+   it reads at that moment — changing touch-action mid-gesture changes
+   nothing. So the grip is touch-action:none from first contact: a touch that
+   begins on the grip is always a drag, and the rest of the row still scrolls
+   the sheet. That also retires the old long-press arming — its only job was
+   telling a drag from a scroll, and on the grip there is no scroll to tell
+   apart. Grab moves the row immediately, on every pointer type. */
 (function dragOrder(){
   const list = $("#injList");
   if (!list) return;
-  const HOLD = 260, SLOP = 9;
-  let armTimer = null, grip = null, dragId = null, rows = [], startY = 0, armed = false;
+  let grip = null, dragId = null, rows = [];
 
   function rowRects(){
     return Array.prototype.map.call(list.querySelectorAll("[data-row]"), function(el){
@@ -3653,32 +3655,23 @@ on("#injList", "click", function(e){
     });
   }
   function disarm(){
-    clearTimeout(armTimer); armTimer = null;
     if (grip) grip.classList.remove("armed");
     for (const r of rows) r.el.classList.remove("drop-target", "dragging");
-    grip = null; dragId = null; rows = []; armed = false;
+    grip = null; dragId = null; rows = [];
   }
   list.addEventListener("pointerdown", function(e){
     const g = e.target.closest("[data-grip]");
     if (!g) return;
-    grip = g; dragId = g.dataset.grip; startY = e.clientY; armed = false;
-    armTimer = setTimeout(function(){
-      armed = true;
-      rows = rowRects();
-      g.classList.add("armed");
-      const me = list.querySelector('[data-row="' + dragId + '"]');
-      if (me) me.classList.add("dragging");
-      try { g.setPointerCapture(e.pointerId); } catch(_){}
-      if (navigator.vibrate) navigator.vibrate(8);
-    }, HOLD);
+    grip = g; dragId = g.dataset.grip;
+    rows = rowRects();
+    g.classList.add("armed");
+    const me = list.querySelector('[data-row="' + dragId + '"]');
+    if (me) me.classList.add("dragging");
+    try { g.setPointerCapture(e.pointerId); } catch(_){}
+    if (navigator.vibrate) navigator.vibrate(8);
   });
   list.addEventListener("pointermove", function(e){
     if (!dragId) return;
-    if (!armed){
-      // moving before the press completes means this was a scroll
-      if (Math.abs(e.clientY - startY) > SLOP) disarm();
-      return;
-    }
     e.preventDefault();
     let target = null;
     for (const r of rows){ if (r.id !== dragId && e.clientY > r.mid) target = r; }
@@ -3687,9 +3680,10 @@ on("#injList", "click", function(e){
   });
   function finish(e){
     if (!dragId) return;
-    const wasArmed = armed, id = dragId, y = e ? e.clientY : startY, snapshot = rows;
+    const id = dragId, y = e ? e.clientY : 0, snapshot = rows;
     disarm();
-    if (!wasArmed) return;
+    /* A tap computes the row's own slot and moves it there — a no-op — so no
+       gate is needed between tapping the grip and dragging it. */
     let index = 0;
     for (const r of snapshot){ if (r.id !== id && y > r.mid) index++; }
     ordApply(orderMoveTo(PS().order, id, index));

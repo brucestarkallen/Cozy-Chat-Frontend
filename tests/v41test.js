@@ -36,14 +36,14 @@ console.log('=== 1. SCROLLING IS NOT BLOCKED ===');
      /\.sheet\{[^}]*display:flex[^}]*flex-direction:column/.test(css));
   ck('the header no longer uses position:sticky',
      !/\.sheet-head\{[^}]*position:sticky/.test(css));
-  ck('the grip allows vertical scrolling', /\.ord-grip\{[^}]*touch-action:pan-y/.test(css));
-  ck('only an armed grip blocks it', /\.ord-grip\.armed\{[^}]*touch-action:none/.test(css));
+  ck('the grip owns its touch from first contact', /\.ord-grip\{[^}]*touch-action:none/.test(css));
+  ck('no mid-gesture touch-action swap remains', !/\.ord-grip\.armed\{[^}]*touch-action/.test(css));
   const js=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]).join('\n');
   const pd=js.slice(js.indexOf('list.addEventListener("pointerdown"'), js.indexOf('list.addEventListener("pointermove"'));
   ck('pointerdown never calls preventDefault (that killed the scroll)',
      !/preventDefault/.test(pd), pd.match(/preventDefault/)?'still there':'clean');
-  ck('the drag arms on a hold, not on contact', /setTimeout\(function\(\)\{\s*armed = true/.test(js));
-  ck('moving before the hold cancels it', /if \(Math\.abs\(e\.clientY - startY\) > SLOP\) disarm/.test(js));
+  ck('the drag arms on contact, no hold to wait out', !/setTimeout\(function\(\)\{\s*armed = true/.test(js) && /g\.classList\.add\("armed"\)/.test(pd));
+  ck('the scroll-vs-drag slop gate is gone with its reason', !/SLOP/.test(js));
   ck('a pointerup outside the list cannot leave it stuck', /window\.addEventListener\("pointerup"/.test(js));
 }
 
