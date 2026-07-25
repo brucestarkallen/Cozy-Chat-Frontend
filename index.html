@@ -338,7 +338,8 @@ button{background:none;border:0;cursor:pointer;padding:0}
 }
 .modal.show{pointer-events:auto}
 .sheet{
-  width:100%;max-width:540px;max-height:86dvh;overflow-y:auto;
+  width:100%;max-width:540px;max-height:86dvh;
+  display:flex;flex-direction:column;overflow:hidden;
   background:var(--bg-2);border:1px solid var(--border);border-radius:var(--r-lg);
   box-shadow:var(--shadow);transform:translateY(14px) scale(.985);opacity:0;
   transition:transform .22s cubic-bezier(.34,1.3,.64,1),opacity .18s;
@@ -347,10 +348,14 @@ button{background:none;border:0;cursor:pointer;padding:0}
 .sheet-head{
   display:flex;align-items:center;justify-content:space-between;
   padding:16px 18px 12px;border-bottom:1px solid var(--border-soft);
-  position:sticky;top:0;background:var(--bg-2);z-index:1;
+  background:var(--bg-2);flex:none;
 }
 .sheet-head h3{margin:0;font-size:15px;font-weight:650}
-.sheet-body{padding:16px 18px calc(20px + var(--safe-b))}
+.sheet-body{
+  padding:16px 18px calc(20px + var(--safe-b));
+  overflow-y:auto;overscroll-behavior:contain;
+  flex:1 1 auto;min-height:0;-webkit-overflow-scrolling:touch;
+}
 .field{margin-bottom:16px}
 .field > label{display:block;margin-bottom:6px}
 .hint{margin-top:5px;font-size:12px;color:var(--muted);line-height:1.5}
@@ -382,7 +387,7 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 .prov-info{flex:1;min-width:0}
 .prov-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .prov-sub{font-family:var(--mono);font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border-soft);padding:0 18px;position:sticky;top:53px;background:var(--bg-2);z-index:1}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border-soft);padding:0 18px;position:sticky;top:53px;background:var(--bg-2);z-index:1;flex:none}
 .tab{
   padding:10px 12px;font-size:13px;font-weight:600;color:var(--muted);
   border-bottom:2px solid transparent;margin-bottom:-1px;
@@ -594,6 +599,16 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 .file-pop button:hover:not(:disabled){background:var(--surface);color:var(--text)}
 .file-pop button:disabled{opacity:.35;cursor:default}
 .file-pop button.danger:hover{color:var(--danger)}
+.file-pop .pop-toggle{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  border-bottom:1px solid var(--border-soft);border-radius:7px 7px 0 0;margin-bottom:4px;
+}
+.file-pop .pop-toggle::after{
+  content:"";flex:none;width:30px;height:17px;border-radius:9px;
+  background:var(--surface-2);border:1px solid var(--border);position:relative;transition:background .16s;
+}
+.file-pop .pop-toggle.on::after{background:var(--ember);border-color:var(--ember)}
+.file-pop .pop-toggle.on{color:var(--text)}
 .doc-row{
   display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:7px;
   border:1px solid var(--border);border-radius:var(--r);background:var(--surface);cursor:pointer;
@@ -671,9 +686,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 .ord-row.drop-target{transform:translateY(2px);border-color:var(--ember)}
 .ord-row.off .ord-name{opacity:.4}
 .ord-grip{
-  flex:none;display:grid;place-items:center;width:26px;height:30px;color:var(--muted);
-  cursor:grab;touch-action:none;border-radius:6px;
+  flex:none;display:grid;place-items:center;width:30px;height:34px;color:var(--muted);
+  cursor:grab;border-radius:6px;touch-action:pan-y;
 }
+.ord-grip.armed{background:var(--ember);color:#191106;touch-action:none}
 .ord-grip:active{cursor:grabbing;background:var(--surface-2)}
 .ord-main{flex:1;min-width:0}
 .ord-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -801,6 +817,9 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 
     <div class="file-pop" id="filePop">
       <div class="fname" id="fileName"></div>
+      <button id="filesOnBtn" class="pop-toggle" role="switch" aria-checked="false">
+        Let the assistant write files
+      </button>
       <button id="docViewBtn">Open the file</button>
       <button id="docUndoBtn">Undo last change</button>
       <button class="danger" id="docDetachBtn">Stop using it here</button>
@@ -1206,10 +1225,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v4.0.2
+   COZY CHAT v4.1.0
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "4.0.2";
+const VERSION = "4.1.0";
 
 const PRESETS = {
   anthropic:  { name:"Claude",     kind:"anthropic", url:"https://api.anthropic.com/v1", model:"claude-sonnet-4-6", ctx:200000, hint:"e.g. claude-sonnet-4-6, claude-opus-4-5" },
@@ -1653,13 +1672,23 @@ function renderThread(){
 }
 function renderFileBtn(){
   const btn = $("#fileBtn");
+  if (!btn) return;
   const d = (current && current.docId) ? docs.find(x => x.id === current.docId) : null;
-  btn.hidden = !d;
-  btn.classList.toggle("on", !!d);
-  if (d){
-    $("#fileName").textContent = (d.name || "").trim() || "untitled";
-    $("#docUndoBtn").disabled = !(d.undo && d.undo.length);
-  } else closeFilePop();
+  const on = !!(current && current.filesOn);
+  // always reachable, otherwise there is no way to let the model start a file
+  btn.hidden = false;
+  btn.classList.toggle("on", !!d || on);
+  $("#fileName").textContent = d ? ((d.name || "").trim() || "untitled")
+                                 : (on ? "no file yet — the assistant can make one" : "files are off");
+  $("#docViewBtn").disabled = !d;
+  $("#docUndoBtn").disabled = !d || !(d.undo && d.undo.length);
+  $("#docDetachBtn").disabled = !d;
+  const t = $("#filesOnBtn");
+  if (t){
+    const active = !!d || on;
+    t.classList.toggle("on", active);
+    t.setAttribute("aria-checked", active ? "true" : "false");
+  }
 }
 // The connection name and the model name are usually the same thing typed
 // twice ("Neuralwatt Glm-5.2-fast" + "glm-5.2-fast"). Show it once.
@@ -1731,7 +1760,8 @@ function updateEmber(){
   let used = estTokens(PS().system);
   for (const i of PS().injections) if (i.enabled) used += estTokens(i.text);
   if (current && current.sysExtra) used += estTokens(current.sysExtra);
-  if (current && current.docId){ const dd = docs.find(x=>x.id===current.docId); if (dd) used += estTokens(dd.text) + 260; }
+  if (current && current.docId){ const dd = docs.find(x=>x.id===current.docId); if (dd) used += estTokens(dd.text) + 300; }
+  else if (current && current.filesOn) used += 300;
   if (current) for (const m of current.messages) used += estTokens(m.content) + 4;
   used += estTokens($("#input").value);
   const pct = Math.min(100, (used/limit)*100);
@@ -1826,7 +1856,8 @@ function assembleMessages(kind){
   let sysParts = topSys.slice();
   if (current && current.sysExtra && current.sysExtra.trim()) sysParts.push(current.sysExtra);
   const doc = (current && current.docId) ? docs.find(d => d.id === current.docId) : null;
-  if (doc) sysParts.push(DOCEDIT_PROTOCOL.replace("{{NAME}}", doc.name) + "\n\n[DOCUMENT: " + doc.name + "]\n" + doc.text);
+  if (doc) sysParts.push(doceditProtocol(doc) + "\n\n[DOCUMENT: " + doc.name + "]\n" + doc.text);
+  else if (current && current.filesOn) sysParts.push(doceditProtocol(null));
   const system = sysParts.filter(t => t && t.trim()).join("\n\n");
   return { messages: merged, system: system };
 }
@@ -2035,7 +2066,7 @@ async function send(userText, mode){
     asst.content = fin.text || raw;
     if (fin.think) asst.thinking = fin.think;
     if (sources.length) asst.sources = sources;
-    if (current.docId){
+    if (current.docId || current.filesOn){
       const pd = parseDocEdits(asst.content);
       if (pd.edits.length){ asst.edits = pd.edits; asst.content = stripDocEdits(asst.content); }
       else if (pd.error){ asst.editError = pd.error; asst.content = stripDocEdits(asst.content); }
@@ -2586,12 +2617,17 @@ on("#threadInner", "touchstart", function(e){
    normalised, then a fuzzy word-window that will only apply
    when the difference is whitespace alone.
    ========================================================== */
-const DOCEDIT_PROTOCOL =
-`You can edit the attached file "{{NAME}}". The full current contents are below.
-When the user asks for a change, reply with your normal prose plus at most ONE block:
+const DOCEDIT_HEAD_FILE =
+`You can edit the attached file "{{NAME}}". The full current contents are below.`;
+const DOCEDIT_HEAD_NONE =
+`You can write files for the user. No file is attached yet — create one when asked
+to draft, generate, or maintain a document, rather than only printing it in chat.`;
+const DOCEDIT_BODY =
+`When a file should change, reply with your normal prose plus at most ONE block:
 
 <docedits>
 [
+  {"create_file": "name.md", "replace": "the complete contents", "reason": "why"},
   {"find": "verbatim excerpt from the file", "replace": "new text", "reason": "why"},
   {"insert_after": "verbatim anchor line", "replace": "text placed under the anchor", "reason": "why"},
   {"append": true, "replace": "text added at the end", "reason": "why"},
@@ -2600,11 +2636,17 @@ When the user asks for a change, reply with your normal prose plus at most ONE b
 </docedits>
 
 Rules:
-- "find" and "insert_after" MUST be copied character-for-character from the file. Do not paraphrase them.
-- Quote the smallest unique span that does the job.
+- create_file makes a new file and attaches it, so later edits can target it.
+  Give the whole contents. Use it when the user wants a document produced.
+- "find" and "insert_after" MUST be copied character-for-character from the file.
+  Do not paraphrase them. Quote the smallest unique span that does the job.
 - Valid JSON only: escape newlines inside strings as \\n, no trailing commas.
 - Use replace_all only when explicitly asked to rewrite the whole file.
 - If the user is only chatting or asking a question, send no block at all.`;
+function doceditProtocol(doc){
+  return (doc ? DOCEDIT_HEAD_FILE.replace("{{NAME}}", doc.name) : DOCEDIT_HEAD_NONE)
+    + "\n\n" + DOCEDIT_BODY;
+}
 
 /* ---------- block + JSON tolerance ---------- */
 function findBlock(text, tag){
@@ -2695,6 +2737,10 @@ function parseDocEdits(text){
     if (!e || typeof e !== "object") continue;
     const replace = String(e.replace == null ? "" : e.replace);
     const reason  = String(e.reason  == null ? "" : e.reason);
+    if (typeof e.create_file === "string" && e.create_file.trim()){
+      edits.push({ id:uid(), type:"create", find:null, name:e.create_file.trim(),
+                   replace:replace, reason:reason, status:"pending" }); continue;
+    }
     if (e.replace_all === true){ edits.push({ id:uid(), type:"replace_all", find:null, replace:replace, reason:reason, status:"pending" }); continue; }
     if (e.append === true){ edits.push({ id:uid(), type:"append", find:null, replace:replace, reason:reason, status:"pending" }); continue; }
     if (typeof e.insert_after === "string" && e.insert_after.length){ edits.push({ id:uid(), type:"insert", find:e.insert_after, replace:replace, reason:reason, status:"pending" }); continue; }
@@ -2851,6 +2897,7 @@ function applyEditToText(text, edit){
 
 /* ---------- edit cards ---------- */
 function editKindLabel(e){
+  if (e.type === "create") return "Create file — " + (e.name || "untitled");
   return e.type === "replace_all" ? "Rewrite whole file"
        : e.type === "append" ? "Add at the end"
        : e.type === "insert" ? "Insert after" : "Replace";
@@ -2887,8 +2934,20 @@ function editCardsHtml(m){
 async function applyEdit(msgId, editId){
   const m = current.messages.find(x => x.id === msgId);
   const e = m && m.edits && m.edits.find(x => x.id === editId);
+  if (!m || !e || e.status !== "pending") return;
+
+  if (e.type === "create"){
+    const d = await newDoc(e.name || "untitled.md", e.replace || "");
+    current.docId = d.id;
+    current.filesOn = true;
+    e.status = "applied"; e.note = "created and attached";
+    await persist(); renderThread(); renderFileBtn(); renderDocList(); updateEmber();
+    toast("Created " + d.name);
+    return;
+  }
+
   const doc = docs.find(d => d.id === current.docId);
-  if (!m || !e || !doc || e.status !== "pending") return;
+  if (!doc){ e.status = "failed"; e.note = "no file is attached"; renderThread(); return; }
   const before = doc.text;
   const r = applyEditToText(doc.text, e);
   if (r.text === null){ e.status = "failed"; e.note = r.note; }
@@ -3159,13 +3218,17 @@ on("#injList", "click", function(e){
   }
 });
 
-/* Pointer-based drag: works with a finger and a mouse alike. The row under
-   the pointer is found by comparing midpoints rather than elementFromPoint,
-   so a dragged row being semi-transparent can't confuse the hit test. */
+/* Drag to reorder.
+   On a touchscreen a drag and a scroll start identically, so the drag arms on
+   a long press instead of on contact — until then the browser owns the gesture
+   and the panel scrolls normally. Moving before the press completes cancels
+   it, which is what a scroll looks like. Nothing here calls preventDefault on
+   pointerdown; doing that is what stopped the sheet scrolling at all. */
 (function dragOrder(){
   const list = $("#injList");
   if (!list) return;
-  let dragId = null, rows = [], startY = 0, moved = false;
+  const HOLD = 260, SLOP = 9;
+  let armTimer = null, grip = null, dragId = null, rows = [], startY = 0, armed = false;
 
   function rowRects(){
     return Array.prototype.map.call(list.querySelectorAll("[data-row]"), function(el){
@@ -3173,19 +3236,34 @@ on("#injList", "click", function(e){
       return { id: el.getAttribute("data-row"), el: el, mid: r.top + r.height / 2 };
     });
   }
+  function disarm(){
+    clearTimeout(armTimer); armTimer = null;
+    if (grip) grip.classList.remove("armed");
+    for (const r of rows) r.el.classList.remove("drop-target", "dragging");
+    grip = null; dragId = null; rows = []; armed = false;
+  }
   list.addEventListener("pointerdown", function(e){
     const g = e.target.closest("[data-grip]");
     if (!g) return;
-    dragId = g.dataset.grip; startY = e.clientY; moved = false;
-    rows = rowRects();
-    const me = list.querySelector('[data-row="' + dragId + '"]');
-    if (me) me.classList.add("dragging");
-    g.setPointerCapture(e.pointerId);
-    e.preventDefault();
+    grip = g; dragId = g.dataset.grip; startY = e.clientY; armed = false;
+    armTimer = setTimeout(function(){
+      armed = true;
+      rows = rowRects();
+      g.classList.add("armed");
+      const me = list.querySelector('[data-row="' + dragId + '"]');
+      if (me) me.classList.add("dragging");
+      try { g.setPointerCapture(e.pointerId); } catch(_){}
+      if (navigator.vibrate) navigator.vibrate(8);
+    }, HOLD);
   });
   list.addEventListener("pointermove", function(e){
     if (!dragId) return;
-    if (Math.abs(e.clientY - startY) > 4) moved = true;
+    if (!armed){
+      // moving before the press completes means this was a scroll
+      if (Math.abs(e.clientY - startY) > SLOP) disarm();
+      return;
+    }
+    e.preventDefault();
     let target = null;
     for (const r of rows){ if (r.id !== dragId && e.clientY > r.mid) target = r; }
     for (const r of rows) r.el.classList.remove("drop-target");
@@ -3193,19 +3271,18 @@ on("#injList", "click", function(e){
   });
   function finish(e){
     if (!dragId) return;
-    const order = PS().order;
-    if (moved){
-      let index = 0;
-      for (const r of rows){ if (r.id !== dragId && e.clientY > r.mid) index++; }
-      const from = order.indexOf(dragId);
-      ordApply(orderMoveTo(order, dragId, from < index ? index : index));
-    } else renderInjections();
-    dragId = null; rows = [];
+    const wasArmed = armed, id = dragId, y = e ? e.clientY : startY, snapshot = rows;
+    disarm();
+    if (!wasArmed) return;
+    let index = 0;
+    for (const r of snapshot){ if (r.id !== id && y > r.mid) index++; }
+    ordApply(orderMoveTo(PS().order, id, index));
   }
   list.addEventListener("pointerup", finish);
-  list.addEventListener("pointercancel", function(){ dragId = null; rows = []; renderInjections(); });
+  list.addEventListener("pointercancel", function(){ disarm(); renderInjections(); });
+  // a pointerup that lands outside the list must not leave the drag stuck on
+  window.addEventListener("pointerup", function(e){ if (dragId && !e.target.closest("#injList")) { disarm(); renderInjections(); } });
 })();
-
 
 /* ==========================================================
    UPDATE CHECK
@@ -3373,6 +3450,14 @@ on("#docDelBtn", "click", async function(){
 });
 on("#docViewBtn", "click", function(){ closeFilePop(); if (current && current.docId) openDocEditor(current.docId); });
 on("#docUndoBtn", "click", function(){ closeFilePop(); undoDoc(); });
+on("#filesOnBtn", "click", async function(){
+  if (!current) newConvo();
+  current.filesOn = !(current.filesOn || current.docId);
+  if (!current.filesOn) delete current.docId;
+  await persist(); renderThread(); renderFileBtn(); updateEmber();
+  toast(current.filesOn ? "The assistant can write files in this chat"
+                        : "File writing is off for this chat");
+});
 on("#docDetachBtn", "click", async function(){
   if (!current) return;
   closeFilePop();

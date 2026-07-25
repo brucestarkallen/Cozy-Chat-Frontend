@@ -1,4 +1,3 @@
-// TEST FILE - not for pasting into SillyTavern. Run with: node tests/v31test.js
 const fs=require('fs');const {JSDOM}=require('jsdom');require('fake-indexeddb/auto');
 const html=fs.readFileSync('./out/index.html','utf8');
 function sse(cs){let i=0;return{getReader(){return{read(){
@@ -134,7 +133,8 @@ console.log('\n=== 6. ATTACHED FILE INDICATOR ===');
 {
   const dom=await boot(base());
   const w=dom.window,d=dom.window.document;
-  ck('no icon before anything is attached', d.querySelector('#fileBtn').hidden===true);
+  ck('file icon present but inactive before anything is attached',
+     d.querySelector('#fileBtn').hidden===false && !d.querySelector('#fileBtn').classList.contains('on'));
   await w.eval('(async()=>{const doc=await newDoc("spec.md","body");newConvo();await attachDoc(doc.id);})()');
   await new Promise(r=>setTimeout(r,300));
   ck('icon appears in the top bar', d.querySelector('#fileBtn').hidden===false);
@@ -142,7 +142,7 @@ console.log('\n=== 6. ATTACHED FILE INDICATOR ===');
   ck('popover starts closed', !d.querySelector('#filePop').classList.contains('show'));
   await w.eval('(async()=>{delete current.docId;await persist();renderThread();})()');
   await new Promise(r=>setTimeout(r,200));
-  ck('icon gone when nothing attached', d.querySelector('#fileBtn').hidden===true);
+  ck('icon inactive when nothing attached', !d.querySelector('#fileBtn').classList.contains('on'));
 }
 
 console.log('\n=== 7. EFFORT PICKER UI ===');

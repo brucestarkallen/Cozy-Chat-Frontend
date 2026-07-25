@@ -1,4 +1,3 @@
-// TEST FILE - not for pasting into SillyTavern. Run with: node tests/v32test.js
 const fs=require('fs');const {JSDOM}=require('jsdom');require('fake-indexeddb/auto');
 const html=fs.readFileSync('./out/index.html','utf8');
 let pass=0,fail=0;
@@ -43,7 +42,12 @@ console.log('\n=== 2. THE FILE STRIP IS GONE ===');
   const dom=await boot(base());const w=dom.window,d=dom.window.document;
   ck('no strip element in the document at all', d.querySelector('.docbar')===null && d.querySelector('#docBar')===null);
   ck('no strip CSS rules left', !html.includes('.docbar{') && !html.includes('.doc-chip'));
-  ck('file icon hidden with nothing attached', d.querySelector('#fileBtn').hidden===true);
+  // the icon is always reachable now — it is how file writing is switched on —
+  // but it must read as inactive and its file actions must be unavailable
+  ck('file icon present but inactive with nothing attached',
+     d.querySelector('#fileBtn').hidden===false && !d.querySelector('#fileBtn').classList.contains('on'));
+  ck('it says so rather than naming a file',
+     /off/i.test(d.querySelector('#fileName').textContent), d.querySelector('#fileName').textContent);
   // thread sits directly under the top bar
   const kids=Array.from(d.querySelector('.main').children).map(e=>e.id||e.className.split(' ')[0]);
   ck('top bar is followed by the thread', kids[0]==='topbar'||kids[0].includes('topbar'), kids.join(' > '));
@@ -71,7 +75,8 @@ console.log('\n=== 3. ATTACHED FILE LIVES IN THE TOP BAR ===');
   ck('removing tells you the file is still saved',
      d.querySelector('#toast').textContent.includes('still saved'), d.querySelector('#toast').textContent);
   ck('the file itself was not deleted', w.eval('docs.length')===1);
-  ck('icon disappears again', d.querySelector('#fileBtn').hidden===true);
+  ck('icon goes inactive again', !d.querySelector('#fileBtn').classList.contains('on'));
+  ck('and its file actions are disabled', d.querySelector('#docViewBtn').disabled===true);
   ck('popover closed too', !d.querySelector('#filePop').classList.contains('show'));
 }
 console.log('\n=== 4. BLANK NAMES CAN NEVER RENDER EMPTY ===');

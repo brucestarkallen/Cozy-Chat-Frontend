@@ -67,13 +67,14 @@ Tap **Test** before saving.
 - Images go to the model as images; text files are inlined as code blocks
 - 6 MB per file
 
-**Files the assistant can edit**
-- Sidebar → **Files**. Create one, or import from your device.
-- An attached file shows as a single icon in the top bar — no extra row on
-  screen. Tap it for Open / Undo / Stop using it here.
-- Attach a file to a chat and the assistant can change it directly. It proposes
-  edits as red/green cards — **Apply**, **Skip**, or **Apply all**.
-- Every applied batch goes on an undo stack (last 8), so **Undo** is one tap.
+**Files the assistant can edit — and now write**
+- Tap the file icon in the top bar → **Let the assistant write files**.
+- Ask for a document and it creates one: the reply comes with a
+  **Create file — name.md** card, and approving it makes the file and attaches
+  it, so every later edit targets it. No need to make an empty file first.
+- Or make one yourself: sidebar → **Files** → create, or import from your device.
+- Changes arrive as red/green cards — **Apply**, **Skip**, or **Apply all** —
+  and every applied batch can be undone (8 deep).
 - Matching is deliberately strict: exact first, then punctuation-normalised
   (curly quotes, em dashes), then a fuzzy word-window that **only applies when the
   difference is whitespace**. If the model misquotes a single word, the edit is
@@ -223,8 +224,8 @@ network-first, so a refresh always gets the newest version.
 | `send()` | Sends and reads the streaming reply |
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
-**Tests.** `v4test.js`, `v32test.js`, `v31test.js`, `v3test.js`, `v2test.js`, `domtest.js`, `migtest.js` and
-`negtest.js` and `csstest.js` run under Node with jsdom (`npm i jsdom fake-indexeddb`). 297 checks across the
+**Tests.** `v41test.js`, `v4test.js`, `v32test.js`, `v31test.js`, `v3test.js`, `v2test.js`, `domtest.js`, `migtest.js` and
+`negtest.js` and `csstest.js` run under Node with jsdom (`npm i jsdom fake-indexeddb`). 335 checks across the
 matching engine, JSON tolerance, prompt assembly, streaming, migration, and a
 negative test that deliberately reintroduces a fixed bug to prove the guard fires.
 
