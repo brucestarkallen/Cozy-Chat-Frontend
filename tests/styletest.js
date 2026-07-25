@@ -59,7 +59,10 @@ setTimeout(()=>{
   probe('textarea gets a text colour', ta, 'color');
   probe('textarea gets a border', ta, 'border');
   ck('textarea fills the row', cs(ta).width==='100%', cs(ta).width);
-  ck('textarea is tall enough to write in', parseInt(cs(ta).minHeight)>=80, cs(ta).minHeight);
+  // previews are a fixed height; real editing happens in the full-screen editor
+  ck('preview has a usable fixed height', parseInt(cs(ta).height)>=90, cs(ta).height);
+  ck('preview is read-only so it cannot become a nested scroller', ta.readOnly===true);
+  ck('a full-screen editor exists to edit it in', !!d.querySelector('#bigArea'));
   // The real invariant: the block editor must be styled by the SAME rules as
   // the main system prompt, not by bespoke ones. Inventing separate rules is
   // what left it unstyled twice.

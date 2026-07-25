@@ -33,53 +33,63 @@ setTimeout(()=>{
   d.querySelector('#settingsBtn').dispatchEvent(new w.Event('click',{bubbles:true}));
   d.querySelectorAll('.tab')[2].dispatchEvent(new w.Event('click',{bubbles:true}));
 
-  console.log('=== 1. NO NESTED SCROLL IN SETTINGS ===');
+  console.log('=== 1. SETTINGS NEVER GROWS A WALL OF TEXT ===');
   const css=[...html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(m=>m[1]).join('\n');
-  ck('text boxes never scroll internally', /textarea\.f\{[^}]*overflow-y:hidden/.test(css));
-  ck('and have no resize handle to fight the panel', /textarea\.f\{[^}]*resize:none/.test(css));
-  ck('the panel itself scrolls', /\.sheet-body\{[^}]*overflow-y:auto/.test(css));
+  ck('previews are a fixed height', /textarea\.f\{[^}]*height:112px/.test(css),
+     (css.match(/textarea\.f\{[^}]*/)||[''])[0].slice(0,70));
+  ck('they never scroll internally', /textarea\.f\{[^}]*overflow:hidden/.test(css));
+  ck('nothing resizes them to fit content',
+     !/autoSize/.test(html), 'autoSize refs: '+(html.match(/autoSize/g)||[]).length);
+  ck('the panel is still the scroller', /\.sheet-body\{[^}]*overflow-y:auto/.test(css));
 
-  console.log('\n=== 2. A LONG BLOCK GROWS TO FIT ===');
+  console.log('\n=== 2. LONG TEXT OPENS ON ITS OWN SCREEN ===');
+  d.querySelector('#settingsBtn').dispatchEvent(new w.Event('click',{bubbles:true}));
+  d.querySelectorAll('.tab')[2].dispatchEvent(new w.Event('click',{bubbles:true}));
   d.querySelector('[data-edit="x"]').dispatchEvent(new w.Event('click',{bubbles:true}));
   const ta=d.querySelector('.ord-editor textarea');
-  ck('editor opened', !!ta);
-  w.eval('autoSize')(ta);
-  const h=parseInt(ta.style.height);
-  ck('height was set from the content, not left at the default', h>1000, ta.style.height);
-  ck('it is taller than the panel, so the panel scrolls instead', h > 800, h+'px');
-  ck('internal scrolling is switched off on the element', ta.style.overflowY==='hidden', ta.style.overflowY);
+  ck('the block shows a preview, not the whole text', !!ta && ta.readOnly, String(ta && ta.readOnly));
+  ck('its height is not stretched by the content', !ta.style.height, ta.style.height||'unset');
+  ta.dispatchEvent(new w.Event('click',{bubbles:true}));
+  ck('tapping it opens the full-screen editor',
+     d.querySelector('#bigModal').classList.contains('show'));
+  ck('the editor is titled with the block name',
+     d.querySelector('#bigTitle').textContent==='Plot essential maker', d.querySelector('#bigTitle').textContent);
+  ck('and holds the whole text', d.querySelector('#bigArea').value===LONG);
+  ck('with a size readout', /chars/.test(d.querySelector('#bigStat').textContent),
+     d.querySelector('#bigStat').textContent);
 
-  console.log('\n=== 3. IT KEEPS UP WHILE TYPING ===');
-  ta.value = LONG + '\n' + LONG;
-  ta.dispatchEvent(new w.Event('input',{bubbles:true}));
-  const h2=parseInt(ta.style.height);
-  ck('doubling the text roughly doubles the box', h2 > h * 1.8, h+' -> '+h2);
-  ta.value = 'short';
-  ta.dispatchEvent(new w.Event('input',{bubbles:true}));
-  ck('deleting text shrinks it back', parseInt(ta.style.height) < 200, ta.style.height);
+  console.log('\n=== 3. THE EDITOR IS THE ONLY SCROLLER ===');
+  ck('its body does not scroll', /#bigModal \.sheet-body\{[^}]*overflow:hidden/.test(css));
+  ck('the textarea does', /#bigArea\{[^}]*overflow-y:auto/.test(css));
+  ck('and it fills the space', /#bigArea\{[^}]*flex:1 1 auto/.test(css));
 
-  console.log('\n=== 4. THE MAIN PROMPT BEHAVES IDENTICALLY ===');
-  d.querySelectorAll('.tab')[2].dispatchEvent(new w.Event('click',{bubbles:true}));
+  console.log('\n=== 4. SAVING GOES BACK THROUGH THE NORMAL PATH ===');
+  d.querySelector('#bigArea').value = 'rewritten by the big editor';
+  d.querySelector('#bigSave').dispatchEvent(new w.Event('click',{bubbles:true}));
+  ck('the modal closes', !d.querySelector('#bigModal').classList.contains('show'));
+  ck('the block text is updated', w.eval('injById("x").text')==='rewritten by the big editor',
+     w.eval('injById("x").text'));
+  ck('the preview shows it', d.querySelector('.ord-editor textarea').value==='rewritten by the big editor');
+  ck('it reaches the payload', w.eval(`(function(){current={id:'c',title:'t',messages:[{id:'1',role:'user',content:'U'}]};
+     return assembleMessages("openai").system;})()`).includes('rewritten by the big editor'));
+
+  console.log('\n=== 5. CANCEL LEAVES IT ALONE ===');
+  d.querySelector('.ord-editor textarea').dispatchEvent(new w.Event('click',{bubbles:true}));
+  d.querySelector('#bigArea').value='discard me';
+  d.querySelector('#bigCancel').dispatchEvent(new w.Event('click',{bubbles:true}));
+  ck('cancel closes', !d.querySelector('#bigModal').classList.contains('show'));
+  ck('and changes nothing', w.eval('injById("x").text')==='rewritten by the big editor');
+
+  console.log('\n=== 6. THE MAIN PROMPT WORKS THE SAME WAY ===');
   const sp=d.querySelector('#sysPrompt');
-  w.eval('autoSize')(sp);
-  ck('main prompt grows too', parseInt(sp.style.height)>1000, sp.style.height);
-  ck('same helper drives both', sp.style.overflowY==='hidden');
-  const chatSys=d.querySelector('#chatSys');
-  ck('the per-chat box is covered as well', !!chatSys);
-
-  console.log('\n=== 5. SIZED ON OPEN, NOT ONLY ON TYPING ===');
-  const js=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]).join('\n');
-  ck('block editors are sized right after rendering', /el\.innerHTML = rows;\s*autoSizeAll\(el\)/.test(js));
-  ck('main fields are sized when settings sync', /autoSize\(\$\("#sysPrompt"\)\); autoSize\(\$\("#chatSys"\)\)/.test(js));
-  // behaviour, not source text: change a value behind the panel's back, reopen,
-  // and the control must reflect it — and be sized to it
-  d.querySelector('#closeSettings').dispatchEvent(new w.Event('click',{bubbles:true}));
-  w.eval('PS().system = "one line only"; saveSettings();');
-  d.querySelector('#settingsBtn').dispatchEvent(new w.Event('click',{bubbles:true}));
-  ck('reopening re-reads the value', d.querySelector('#sysPrompt').value==='one line only',
-     d.querySelector('#sysPrompt').value.slice(0,20));
-  ck('and re-sizes the box to it', parseInt(d.querySelector('#sysPrompt').style.height) < 200,
-     d.querySelector('#sysPrompt').style.height);
+  ck('main prompt is a preview', sp.readOnly===true);
+  ck('and is not stretched', !sp.style.height, sp.style.height||'unset');
+  sp.dispatchEvent(new w.Event('click',{bubbles:true}));
+  ck('tapping opens it full screen', d.querySelector('#bigModal').classList.contains('show'));
+  ck('titled as the main prompt', d.querySelector('#bigTitle').textContent==='Main system prompt');
+  d.querySelector('#bigArea').value='new main prompt';
+  d.querySelector('#bigSave').dispatchEvent(new w.Event('click',{bubbles:true}));
+  ck('saving updates the preset', w.eval('PS().system')==='new main prompt', w.eval('PS().system'));
 
   console.log('\n'+(fail?'FAILED '+fail:'ALL PASS')+'  ('+(pass+fail)+' checks)');
   process.exit(fail?1:0);

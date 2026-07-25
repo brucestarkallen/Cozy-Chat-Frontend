@@ -375,9 +375,36 @@ input[type=text],input[type=password],input[type=number],textarea.f,select{
   transition:border-color .15s;
 }
 input:focus,textarea.f:focus,select:focus{border-color:var(--ember)}
-/* Grown to fit by autoSize(), so the panel is the only scroll container.
-   No resize handle: dragging it on a phone fights the panel scroll. */
-textarea.f{resize:none;min-height:88px;line-height:1.55;font-size:14.5px;overflow-y:hidden}
+/* In settings, a text field is a fixed-height preview you tap to open on its
+   own screen. It never scrolls internally, so it can never fight the panel. */
+textarea.f{
+  resize:none;height:112px;min-height:0;line-height:1.55;font-size:14.5px;
+  overflow:hidden;cursor:pointer;
+}
+textarea.f:hover{border-color:var(--ember)}
+.f-wrap{position:relative}
+.f-wrap::after{
+  content:"Tap to edit";position:absolute;right:9px;bottom:8px;
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--muted);background:var(--surface);padding:2px 6px;border-radius:5px;
+  border:1px solid var(--border);pointer-events:none;
+}
+.f-wrap::before{
+  content:"";position:absolute;left:1px;right:1px;bottom:1px;height:34px;border-radius:0 0 var(--r) var(--r);
+  background:linear-gradient(to bottom, transparent, var(--surface));pointer-events:none;
+}
+
+/* the full-screen text editor: one scroll container, nothing nested */
+#bigModal .sheet-body{overflow:hidden;display:flex;flex-direction:column;padding:12px}
+#bigArea{
+  flex:1 1 auto;min-height:0;width:100%;resize:none;overflow-y:auto;
+  background:var(--code-bg);color:var(--text);border:1px solid var(--border);
+  border-radius:var(--r);padding:12px 13px;outline:none;
+  font-family:var(--mono);font-size:13px;line-height:1.62;
+}
+#bigArea:focus{border-color:var(--ember)}
+.big-foot{display:flex;gap:8px;padding:10px 12px calc(12px + var(--safe-b));border-top:1px solid var(--border-soft);flex:none}
+.big-foot .stat{flex:1;font-family:var(--mono);font-size:10.5px;color:var(--muted);align-self:center}
 select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 17px) 51%,calc(100% - 12px) 51%;background-size:5px 5px;background-repeat:no-repeat}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .btn{
@@ -998,7 +1025,7 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
       </div>
       <div class="field">
         <label class="lbl" for="chatSys">This chat only — extra system text</label>
-        <textarea class="f" id="chatSys" placeholder="Applies to the open conversation only. Added after the instruction set." style="min-height:64px"></textarea>
+        <div class="f-wrap"><textarea class="f" id="chatSys" readonly placeholder="Applies to the open conversation only. Added after the instruction set."></textarea></div>
       </div>
       <div class="row2">
         <div class="field">
@@ -1066,7 +1093,7 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
       <hr style="border:0;border-top:1px solid var(--border-soft);margin:18px 0">
       <div class="field">
         <label class="lbl" for="sysPrompt">Main system prompt</label>
-        <textarea class="f" id="sysPrompt" placeholder="How the assistant should behave. Leave blank for none."></textarea>
+        <div class="f-wrap"><textarea class="f" id="sysPrompt" readonly placeholder="How the assistant should behave. Leave blank for none."></textarea></div>
         <div class="hint">Always sits at the very top, before the conversation.</div>
       </div>
       <hr style="border:0;border-top:1px solid var(--border-soft);margin:18px 0">
@@ -1234,6 +1261,26 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
   </div>
 </div>
 
+<!-- ============ FULL-SCREEN TEXT ============ -->
+<div class="modal" id="bigModal">
+  <div class="sheet" style="max-width:760px">
+    <div class="sheet-head">
+      <h3 id="bigTitle">Edit</h3>
+      <button class="icon-btn" id="bigClose" aria-label="Close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="sheet-body">
+      <textarea id="bigArea" spellcheck="false" autocapitalize="off"></textarea>
+    </div>
+    <div class="big-foot">
+      <span class="stat" id="bigStat"></span>
+      <button class="btn" id="bigCancel">Cancel</button>
+      <button class="btn primary" id="bigSave">Save</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 <input type="file" id="filePicker" accept="application/json,.json" hidden>
 <input type="file" id="docPicker" accept=".md,.txt,.json,.yaml,.yml,.csv,.xml,.html,.js,.py,text/*" hidden>
@@ -1242,10 +1289,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v4.4.0
+   COZY CHAT v4.5.0
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "4.4.0";
+const VERSION = "4.5.0";
 
 const PRESETS = {
   anthropic:  { name:"Claude",     kind:"anthropic", url:"https://api.anthropic.com/v1", model:"claude-sonnet-4-6", ctx:200000, hint:"e.g. claude-sonnet-4-6, claude-opus-4-5" },
@@ -2295,7 +2342,7 @@ function renderInjections(){
       + '<div class="field"><label class="lbl">Name</label>'
       + '<input type="text" value="' + escapeHtml(i.name) + '" data-injname="' + id + '" placeholder="Name"></div>'
       + '<div class="field"><label class="lbl">What this instruction says</label>'
-      + '<textarea class="f" data-injtext="' + id + '" placeholder="Type it here, the same as the main system prompt">' + escapeHtml(i.text) + '</textarea></div>'
+      + '<div class="f-wrap"><textarea class="f" data-injtext="' + id + '" readonly placeholder="Tap to write this instruction">' + escapeHtml(i.text) + '</textarea></div></div>'
       + '<div class="ord-ctl">'
       + '<div><span class="mini-lbl">Sent as</span><select data-injrole="' + id + '">'
       + '<option value="system"' + (i.role==="system"?" selected":"") + '>System</option>'
@@ -2313,7 +2360,6 @@ function renderInjections(){
       + '</div>';
   }).join("");
   el.innerHTML = rows;
-  autoSizeAll(el);
 }
 function addInjection(){
   const p = PS();
@@ -2392,7 +2438,6 @@ function setToggle(el, on){ el.classList.toggle("on", !!on); el.setAttribute("ar
 function syncSettingsUI(){
   $("#sysPrompt").value = PS().system;
   $("#chatSys").value = (current && current.sysExtra) || "";
-  autoSize($("#sysPrompt")); autoSize($("#chatSys"));
   renderPresetBar();
   $("#temp").value = S.temperature;
   $("#maxTok").value = S.maxTokens;
@@ -2427,20 +2472,37 @@ function on(sel, evt, fn, opts){
   el.addEventListener(evt, fn, opts);
 }
 const input = $("#input");
-/* A textarea with more text than height becomes its own scroll container,
-   nested inside the panel's scroll. On a phone that is almost impossible to
-   drive: you cannot reliably grab the inner one, and grabbing it stops the
-   outer one. So text boxes in settings grow to fit their contents instead,
-   leaving exactly one thing that scrolls — the panel. */
-function autoSize(el){
+/* Settings shows a fixed-height preview of each text field. Growing them to
+   fit turned a long instruction into thousands of pixels you had to scroll
+   past; scrolling them internally nested a scroller inside the panel. Neither
+   works on a phone, so editing happens on its own screen instead. */
+let bigTarget = null;
+function openBigText(el, title){
   if (!el) return;
-  el.style.height = "auto";
-  el.style.height = Math.max(el.scrollHeight, 60) + "px";
-  el.style.overflowY = "hidden";
+  bigTarget = el;
+  $("#bigTitle").textContent = title || "Edit";
+  $("#bigArea").value = el.value;
+  bigStat();
+  $("#bigModal").classList.add("show");
+  $("#scrim").classList.add("show");
+  setTimeout(function(){ $("#bigArea").focus(); }, 60);
 }
-function autoSizeAll(root){
-  const scope = root || document;
-  Array.prototype.forEach.call(scope.querySelectorAll("textarea.f"), autoSize);
+function bigStat(){
+  const v = $("#bigArea").value;
+  $("#bigStat").textContent = v.length.toLocaleString() + " chars · ~" + estTokens(v).toLocaleString() + " tokens";
+}
+function closeBigText(){
+  $("#bigModal").classList.remove("show");
+  if (!$("#settingsModal").classList.contains("show")) $("#scrim").classList.remove("show");
+  bigTarget = null;
+}
+function saveBigText(){
+  if (!bigTarget) return closeBigText();
+  bigTarget.value = $("#bigArea").value;
+  // let the existing handlers persist it, so there is one code path for saving
+  bigTarget.dispatchEvent(new Event("input",  { bubbles:true }));
+  bigTarget.dispatchEvent(new Event("change", { bubbles:true }));
+  closeBigText();
 }
 function autoGrow(){ input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, 190) + "px"; }
 input.addEventListener("input", function(){ autoGrow(); $("#sendBtn").disabled = streaming ? false : !input.value.trim(); updateEmber(); });
@@ -2611,7 +2673,7 @@ on("#injList", "input", function(e){
   const id = t.dataset.injtext || t.dataset.injname || t.dataset.injdepth;
   if (!id) return;
   const i = injById(id); if (!i) return;
-  if (t.dataset.injtext  != null){ i.text = t.value; autoSize(t); }
+  if (t.dataset.injtext  != null) i.text = t.value;
   if (t.dataset.injname  != null){
     i.name = t.value;
     const row = $("#injList").querySelector('[data-row="' + id + '"] .ord-name');
@@ -3231,9 +3293,20 @@ function renderEffort(){
   hint.textContent = (cur === "off" ? "" : "") + (EFFORT_HINTS[style] || "");
 }
 on("#jumpBtn", "click", function(){ pinned = true; scrollDown(true); });
-// the main prompt and the per-chat box grow the same way as the block editors
-on("#sysPrompt", "input", function(e){ autoSize(e.target); });
-on("#chatSys", "input", function(e){ autoSize(e.target); });
+/* Any text preview opens on its own screen. One place to edit long text,
+   one scroll container while doing it. */
+on("#sysPrompt", "click", function(e){ openBigText(e.target, "Main system prompt"); });
+on("#chatSys",   "click", function(e){ openBigText(e.target, "This chat only"); });
+on("#injList",   "click", function(e){
+  const t = e.target.closest("[data-injtext]");
+  if (!t) return;
+  const i = injById(t.dataset.injtext);
+  openBigText(t, (i && i.name) || "Instruction");
+});
+on("#bigArea",  "input", bigStat);
+on("#bigSave",  "click", saveBigText);
+on("#bigCancel","click", closeBigText);
+on("#bigClose", "click", closeBigText);
 on("#tgSquash", "click", function(){
   S.squashSystem = !(S.squashSystem !== false);
   setToggle($("#tgSquash"), S.squashSystem);
