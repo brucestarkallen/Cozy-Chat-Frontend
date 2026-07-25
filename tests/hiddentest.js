@@ -1,7 +1,7 @@
 // Guards the blue dot: an element with the hidden attribute that an author
 // rule keeps on screen by setting display.
 const fs=require('fs');const {JSDOM}=require('jsdom');require('fake-indexeddb/auto');
-const html=fs.readFileSync('./out/index.html','utf8');
+const html=fs.readFileSync(__dirname+'/../index.html','utf8');
 let pass=0,fail=0;
 const ck=(n,ok,x)=>{console.log((ok?'  ok  ':'  FAIL'),n,x===undefined?'':'→ '+x);ok?pass++:fail++;};
 const dom=new JSDOM(html,{runScripts:'dangerously',pretendToBeVisual:true,url:'https://x.com/',

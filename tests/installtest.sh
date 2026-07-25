@@ -2,12 +2,13 @@
 # git remote (file:// so --depth is honoured) and a fake Termux $PREFIX.
 # Run with: bash tests/installtest.sh
 set -u
+SRC="$(cd "$(dirname "$0")/.." && pwd)"
 rm -rf /tmp/upd; mkdir -p /tmp/upd; cd /tmp/upd
 mkdir -p origin prefix/bin home
 cd origin && git init -q -b main . && git config user.email t@t && git config user.name t
-cp /home/claude/build/out/serve.py .
+cp "$SRC/serve.py" .
 echo '<!-- COZY CHAT v1.0.0 --><h1>old</h1>' > index.html
-cp /home/claude/build/out/install.sh .
+cp "$SRC/install.sh" .
 git add -A && git commit -qm one && cd ..
 export COZY_REPO="file:///tmp/upd/origin" COZY_DIR=/tmp/upd/home/cozy-chat
 export PREFIX=/tmp/upd/prefix HOME=/tmp/upd/home COZY_PORT=8803
@@ -15,7 +16,7 @@ export PATH="$PREFIX/bin:$PATH"
 FAILED=0; ok(){ printf '  ok   %s %s\n' "$1" "${2:-}"; }; bad(){ printf '  FAIL %s %s\n' "$1" "${2:-}"; FAILED=1; }
 pkill -f "serve.py 8803" >/dev/null 2>&1; sleep 0.3
 
-bash /home/claude/build/out/install.sh >/dev/null 2>&1
+bash "$SRC/install.sh" >/dev/null 2>&1
 [ -f "$COZY_DIR/.git/shallow" ] && ok "clone is shallow (like the real one)" || bad "not shallow — path untested again"
 
 cozy >/tmp/upd/r1.log 2>&1; sleep 1

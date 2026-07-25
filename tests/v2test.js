@@ -1,7 +1,7 @@
 const fs=require('fs');
 const {JSDOM}=require('jsdom');
 require('fake-indexeddb/auto');
-const html=fs.readFileSync('./out/index.html','utf8');
+const html=fs.readFileSync(__dirname+'/../index.html','utf8');
 
 function sse(chunks){let i=0;return{getReader(){return{read(){
   if(i>=chunks.length)return Promise.resolve({done:true});

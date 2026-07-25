@@ -141,12 +141,14 @@ button{background:none;border:0;cursor:pointer;padding:0}
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
 .convo.active .convo-title{color:var(--text)}
-.convo-del{
+.convo-del,.convo-arch{
   flex:none;opacity:0;padding:3px;border-radius:5px;color:var(--muted);
   transition:opacity .15s,color .15s;
 }
-.convo:hover .convo-del,.convo.active .convo-del{opacity:1}
+.convo:hover .convo-del,.convo.active .convo-del,
+.convo:hover .convo-arch,.convo.active .convo-arch{opacity:1}
 .convo-del:hover{color:var(--danger);background:var(--surface-2)}
+.convo-arch:hover{color:var(--text);background:var(--surface-2)}
 .sb-foot{padding:10px 12px calc(10px + var(--safe-b));border-top:1px solid var(--border-soft);display:flex;gap:8px}
 .sb-foot button{
   flex:1;padding:8px;border:1px solid var(--border);border-radius:var(--r);
@@ -1330,10 +1332,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v5.1.2
+   COZY CHAT v5.2.0
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "5.1.2";
+const VERSION = "5.2.0";
 
 const PRESETS = {
   anthropic:  { name:"Claude",     kind:"anthropic", url:"https://api.anthropic.com/v1", model:"claude-sonnet-4-6", ctx:200000, hint:"e.g. claude-sonnet-4-6, claude-opus-4-5" },
@@ -1384,8 +1386,8 @@ const EFFORT_HINTS = {
   openrouter: "Sends a reasoning object with an effort level.",
   none: "Nothing extra is sent — the model decides on its own."
 };
-function applyReasoning(body, p){
-  const eff = chatEffort();
+function applyReasoning(body, p, c){
+  const eff = chatEffort(c);
   const style = reasonStyle(p);
   if (style === "none") return;
   if (style === "anthropic"){
@@ -1441,6 +1443,7 @@ const DB = (() => {
       let out; try { out = fn(st); } catch(e){ rej(e); return; }
       t.oncomplete = () => res(out && out.result !== undefined ? out.result : out);
       t.onerror = () => rej(t.error);
+      t.onabort  = () => rej(t.error || new Error("storage transaction aborted"));
     });
   }
   return {
@@ -1450,7 +1453,8 @@ const DB = (() => {
     clear: () => tx("readwrite", s => s.clear()),
     docAll:  () => tx("readonly",  s => s.getAll(),   "docs"),
     docPut:  d  => tx("readwrite", s => s.put(d),     "docs"),
-    docDel:  id => tx("readwrite", s => s.delete(id), "docs")
+    docDel:  id => tx("readwrite", s => s.delete(id), "docs"),
+    docClear: () => tx("readwrite", s => s.clear(),    "docs")
   };
 })();
 
@@ -1537,8 +1541,9 @@ function orderMoveTo(order, id, index){
 }
 
 // the active instruction set — every read of system/injections goes through here
-function PS(){
-  const want = (current && current.cfg && current.cfg.presetId) || S.activePreset;
+function PS(c){
+  c = c || current;
+  const want = (c && c.cfg && c.cfg.presetId) || S.activePreset;
   let p = S.presets.find(x => x.id === want) || S.presets.find(x => x.id === S.activePreset);
   if (!p){ p = S.presets[0]; S.activePreset = p ? p.id : null; }
   if (!p){ p = { id:"default", name:"Default", system:"", injections:[] }; S.presets = [p]; S.activePreset = p.id; }
@@ -1551,14 +1556,14 @@ function saveSettings(){ localStorage.setItem("cozychat:settings", JSON.stringif
    opening an old one brings back exactly how it was set up, and changing
    anything while it is open belongs to that chat alone. */
 const CHAT_KEYS = ["providerId","model","presetId","temperature","maxTokens","effort","squashSystem"];
-function chatCfg(){
-  if (!current) return {};
-  if (!current.cfg) current.cfg = {};
-  return current.cfg;
+function chatCfg(c){
+  c = c || current;
+  if (!c) return {};
+  if (!c.cfg) c.cfg = {};
+  return c.cfg;
 }
-function cfgGet(key, fallback){
-  const c = chatCfg();
-  const v = c[key];
+function cfgGet(key, fallback, c){
+  const v = chatCfg(c)[key];
   return (v === undefined || v === null || v === "") ? fallback : v;
 }
 function cfgSet(key, val){
@@ -1583,17 +1588,17 @@ function pushCfgToGlobals(){
   saveSettings();
 }
 
-function activeProv(){
-  const id = cfgGet("providerId", S.activeProvider);
+function activeProv(c){
+  const id = cfgGet("providerId", S.activeProvider, c);
   const p = S.providers.find(x => x.id === id) || S.providers.find(x => x.id === S.activeProvider) || S.providers[0] || null;
   if (!p) return null;
-  const m = cfgGet("model", null);
+  const m = cfgGet("model", null, c);
   return m && m !== p.model ? Object.assign({}, p, { model:m }) : p;
 }
-function chatTemp(){ return Number(cfgGet("temperature", S.temperature)); }
-function chatMaxTok(){ return Number(cfgGet("maxTokens", S.maxTokens)) || 4096; }
-function chatEffort(){ return cfgGet("effort", S.effort) || "off"; }
-function chatSquash(){ return cfgGet("squashSystem", S.squashSystem !== false) !== false; }
+function chatTemp(c){ return Number(cfgGet("temperature", S.temperature, c)); }
+function chatMaxTok(c){ return Number(cfgGet("maxTokens", S.maxTokens, c)) || 4096; }
+function chatEffort(c){ return cfgGet("effort", S.effort, c) || "off"; }
+function chatSquash(c){ return cfgGet("squashSystem", S.squashSystem !== false, c) !== false; }
 
 /* ---------- state ---------- */
 let convos = [], current = null, streaming = null, editingProv = null;
@@ -1752,14 +1757,15 @@ function newConvo(seed){
   renderSidebar(); renderThread(); closeDrawer(); $("#input").focus();
   return c;
 }
-async function persist(){
-  if (!current) return;
-  current.updatedAt = Date.now();
-  await DB.put(JSON.parse(JSON.stringify(current)));
-  const i = convos.findIndex(c => c.id === current.id);
-  if (i > 0){ convos.splice(i,1); convos.unshift(current); }
+async function persistConvo(c){
+  if (!c) return;
+  c.updatedAt = Date.now();
+  await DB.put(JSON.parse(JSON.stringify(c)));
+  const i = convos.findIndex(x => x.id === c.id);
+  if (i > 0){ convos.splice(i,1); convos.unshift(c); }
   renderSidebar();
 }
+async function persist(){ await persistConvo(current); }
 function searchHit(c, q){
   // returns a highlighted snippet if the query appears in the body, else null
   const lq = q.toLowerCase();
@@ -1777,6 +1783,9 @@ function searchHit(c, q){
   return null;
 }
 function convoRow(c, hit){
+  const arch = '<button class="convo-arch" data-arch="' + c.id + '" aria-label="' + (c.archived ? "Unarchive" : "Archive") + '" title="' + (c.archived ? "Put back in the list" : "Archive") + '">'
+    + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    + '<path d="M3 7h18M5 7v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7M10 11h4"/></svg></button>';
   const del = '<button class="convo-del" data-del="' + c.id + '" aria-label="Delete chat">'
     + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">'
     + '<path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M7 7l1 13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-13"/></svg></button>';
@@ -1784,7 +1793,7 @@ function convoRow(c, hit){
     ? '<svg class="pin" width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 9 9l-6 .8 4.5 4-1.4 6.2L12 16.8l5.9 3.2-1.4-6.2 4.5-4L15 9Z"/></svg>' : "";
   return '<div class="convo' + (current && c.id===current.id ? " active":"") + '" data-id="' + c.id + '">'
     + pin + '<div class="convo-col"><div class="convo-title">' + escapeHtml(c.title) + '</div>'
-    + (hit ? '<div class="convo-hit">' + hit + '</div>' : "") + '</div>' + del + '</div>';
+    + (hit ? '<div class="convo-hit">' + hit + '</div>' : "") + '</div>' + arch + del + '</div>';
 }
 function renderSidebar(){
   const list = $("#convoList");
@@ -1805,12 +1814,19 @@ function renderSidebar(){
   }
 
   const live = convos.filter(c => !c.archived);
-  if (!live.length){ list.innerHTML = '<div class="empty-note">Nothing here yet.<br>Start a chat and it\'ll show up.</div>'; return; }
+  const arch = convos.filter(c => c.archived).length;
+  /* Archiving the only chat must not read as deletion: the empty state still
+     says how many are archived and that search reaches them. */
+  if (!live.length){
+    list.innerHTML = arch
+      ? '<div class="sec-head">' + arch + ' archived — search to find them</div>'
+      : '<div class="empty-note">Nothing here yet.<br>Start a chat and it\'ll show up.</div>';
+    return;
+  }
   const pinned = live.filter(c => c.pinned), rest = live.filter(c => !c.pinned);
   let html = "";
   if (pinned.length) html += '<div class="sec-head">Pinned</div>' + pinned.map(c => convoRow(c, null)).join("");
   if (rest.length)   html += (pinned.length ? '<div class="sec-head">Recent</div>' : "") + rest.map(c => convoRow(c, null)).join("");
-  const arch = convos.filter(c => c.archived).length;
   if (arch) html += '<div class="sec-head">' + arch + ' archived — search to find them</div>';
   list.innerHTML = html;
 }
@@ -1831,17 +1847,18 @@ function renderThread(){
 }
 /* A conversation attaches any number of files. docId was the single-file
    field; it is read once and folded into docIds so older chats carry over. */
-function chatDocIds(){
-  if (!current) return [];
-  if (!Array.isArray(current.docIds)){
-    current.docIds = current.docId ? [current.docId] : [];
-    delete current.docId;
+function chatDocIds(c){
+  c = c || current;
+  if (!c) return [];
+  if (!Array.isArray(c.docIds)){
+    c.docIds = c.docId ? [c.docId] : [];
+    delete c.docId;
   }
   // drop ids whose file has since been deleted
-  current.docIds = current.docIds.filter(id => docs.some(d => d.id === id));
-  return current.docIds;
+  c.docIds = c.docIds.filter(id => docs.some(d => d.id === id));
+  return c.docIds;
 }
-function chatDocs(){ return chatDocIds().map(id => docs.find(d => d.id === id)).filter(Boolean); }
+function chatDocs(c){ return chatDocIds(c).map(id => docs.find(d => d.id === id)).filter(Boolean); }
 function isAttached(id){ return chatDocIds().indexOf(id) >= 0; }
 
 function renderFileBtn(){
@@ -1976,8 +1993,9 @@ function updateEmber(){
 /* ==========================================================
    PROMPT ASSEMBLY
    ========================================================== */
-function assembleMessages(kind){
-  const base = current.messages
+function assembleMessages(kind, c){
+  c = c || current;
+  const base = c.messages
     .filter(m => (m.role === "user" || m.role === "assistant") && !m.pending)
     .map(m => {
       let c = m.content;
@@ -2000,7 +2018,7 @@ function assembleMessages(kind){
       return { role:m.role, content:c };
     });
 
-  const p = PS();
+  const p = PS(c);
   const live = p.injections.filter(i => i.enabled && i.text.trim());
   const byId = {};
   for (const i of live) byId[i.id] = i;
@@ -2046,7 +2064,7 @@ function assembleMessages(kind){
   // single system message far better than a run of them, and it costs fewer
   // delimiter tokens. Off keeps every block as its own message, which some
   // models follow more literally.
-  const squash = chatSquash();
+  const squash = chatSquash(c);
   const merged = [];
   for (const m of out){
     const prev = merged[merged.length - 1];
@@ -2061,30 +2079,30 @@ function assembleMessages(kind){
   if (tail && tail.role === "assistant" && typeof tail.content === "string")
     tail.content = tail.content.replace(/\s+$/, "");
   let sysParts = topSys.slice();
-  if (current && current.sysExtra && current.sysExtra.trim()) sysParts.push(current.sysExtra);
-  const attached = chatDocs();
+  if (c.sysExtra && c.sysExtra.trim()) sysParts.push(c.sysExtra);
+  const attached = chatDocs(c);
   if (attached.length){
     sysParts.push(doceditProtocol(attached));
     for (const d of attached) sysParts.push("[FILE: " + d.name + "]\n" + d.text);
-  } else if (current && current.filesOn) sysParts.push(doceditProtocol([]));
+  } else if (c.filesOn) sysParts.push(doceditProtocol([]));
   const system = sysParts.filter(t => t && t.trim()).join("\n\n");
   return { messages: merged, system: system };
 }
 
-function buildPayload(opts){
+function buildPayload(opts, c){
   opts = opts || {};
-  const p = activeProv();
-  const asm = assembleMessages(p.kind);
+  const p = activeProv(c);
+  const asm = assembleMessages(p.kind, c);
   const useNative = S.search.on && S.search.provider === "native" && p.kind === "anthropic" && opts.search;
 
   if (p.kind === "anthropic"){
     const body = {
-      model:p.model, max_tokens:chatMaxTok(),
-      temperature:chatTemp(), stream:true, messages: asm.messages
+      model:p.model, max_tokens:chatMaxTok(c),
+      temperature:chatTemp(c), stream:true, messages: asm.messages
     };
     if (asm.system) body.system = asm.system;
     if (useNative) body.tools = [{ type:"web_search_20250305", name:"web_search", max_uses:Number(S.search.count)||5 }];
-    applyReasoning(body, p);
+    applyReasoning(body, p, c);
     return {
       url: (p.proxy || p.url).replace(/\/+$/,"") + "/messages",
       headers: { "content-type":"application/json", "x-api-key":p.apiKey,
@@ -2093,11 +2111,11 @@ function buildPayload(opts){
     };
   }
   const body = {
-    model:p.model, max_tokens:chatMaxTok(),
-    temperature:chatTemp(), stream:true,
+    model:p.model, max_tokens:chatMaxTok(c),
+    temperature:chatTemp(c), stream:true,
     messages: asm.system ? [{ role:"system", content:asm.system }].concat(asm.messages) : asm.messages
   };
-  applyReasoning(body, p);
+  applyReasoning(body, p, c);
   return {
     url: (p.proxy || p.url).replace(/\/+$/,"") + "/chat/completions",
     headers: { "content-type":"application/json", "authorization":"Bearer " + p.apiKey },
@@ -2152,11 +2170,16 @@ function friendlyError(err, p){
   return msg;
 }
 
-async function send(userText, mode){
-  const p = activeProv();
+/* send() serves exactly one conversation from start to finish. It reads and
+   writes only `convo`, never the global `current` — so switching chats, or a
+   newer send superseding this one, can no longer persist the wrong chat, drop
+   the streamed reply, or push an error into whichever chat happens to be open. */
+async function send(userText, mode, forConvo){
+  if (forConvo && !convos.some(c => c.id === forConvo.id)) return;
+  const convo = forConvo || current || newConvo();
+  const p = activeProv(convo);
   if (!p || !p.apiKey){ openSettings(); toast("Add a connection first"); return; }
   if (!p.model){ openSettings(); toast("Set a model name first"); return; }
-  if (!current) newConvo();
 
   const wantSearch = S.search.on && (S.search.always || searchArmed);
   searchArmed = false; syncSearchBtn();
@@ -2164,9 +2187,9 @@ async function send(userText, mode){
   if (userText != null){
     const um = { id:uid(), role:"user", content:userText, ts:Date.now() };
     if (pendingAtts.length){ um.attachments = pendingAtts.slice(); pendingAtts = []; renderAttachTray(); }
-    current.messages.push(um);
-    if (S.autoTitle && current.title === "New chat") current.title = userText.trim().split("\n")[0].slice(0,44) || "New chat";
-    renderThread(); await persist();
+    convo.messages.push(um);
+    if (S.autoTitle && convo.title === "New chat") convo.title = userText.trim().split("\n")[0].slice(0,44) || "New chat";
+    renderThread(); await persistConvo(convo);
 
     if (wantSearch && S.search.provider !== "native"){
       const node = document.querySelector('[data-mid="' + um.id + '"] .msg-body');
@@ -2179,36 +2202,51 @@ async function send(userText, mode){
         um.sources = await runSearch(userText);
         if (!um.sources.length) toast("Search came back empty");
       } catch (e){ toast(String(e.message || e)); }
-      renderThread(); await persist();
+      renderThread(); await persistConvo(convo);
     }
   }
 
   const continuing = mode === "continue";
   let asst;
   if (continuing){
-    asst = current.messages[current.messages.length - 1];
+    asst = convo.messages[convo.messages.length - 1];
     if (!asst || asst.role !== "assistant") return;
   } else {
     asst = { id:uid(), role:"assistant", content:"", thinking:"", model:p.model, ts:Date.now(), variants:[], vi:0, pending:true };
-    current.messages.push(asst);
+    convo.messages.push(asst);
     renderThread();
   }
 
   const startLen = continuing ? asst.content.length : 0;
   let raw = continuing ? asst.content : "";
-  const node = document.querySelector('[data-mid="' + asst.id + '"] .msg-body');
-  if (!continuing && node) node.innerHTML = '<span class="caret"></span>';
+  const seed = document.querySelector('[data-mid="' + asst.id + '"] .msg-body');
+  if (!continuing && seed) seed.innerHTML = '<span class="caret"></span>';
 
-  streaming = new AbortController();
+  if (streaming) streaming.abort();
+  const ctrl = new AbortController();
+  ctrl.convoId = convo.id;
+  streaming = ctrl;
   setSending(true);
 
-  let painting = false;
+  let painting = false, done = false;
+  /* A paint scheduled on the last chunk can fire after the stream has
+     finished and been finalized — overwriting the stripped, settled message
+     with the raw text again. Once done, every queued frame bails. */
+  /* The node is looked up fresh on every frame. Any re-render — a message
+     deleted, a file attached, a switch to another chat and back — replaces
+     the DOM, and a reference captured once would keep painting into a
+     detached element: data intact, screen frozen. Re-querying means the
+     stream stays visibly alive wherever its message is on screen, and
+     harmlessly skips the DOM while it is not. */
   const paint = () => {
-    if (painting || !node) return; painting = true;
+    if (painting) return; painting = true;
     requestAnimationFrame(() => {
       painting = false;
+      if (done) return;
       const sr = splitReasoning(raw);
       asst.thinking = sr.think || asst.thinking; asst.content = sr.text;
+      const node = document.querySelector('[data-mid="' + asst.id + '"] .msg-body');
+      if (!node) return;
       node.innerHTML = renderMarkdown(trimPartialTag(sr.text)) + '<span class="caret"></span>';
       if (asst.thinking && S.showThinking){
         let tw = document.querySelector('[data-mid="' + asst.id + '"] .think-body');
@@ -2227,8 +2265,8 @@ async function send(userText, mode){
 
   const sources = [];
   try {
-    const req = buildPayload({ search: wantSearch });
-    const res = await fetch(req.url, { method:"POST", headers:req.headers, body:JSON.stringify(req.body), signal:streaming.signal });
+    const req = buildPayload({ search: wantSearch }, convo);
+    const res = await fetch(req.url, { method:"POST", headers:req.headers, body:JSON.stringify(req.body), signal:ctrl.signal });
     if (!res.ok){
       let detail = "";
       try { const j = await res.json(); detail = (j.error && (j.error.message || j.error.type)) || JSON.stringify(j).slice(0,300); }
@@ -2271,11 +2309,12 @@ async function send(userText, mode){
         }
       }
     }
+    done = true;
     const fin = splitReasoning(raw);
-    asst.content = fin.text || raw;
+    asst.content = fin.text;
     if (fin.think) asst.thinking = fin.think;
     if (sources.length) asst.sources = sources;
-    if (chatDocIds().length || current.filesOn){
+    if (chatDocIds(convo).length || convo.filesOn){
       const pd = parseDocEdits(asst.content);
       if (pd.edits.length){ asst.edits = pd.edits; asst.content = stripDocEdits(asst.content); }
       else if (pd.error){ asst.editError = pd.error; asst.content = stripDocEdits(asst.content); }
@@ -2283,16 +2322,18 @@ async function send(userText, mode){
     if (!asst.content && !asst.thinking) asst.content = "_(empty reply)_";
     if (continuing && asst.content.length === startLen) toast("Model had nothing more to add");
   } catch (err){
+    done = true;
     if (err.name === "AbortError"){
       const fin = splitReasoning(raw);
       asst.content = fin.text; if (fin.think) asst.thinking = fin.think;
       if (!asst.content && !asst.thinking) asst.content = "_(stopped)_";
     } else {
-      if (!continuing) current.messages = current.messages.filter(m => m.id !== asst.id);
-      current.messages.push({ id:uid(), role:"error", content:friendlyError(err,p), ts:Date.now() });
+      if (!continuing) convo.messages = convo.messages.filter(m => m.id !== asst.id);
+      convo.messages.push({ id:uid(), role:"error", content:friendlyError(err,p), ts:Date.now() });
     }
   } finally {
-    streaming = null; setSending(false);
+    // a newer send may own the controls by now — only the owner releases them
+    if (streaming === ctrl){ streaming = null; setSending(false); }
     if (asst) delete asst.pending;
     if (asst && asst.role === "assistant"){
       asst.variants = asst.variants || [];
@@ -2300,7 +2341,9 @@ async function send(userText, mode){
       if (continuing && asst.variants.length) asst.variants[asst.vi] = snap;
       else { asst.variants.push(snap); asst.vi = asst.variants.length - 1; }
     }
-    renderThread(); await persist();
+    // the chat may have been deleted mid-stream; putting it back would resurrect it
+    if (convos.some(c => c.id === convo.id)) await persistConvo(convo);
+    if (convo === current) renderThread();
   }
 }
 
@@ -2369,6 +2412,7 @@ function applyPreset(key){
   fillModelList([]);
 }
 function saveProv(){
+  const prevChatProv = current ? cfgGet("providerId", S.activeProvider) : null;
   const preset = $("#pPreset").value;
   const data = { id:editingProv||uid(), preset:preset, kind:PRESETS[preset].kind,
     name:$("#pName").value.trim()||PRESETS[preset].name, url:$("#pUrl").value.trim(),
@@ -2379,7 +2423,11 @@ function saveProv(){
   const i = S.providers.findIndex(p=>p.id===data.id);
   if (i>=0) S.providers[i]=data; else S.providers.push(data);
   S.activeProvider = data.id;
-  if (current) cfgSet("providerId", data.id);
+  if (current){
+    // a per-chat model pick only means anything on the connection it was made for
+    if (prevChatProv !== data.id) cfgSet("model", null);
+    cfgSet("providerId", data.id);
+  }
   saveSettings(); renderProvList(); renderThread();
   $("#provEditor").hidden = true; editingProv = null; toast("Connection saved");
 }
@@ -2532,7 +2580,7 @@ function download(name, text, type){
   setTimeout(function(){ URL.revokeObjectURL(u); }, 1500);
 }
 async function backup(){
-  const data = { app:"cozy-chat", version:VERSION, exportedAt:new Date().toISOString(), settings:S, conversations:await DB.all() };
+  const data = { app:"cozy-chat", version:VERSION, exportedAt:new Date().toISOString(), settings:S, conversations:await DB.all(), docs:await DB.docAll() };
   download("cozy-chat-backup-" + new Date().toISOString().slice(0,10) + ".json", JSON.stringify(data,null,2), "application/json");
   toast("Backup saved to Downloads");
 }
@@ -2543,18 +2591,27 @@ async function handleRestore(file){
     if (!confirm("Restore " + data.conversations.length + " conversations? This replaces what's here now.")) return;
     await DB.clear();
     for (const c of data.conversations) await DB.put(c);
+    // older backups predate files; only replace the store when the backup has them
+    if (Array.isArray(data.docs)){
+      await DB.docClear();
+      for (const d of data.docs) await DB.docPut(d);
+    }
     if (data.settings){
-      S = Object.assign({}, DEFAULTS, data.settings);
-      S.search = Object.assign({}, DEFAULTS.search, data.settings.search||{});
+      /* Route the file's settings through loadSettings, the one place every
+         migration lives — a pre-v3 backup's loose system prompt, a pre-v4
+         set's top/bottom ordering. Rebuilding S by hand here skipped all of
+         that and quietly lost what the migrations preserve. */
+      localStorage.setItem("cozychat:settings", JSON.stringify(data.settings));
+      S = loadSettings();
       saveSettings();
     }
-    await loadConvos(); current = convos[0] || null;
+    await loadConvos(); await loadDocs(); current = convos[0] || null;
     applyTheme(); syncSettingsUI(); renderSidebar(); renderThread(); toast("Restored");
   } catch(_) { toast("That file didn't look like a Cozy Chat backup"); }
 }
 function exportMd(){
   if (!current || !current.messages.length){ toast("Nothing to save yet"); return; }
-  const body = current.messages.map(m => "## " + (m.role==="user"?"You":(m.model||"Assistant")) + "\n\n" + m.content).join("\n\n---\n\n");
+  const body = current.messages.map(m => "## " + (m.role==="user" ? "You" : m.role==="error" ? "Error" : (m.model||"Assistant")) + "\n\n" + m.content).join("\n\n---\n\n");
   download((current.title.replace(/[^\w\s-]/g,"").slice(0,50)||"chat") + ".md", "# " + current.title + "\n\n" + body + "\n", "text/markdown");
   toast("Saved to Downloads");
 }
@@ -2668,10 +2725,23 @@ on("#themeBtn", "click", function(){
 });
 
 on("#convoList", "click", async function(e){
+  const ar = e.target.closest("[data-arch]");
+  if (ar){
+    e.stopPropagation();
+    const c = convos.find(x => x.id === ar.dataset.arch);
+    if (!c) return;
+    c.archived = !c.archived;
+    await DB.put(JSON.parse(JSON.stringify(c)));
+    if (c.archived && current && current.id === c.id) current = convos.filter(x => !x.archived)[0] || null;
+    renderSidebar(); renderThread();
+    toast(c.archived ? "Archived — search finds it any time" : "Back in the list");
+    return;
+  }
   const del = e.target.closest("[data-del]");
   if (del){
     e.stopPropagation();
     if (!confirm("Delete this chat?")) return;
+    if (streaming && streaming.convoId === del.dataset.del) streaming.abort();
     await DB.del(del.dataset.del);
     convos = convos.filter(c => c.id !== del.dataset.del);
     if (current && current.id === del.dataset.del) current = convos[0] || null;
@@ -2713,25 +2783,33 @@ on("#threadInner", "click", async function(e){
   const dm = e.target.closest("[data-delmsg]");
   if (dm){ current.messages = current.messages.filter(x=>x.id!==dm.dataset.delmsg); renderThread(); await persist(); return; }
   const co = e.target.closest("[data-continue]");
-  if (co){ pinned = true; send(null, "continue"); return; }
+  if (co){ pinned = true; send(null, "continue", current); return; }
   const rg = e.target.closest("[data-regen]");
   if (rg){
-    const i = current.messages.findIndex(x=>x.id===rg.dataset.regen);
-    const m = current.messages[i];
+    const convo = current;
+    const i = convo.messages.findIndex(x=>x.id===rg.dataset.regen);
+    const m = convo.messages[i];
     if (i === lastAssistantIdx()){
       const kept = variantsOf(m).slice();
-      current.messages = current.messages.slice(0, i);
-      renderThread(); await persist(); pinned = true;
-      await send(null);
-      const nm = current.messages[current.messages.length-1];
+      convo.messages = convo.messages.slice(0, i);
+      renderThread(); await persistConvo(convo); pinned = true;
+      await send(null, null, convo);
+      const nm = convo.messages[convo.messages.length-1];
       if (nm && nm.role === "assistant"){
         nm.variants = kept.concat(nm.variants || []);
         nm.vi = nm.variants.length - 1; syncVariant(nm);
-        renderThread(); await persist();
+      } else {
+        // the swipe failed — put the original reply back so its versions
+        // survive, with the error still visible after it
+        const at = convo.messages.length && convo.messages[convo.messages.length-1].role === "error"
+          ? convo.messages.length - 1 : convo.messages.length;
+        convo.messages.splice(at, 0, m);
       }
+      if (convo === current) renderThread();
+      await persistConvo(convo);
     } else {
-      current.messages = current.messages.slice(0, i);
-      renderThread(); await persist(); pinned = true; send(null);
+      convo.messages = convo.messages.slice(0, i);
+      renderThread(); await persistConvo(convo); pinned = true; send(null, null, convo);
     }
     return;
   }
@@ -2747,24 +2825,27 @@ function startEdit(id){
   const ta = node.querySelector("textarea");
   ta.value = m.content; ta.style.height = Math.min(ta.scrollHeight+10,340)+"px"; ta.focus();
   node.querySelector("[data-savedit]").onclick = async function(){
+    const convo = current;
     m.content = ta.value;
-    const i = current.messages.findIndex(x=>x.id===id);
-    current.messages = current.messages.slice(0,i+1);
-    renderThread(); await persist(); pinned = true; send(null);
+    const i = convo.messages.findIndex(x=>x.id===id);
+    convo.messages = convo.messages.slice(0,i+1);
+    renderThread(); await persistConvo(convo); pinned = true; send(null, null, convo);
   };
   node.querySelector("[data-canceledit]").onclick = function(){ renderThread(); };
 }
 
-on("#regenBtn", "click", function(){
+on("#regenBtn", "click", async function(){
   if (!current || !current.messages.length) return;
-  let i = current.messages.length-1;
-  while (i>=0 && current.messages[i].role!=="assistant" && current.messages[i].role!=="error") i--;
+  const convo = current;
+  let i = convo.messages.length-1;
+  while (i>=0 && convo.messages[i].role!=="assistant" && convo.messages[i].role!=="error") i--;
   if (i<0) return;
-  current.messages = current.messages.slice(0,i);
-  renderThread(); persist(); pinned = true; send(null);
+  convo.messages = convo.messages.slice(0,i);
+  renderThread(); await persistConvo(convo); pinned = true; send(null, null, convo);
 });
 on("#clearBtn", "click", async function(){
   if (!current || !confirm("Clear every message in this chat?")) return;
+  if (streaming && streaming.convoId === current.id) streaming.abort();
   current.messages = []; renderThread(); await persist();
 });
 
@@ -2789,6 +2870,7 @@ on("#delProvBtn", "click", function(){
   if (S.activeProvider===editingProv) S.activeProvider = S.providers[0]?S.providers[0].id:null;
   for (const c of convos) if (c.cfg && c.cfg.providerId === editingProv){
     c.cfg.providerId = S.activeProvider;
+    c.cfg.model = null;    // the override belonged to the deleted connection
     DB.put(JSON.parse(JSON.stringify(c)));
   }
   saveSettings(); renderProvList(); renderThread();
@@ -3205,8 +3287,8 @@ function editCardsHtml(m){
    unambiguous. With several the model must name it, and a wrong name is
    refused rather than guessed — silently writing into the wrong document
    would be far worse than a failed card. */
-function resolveTarget(e){
-  const list = chatDocs();
+function resolveTarget(e, c){
+  const list = chatDocs(c);
   if (!list.length) return null;
   const want = (e.file || "").trim().toLowerCase();
   if (!want) return list.length === 1 ? list[0] : null;
@@ -3215,25 +3297,26 @@ function resolveTarget(e){
       || list.find(d => base(d.name) === base(want))
       || null;
 }
-async function applyEdit(msgId, editId){
-  const m = current.messages.find(x => x.id === msgId);
+async function applyEdit(msgId, editId, convo){
+  const c = convo || current;
+  const m = c && c.messages.find(x => x.id === msgId);
   const e = m && m.edits && m.edits.find(x => x.id === editId);
   if (!m || !e || e.status !== "pending") return;
 
   if (e.type === "create"){
     const d = await newDoc(e.name || "untitled.md", e.replace || "");
-    chatDocIds().push(d.id);
-    current.filesOn = true;
+    chatDocIds(c).push(d.id);
+    c.filesOn = true;
     e.status = "applied"; e.note = "created and attached";
-    await persist(); renderThread(); renderFileBtn(); renderDocList(); updateEmber();
+    await persistConvo(c); renderThread(); renderFileBtn(); renderDocList(); updateEmber();
     toast("Created " + d.name);
     return;
   }
 
-  const doc = resolveTarget(e);
+  const doc = resolveTarget(e, c);
   if (!doc){
     e.status = "failed";
-    e.note = chatDocs().length > 1
+    e.note = chatDocs(c).length > 1
       ? (e.file ? 'no attached file called "' + e.file + '"' : "didn't say which file to change")
       : "no file is attached";
     renderThread(); return;
@@ -3249,14 +3332,16 @@ async function applyEdit(msgId, editId){
     e.status = "applied"; e.note = r.note;
     await DB.docPut(JSON.parse(JSON.stringify(doc)));
   }
-  renderThread(); renderFileBtn(); await persist();
+  renderThread(); renderFileBtn(); await persistConvo(c);
 }
 async function applyAll(msgId){
-  const m = current.messages.find(x => x.id === msgId);
+  const c = current;
+  const m = c && c.messages.find(x => x.id === msgId);
   if (!m || !m.edits) return;
-  for (const e of m.edits) if (e.status === "pending") await applyEdit(msgId, e.id);
-  const done = m.edits.filter(e => e.status === "applied").length;
-  const bad  = m.edits.filter(e => e.status === "failed").length;
+  const todo = m.edits.filter(e => e.status === "pending");
+  for (const e of todo) await applyEdit(msgId, e.id, c);
+  const done = todo.filter(e => e.status === "applied").length;
+  const bad  = todo.filter(e => e.status === "failed").length;
   toast(done + " applied" + (bad ? ", " + bad + " couldn't be matched" : ""));
 }
 async function undoDoc(id){
@@ -3334,6 +3419,15 @@ function renderPresetBar(){
     '<option value="' + p.id + '"' + (p.id === PS().id ? " selected" : "") + '>' + escapeHtml(p.name) + '</option>').join("");
   $("#presetDelBtn").disabled = S.presets.length < 2;
   $("#presetDelBtn").style.opacity = S.presets.length < 2 ? ".4" : "1";
+}
+/* A duplicated or imported set gets fresh ids on every block; the order list
+   must be remapped to match, or ensureOrder drops the unknown ids and the
+   whole arrangement silently collapses to blocks-after-the-conversation. */
+function reidPreset(p){
+  const map = {};
+  p.injections = (p.injections || []).map(function(i){ const nid = uid(); map[i.id] = nid; i.id = nid; return i; });
+  if (Array.isArray(p.order)) p.order = p.order.map(function(id){ return map[id] || id; });
+  return p;
 }
 function switchPreset(id){
   cfgSet("presetId", id);
@@ -3465,7 +3559,7 @@ function renderEffort(){
   const hint = $("#effortHint");
   if (!p){ hint.textContent = "Add a connection first."; return; }
   const style = reasonStyle(p);
-  hint.textContent = (cur === "off" ? "" : "") + (EFFORT_HINTS[style] || "");
+  hint.textContent = EFFORT_HINTS[style] || "";
 }
 on("#jumpBtn", "click", function(){ pinned = true; scrollDown(true); });
 /* Any text preview opens on its own screen. One place to edit long text,
@@ -3686,7 +3780,7 @@ on("#presetDupBtn", "click", function(){
   const src = PS();
   const p = JSON.parse(JSON.stringify(src));
   p.id = uid(); p.name = src.name + " copy";
-  p.injections.forEach(function(i){ i.id = uid(); });
+  reidPreset(p);
   S.presets.push(p); switchPreset(p.id); toast("Copied");
 });
 on("#presetRenameBtn", "click", function(){
@@ -3722,7 +3816,7 @@ on("#presetPicker", "change", async function(e){
     const p = j.preset || j;
     if (!p || typeof p.system !== "string") throw new Error("bad");
     p.id = uid(); p.name = p.name || "Imported set";
-    p.injections = (p.injections || []).map(function(i){ i.id = uid(); return i; });
+    reidPreset(p);
     S.presets.push(p); switchPreset(p.id); toast("Imported " + p.name);
   } catch(_) { toast("That wasn't an instruction set file"); }
 });
@@ -3916,6 +4010,14 @@ on("#attachTray", "click", function(e){
 on("#input", "paste", async function(e){
   const items = (e.clipboardData && e.clipboardData.files) || [];
   if (items.length){ e.preventDefault(); await addAttachments(Array.from(items)); }
+});
+/* A file dropped anywhere on the page must become an attachment. The browser's
+   default is to navigate the tab TO the file, which replaces the app. */
+document.addEventListener("dragover", function(e){ e.preventDefault(); });
+document.addEventListener("drop", async function(e){
+  e.preventDefault();
+  const fs = e.dataTransfer && e.dataTransfer.files;
+  if (fs && fs.length) await addAttachments(Array.from(fs));
 });
 
 /* --- pin / archive from the conversation list --- */

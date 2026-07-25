@@ -1,7 +1,7 @@
 // Guards the reported bug: a long instruction sitting in a short box that
 // becomes its own scroll container, nested inside the panel's scroll.
 const fs=require('fs');const {JSDOM}=require('jsdom');require('fake-indexeddb/auto');
-const html=fs.readFileSync('./out/index.html','utf8');
+const html=fs.readFileSync(__dirname+'/../index.html','utf8');
 let pass=0,fail=0;
 const ck=(n,ok,x)=>{console.log((ok?'  ok  ':'  FAIL'),n,x===undefined?'':'→ '+x);ok?pass++:fail++;};
 const LONG=Array.from({length:220},(_,i)=>'Line '+i+' of a long instruction block that will not fit in a short box.').join('\n');

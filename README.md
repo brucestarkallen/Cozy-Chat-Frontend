@@ -31,7 +31,7 @@ no waiting. Edit `index.html` in Termux, refresh the tab, changes are live.
 
 **One thing to know:** the web version and the local version are treated as two
 different sites by Chrome, so they keep **separate** conversation histories.
-Pick one as your main, or move chats across with **Back up** / **Restore**.
+Pick one as your main, or move everything across with **Back up** / **Restore**.
 
 ---
 
@@ -60,7 +60,7 @@ Tap **Test** before saving.
 **Finding things**
 - **Search every chat** — matches message contents, not just titles, with the hit highlighted
 - **Pin** a chat: long-press its title (or right-click it in the list)
-- Archived chats stay out of the list but still turn up in search
+- **Archive** — the box icon on a chat's row. Archived chats stay out of the list but still turn up in search, where the same icon brings them back
 
 **Attachments**
 - Tap the paperclip, or just paste an image straight into the message box
@@ -183,7 +183,7 @@ Settings → App, or tap the moon icon to cycle.
 
 **Data**
 - Ember bar above the message box fills as the context window fills
-- Backup and restore everything to a JSON file
+- Backup and restore everything — conversations, settings, and your files — to a JSON file
 - Save any conversation as Markdown
 
 ## If a connection won't connect
@@ -247,10 +247,13 @@ network-first, so a refresh always gets the newest version.
 | `send()` | Sends and reads the streaming reply |
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
-**Tests.** `v51test.js`, `v5test.js`, `v41test.js`, `v4test.js`, `v32test.js`, `v31test.js`, `v3test.js`, `v2test.js`, `domtest.js`, `migtest.js` and
-`negtest.js` and `csstest.js` run under Node with jsdom (`npm i jsdom fake-indexeddb`). 472 checks across the
-matching engine, JSON tolerance, prompt assembly, streaming, migration, and a
-negative test that deliberately reintroduces a fixed bug to prove the guard fires.
+**Tests.** Everything in `tests/` — `v52test.js` down to `v2test.js`, plus
+`domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`, `swtest.js`,
+`scrolltest.js`, `styletest.js`, `hiddentest.js`, `coherencetest.js` and
+`installtest.sh` — runs under Node with jsdom (`npm i jsdom fake-indexeddb`).
+654 checks across the matching engine, JSON tolerance, prompt assembly,
+streaming, stream/chat binding, backup round-trips, migration, and negative
+tests that deliberately reintroduce fixed bugs to prove the guards fire.
 
 ---
 
@@ -318,8 +321,9 @@ fade the top icon row until you reach for it.
 
 ## Your data
 
-Conversations live in IndexedDB, settings and keys in localStorage. Nothing is
+Conversations and files live in IndexedDB, settings and keys in localStorage. Nothing is
 uploaded anywhere — requests go straight from your phone to whichever service
 you connected.
 
-Clearing Chrome's site data wipes it, so use **Back up** now and then.
+Clearing Chrome's site data wipes it, so use **Back up** now and then — one
+file carrying every chat, file, and setting.

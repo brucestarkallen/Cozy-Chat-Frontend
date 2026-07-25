@@ -1,6 +1,13 @@
 // TEST FILE - not for pasting into SillyTavern. Run with: node tests/negtest.js
 const fs=require('fs');const {JSDOM}=require('jsdom');require('fake-indexeddb/auto');
-const html=fs.readFileSync('/tmp/sabotage.html','utf8');
+const clean=fs.readFileSync(__dirname+'/../index.html','utf8');
+// Reintroduce the frozen-panel bug: one binding to an element that does not
+// exist, placed before the first real binding. The on() guard must warn and
+// every listener wired after this line must still attach.
+const SAB='on("#thisElementDoesNotExist","click",function(){});\n';
+const anchor='on("#sendBtn", "click", submit);';
+if(clean.split(anchor).length!==2){console.log('  FAIL sabotage anchor not unique');process.exit(1);}
+const html=clean.replace(anchor,SAB+anchor);
 const warns=[],errs=[];
 const dom=new JSDOM(html,{runScripts:'dangerously',pretendToBeVisual:true,url:'https://x.com/',
   beforeParse(w){

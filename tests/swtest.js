@@ -1,7 +1,7 @@
 // Guards the bug that hid v4.0.1 from the user: "network-first" that still
 // reads the browser's HTTP cache and never reaches the server.
 const fs=require('fs');
-const sw=fs.readFileSync('./out/sw.js','utf8');
+const sw=fs.readFileSync(__dirname+'/../sw.js','utf8');
 let pass=0,fail=0;
 const ck=(n,ok,x)=>{console.log((ok?'  ok  ':'  FAIL'),n,x===undefined?'':'→ '+x);ok?pass++:fail++;};
 
@@ -35,7 +35,7 @@ console.log('\n=== simulate the worker fetch decision ===');
 }
 
 console.log('\n=== the app can tell you which build it is running ===');
-const html=fs.readFileSync('./out/index.html','utf8');
+const html=fs.readFileSync(__dirname+'/../index.html','utf8');
 ck('update check fetches with no-store', /fetch\("index\.html\?v=" \+ Date\.now\(\), \{ cache: "no-store" \}\)/.test(html));
 ck('it compares version stamps', /const VERSION = "\(\[/.test(html) || /VERSION = "\(\[\\d\.\]\+\)"/.test(html));
 ck('it clears caches before reloading', /caches\.delete\(k\)/.test(html));

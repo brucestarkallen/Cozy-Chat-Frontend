@@ -1,7 +1,7 @@
 // Guards the exact failure in the screenshot: a control with no rule falls back
 // to the browser default, which on a dark theme is a glaring white box.
 const fs=require('fs');const {JSDOM}=require('jsdom');require('fake-indexeddb/auto');
-const html=fs.readFileSync('./out/index.html','utf8');
+const html=fs.readFileSync(__dirname+'/../index.html','utf8');
 let pass=0,fail=0;
 const ck=(n,ok,x)=>{console.log((ok?'  ok  ':'  FAIL'),n,x===undefined?'':'→ '+x);ok?pass++:fail++;};
 const WHITEISH=['rgb(255, 255, 255)','white','rgba(0, 0, 0, 0)','transparent',''];

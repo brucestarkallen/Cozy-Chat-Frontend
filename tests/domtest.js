@@ -3,7 +3,7 @@ const fs=require('fs');
 const {JSDOM}=require('jsdom');
 require('fake-indexeddb/auto');
 
-const html=fs.readFileSync('/home/claude/build/out/index.html','utf8');
+const html=fs.readFileSync(__dirname+'/../index.html','utf8');
 const errors=[];
 const dom=new JSDOM(html,{
   runScripts:'dangerously',
@@ -32,7 +32,12 @@ setTimeout(()=>{
     ['ctx label filled', d.querySelector('#ctxLabel').textContent.includes('tokens')],
     ['settings modal', !!d.querySelector('#settingsModal')],
     ['presets in select', d.querySelectorAll('#pPreset option').length===7],
-    ['tabs', d.querySelectorAll('.tab').length===3],
+    ['every tab has a matching pane', (()=>{
+        const tabs=[...d.querySelectorAll('.tab')].map(t=>t.dataset.tab);
+        const panes=[...d.querySelectorAll('[data-panel]')].map(p=>p.dataset.panel);
+        return tabs.length>0 && tabs.every(t=>panes.includes(t)) && panes.every(p=>tabs.includes(p));
+      })()],
+    ['original tabs still present', ['conn','chat','inst'].every(t=>d.querySelector('.tab[data-tab="'+t+'"]'))],
     ['model chip', d.querySelector('#modelChip').textContent.length>0],
   ];
   let pass=true;
