@@ -87,6 +87,10 @@ body{
   -webkit-tap-highlight-color:transparent;
 }
 button,input,textarea,select{font:inherit;color:inherit}
+/* The hidden attribute only works because the browser's own stylesheet says
+   display:none, so any author rule setting display beats it and the element
+   stays on screen. This keeps hidden meaning hidden everywhere. */
+[hidden]{display:none !important}
 button{background:none;border:0;cursor:pointer;padding:0}
 :focus-visible{outline:2px solid var(--ember);outline-offset:2px;border-radius:4px}
 
@@ -1326,10 +1330,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v5.1.0
+   COZY CHAT v5.1.1
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "5.1.0";
+const VERSION = "5.1.1";
 
 const PRESETS = {
   anthropic:  { name:"Claude",     kind:"anthropic", url:"https://api.anthropic.com/v1", model:"claude-sonnet-4-6", ctx:200000, hint:"e.g. claude-sonnet-4-6, claude-opus-4-5" },
