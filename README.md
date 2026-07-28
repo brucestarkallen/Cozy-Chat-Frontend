@@ -60,7 +60,7 @@ Tap **Test** before saving.
 **Finding things**
 - **Search every chat** — matches message contents, not just titles, with the hit highlighted
 - **Pin** a chat: long-press its title (or right-click it in the list)
-- **Archive** — the box icon on a chat's row. Archived chats stay out of the list but still turn up in search, where the same icon brings them back
+- **Archive** — the box icon on a chat's row. Archived chats leave the list but are never out of reach: the **"N archived — tap to browse"** row (also Settings → Data → **Browse the archive**) lists every one with its date and last line, so forgetting a title loses nothing. From there: open it where it lies, put it back, or delete it. Search still reaches them too
 
 **Attachments**
 - Tap the paperclip, or just paste an image straight into the message box
@@ -332,7 +332,7 @@ network-first, so a refresh always gets the newest version.
 `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`, `swtest.js`,
 `scrolltest.js`, `styletest.js`, `hiddentest.js`, `coherencetest.js` and
 `installtest.sh` — runs under Node with jsdom (`npm i jsdom fake-indexeddb`).
-789 checks across the matching engine, JSON tolerance, prompt assembly,
+809 checks across the matching engine, JSON tolerance, prompt assembly,
 projects, retrieval, streaming, SSE framing and Hermes tool activity,
 stream/chat binding, touch reorder, reader-owned scrolling, backup
 round-trips, migration, and negative tests that deliberately reintroduce

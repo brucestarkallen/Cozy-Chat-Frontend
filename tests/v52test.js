@@ -278,7 +278,7 @@ console.log('\n=== 10. ARCHIVE EXISTS, AND WORKS ===');
   btn.dispatchEvent(new w.Event('click',{bubbles:true})); await sleep(150);
   ck('the chat is marked archived', w.eval('convos[0].archived')===true);
   ck('it leaves the list', !d.querySelector('#convoList').textContent.includes('Keep me around'));
-  ck('the list says where it went', /archived — search/.test(d.querySelector('#convoList').textContent));
+  ck('the list says where it went', /\d+ archived/.test(d.querySelector('#convoList').textContent));
   ck('an archived current falls back', w.eval('current')===null||w.eval('current.archived')!==true);
   d.querySelector('#convoSearch').value='Keep me'; ev(w,d.querySelector('#convoSearch'),'input');
   const row=d.querySelector('[data-arch]');

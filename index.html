@@ -586,6 +586,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 .proj-head .ph-n{opacity:.6}
 .proj-head .ph-btn{color:var(--muted);font-family:var(--mono);font-size:12px;line-height:1;padding:3px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-2)}
 .fl-badge{opacity:.55;font-size:9px;letter-spacing:.06em;text-transform:uppercase;margin-left:5px}
+.arch-open{display:block;width:100%;text-align:left;cursor:pointer}
+.arch-open:active{color:var(--text-2)}
+.arch-row{position:relative}
+.arch-row .icon-btn{color:var(--muted);flex:none;padding:6px}
 
 /* ---------- diff cards ---------- */
 .edits{
@@ -1267,6 +1271,11 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
         <div class="hint" id="storageInfo">Checking…</div>
       </div>
       <div class="field">
+        <label class="lbl">Archived chats</label>
+        <button class="btn wide" id="archBtn">Browse the archive</button>
+        <div class="hint" style="margin-top:6px">Out of the sidebar, never gone. Search still reaches them too.</div>
+      </div>
+      <div class="field">
         <label class="lbl">Danger zone</label>
         <button class="btn wide" id="wipeBtn" style="color:var(--danger);border-color:var(--danger)">Delete every conversation</button>
       </div>
@@ -1284,6 +1293,20 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 
 
 <!-- ============ DOCUMENTS ============ -->
+<div class="modal" id="archModal">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h3>Archived <span class="hint" id="archCount" style="display:inline"></span></h3>
+      <button class="icon-btn" id="closeArch" aria-label="Close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="sheet-body">
+      <div id="archList"></div>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="projModal">
   <div class="sheet">
     <div class="sheet-head">
@@ -1412,10 +1435,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v5.4.0
+   COZY CHAT v5.5.0
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "5.4.0";
+const VERSION = "5.5.0";
 
 const PRESETS = {
   anthropic:  { name:"Claude",     kind:"anthropic", url:"https://api.anthropic.com/v1", model:"claude-sonnet-4-6", ctx:200000, hint:"e.g. claude-sonnet-4-6, claude-opus-4-5" },
@@ -1919,7 +1942,7 @@ function renderSidebar(){
      says how many are archived and that search reaches them. */
   if (!live.length && !projects.length){
     list.innerHTML = arch
-      ? '<div class="sec-head">' + arch + ' archived — search to find them</div>'
+      ? '<button class="sec-head arch-open" data-openarch>' + arch + ' archived — tap to browse</button>'
       : '<div class="empty-note">Nothing here yet.<br>Start a chat and it\'ll show up.</div>';
     return;
   }
@@ -1937,7 +1960,7 @@ function renderSidebar(){
       + rows.map(c => convoRow(c, null)).join("");
   }
   if (rest.length)   html += ((pinned.length || projects.length) ? '<div class="sec-head">Recent</div>' : "") + rest.map(c => convoRow(c, null)).join("");
-  if (arch) html += '<div class="sec-head">' + arch + ' archived — search to find them</div>';
+  if (arch) html += '<button class="sec-head arch-open" data-openarch>' + arch + ' archived — tap to browse</button>';
   list.innerHTML = html;
 }
 function renderThread(){
@@ -3062,6 +3085,7 @@ on("#themeBtn", "click", function(){
 });
 
 on("#convoList", "click", async function(e){
+  if (e.target.closest("[data-openarch]")){ openArchive(); return; }
   const pn = e.target.closest("[data-projnew]");
   if (pn){ newConvo(null, pn.dataset.projnew); return; }
   const pe = e.target.closest("[data-projedit]");
@@ -4283,6 +4307,71 @@ on("#docDetachBtn", "click", async function(){
   current.docIds = []; delete current.docId; current.filesOn = false;
   await persist(); renderThread(); renderFileBtn(); renderDocList();
   toast("No files are used in this chat any more — they are still saved");
+});
+
+/* --- archive browser --- */
+/* Search only finds what you can still name. Browsing asks nothing of your
+   memory: every archived chat, newest first, with enough of its tail to
+   recognise it — put it back, read it where it lies, or delete it. */
+function renderArchList(){
+  const el = $("#archList");
+  if (!el) return;
+  const list = convos.filter(c => c.archived);
+  const n = $("#archCount");
+  if (n) n.textContent = list.length ? "· " + list.length : "";
+  if (!list.length){
+    el.innerHTML = '<div class="hint">Nothing archived. The box icon on a chat\u2019s row puts it here \u2014 out of the sidebar, never gone.</div>';
+    return;
+  }
+  el.innerHTML = list.map(function(c){
+    const last = c.messages && c.messages.length ? c.messages[c.messages.length - 1] : null;
+    const when = new Date(c.updatedAt).toLocaleDateString();
+    const snip = last ? clip(String(last.content || "").replace(/\s+/g, " "), 64) : "empty chat";
+    return '<div class="doc-row arch-row" data-archopen="' + c.id + '">'
+      + '<div class="info"><div class="nm">' + escapeHtml(c.title) + '</div>'
+      + '<div class="meta">' + escapeHtml(when + " \u00b7 " + snip) + '</div></div>'
+      + '<button class="icon-btn" data-archback="' + c.id + '" aria-label="Put back in the list" title="Put back in the list">'
+      + '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18M5 7v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7M10 11h4"/></svg></button>'
+      + '<button class="icon-btn" data-archdel="' + c.id + '" aria-label="Delete chat" title="Delete">'
+      + '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M7 7l1 13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-13"/></svg></button></div>';
+  }).join("");
+}
+function openArchive(){
+  renderArchList(); closeDrawer();
+  $("#archModal").classList.add("show"); $("#scrim").classList.add("show");
+}
+function closeArchive(){
+  $("#archModal").classList.remove("show");
+  if (!$("#settingsModal").classList.contains("show")) $("#scrim").classList.remove("show");
+}
+on("#closeArch", "click", closeArchive);
+on("#archBtn", "click", openArchive);
+on("#archList", "click", async function(e){
+  const b = e.target.closest("[data-archback]");
+  if (b){
+    const c = convos.find(x => x.id === b.dataset.archback);
+    if (!c) return;
+    c.archived = false;
+    await DB.put(JSON.parse(JSON.stringify(c)));
+    renderArchList(); renderSidebar(); toast("Back in the list");
+    return;
+  }
+  const del = e.target.closest("[data-archdel]");
+  if (del){
+    if (!confirm("Delete this chat?")) return;
+    await DB.del(del.dataset.archdel);
+    convos = convos.filter(c => c.id !== del.dataset.archdel);
+    if (current && current.id === del.dataset.archdel) current = convos.filter(c => !c.archived)[0] || null;
+    renderArchList(); renderSidebar(); renderThread();
+    return;
+  }
+  const row = e.target.closest("[data-archopen]");
+  if (row){
+    current = convos.find(c => c.id === row.dataset.archopen) || null;
+    pinned = true;
+    closeArchive(); closeSettings();
+    renderSidebar(); renderThread(); closeDrawer();
+  }
 });
 
 /* --- projects --- */
