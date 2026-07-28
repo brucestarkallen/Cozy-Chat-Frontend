@@ -203,6 +203,20 @@ console.log('=== 5. A MISSING RUNS API COSTS NOTHING BUT THE CARDS ===');
   ck('the message still sends over the plain stream', msgs[1]&&msgs[1].content==='fell back fine', JSON.stringify(msgs[1]&&msgs[1].content));
   ck('no error row for a missing upgrade', !msgs.some(m=>m.role==='error'));
   ck('the plain endpoint was actually used', w.__calls.some(u=>/chat\/completions$/.test(u)));
+  // the fallback is remembered: the next send never knocks on /runs again
+  const runsCalls=()=>w.__calls.filter(u=>/\/runs$/.test(u)).length;
+  const before=runsCalls();
+  d.querySelector('#input').value='again'; ev(w,d.querySelector('#input'),'input');
+  ev(w,d.querySelector('#sendBtn'),'click');
+  await sleep(500);
+  ck('a down Runs API is not knocked on twice', runsCalls()===before, String(runsCalls()));
+  ck('and the second message still completes', w.eval('current.messages[3].content')==='fell back fine');
+  // editing the connection is the reason to try again
+  w.eval('editProv("h1");saveProv()');
+  d.querySelector('#input').value='third'; ev(w,d.querySelector('#input'),'input');
+  ev(w,d.querySelector('#sendBtn'),'click');
+  await sleep(500);
+  ck('a saved edit tries the Runs API afresh', runsCalls()===before+1, String(runsCalls()));
 }
 {
   // /runs exists (created the run) but its event stream is refused — the run must be stopped

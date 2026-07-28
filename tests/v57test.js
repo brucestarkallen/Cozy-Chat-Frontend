@@ -55,6 +55,13 @@ console.log('=== 1. MARKDOWN IMAGES RENDER ===');
   ck('without a pointless data: link around it', du.indexOf('<a href="data:')<0);
   const dbad=w.eval(`renderMarkdown("![x](data:text/html;base64,PHNjcmlwdD4=)")`);
   ck('only image mimes qualify', dbad.indexOf('<img')<0, dbad);
+  // an old Hermes server leaks its MEDIA tag as raw text — explain it instead
+  const mn=w.eval(`renderMarkdown("Here you go:\\n\\nMEDIA:/tmp/ichigo_final.png\\n\\nEnjoy.")`);
+  ck('a leaked MEDIA tag becomes an explanation', /media-note/.test(mn) && mn.indexOf('/tmp/ichigo_final.png')>=0 && mn.indexOf('Update hermes-agent')>=0,
+     mn.slice(0,160));
+  ck('the raw tag itself is gone from the prose', !/>\s*MEDIA:/.test(mn));
+  const mc=w.eval('renderMarkdown("```\\nMEDIA:/tmp/x.png\\n```")');
+  ck('inside a code block it stays literal', /MEDIA:\/tmp\/x\.png/.test(mc) && mc.indexOf('media-note')<0);
 }
 
 console.log('=== 2. TAVILY: PICTURES RIDE THE SAME REQUEST ===');

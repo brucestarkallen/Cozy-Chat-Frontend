@@ -274,6 +274,11 @@ button{background:none;border:0;cursor:pointer;padding:0}
 .img-strip{display:flex;gap:8px;overflow-x:auto;padding:4px 0 6px;-webkit-overflow-scrolling:touch}
 .img-strip a{flex:none}
 .img-strip img{height:112px;width:auto;border-radius:9px;border:1px solid var(--border);display:block}
+.media-note{
+  margin:6px 0;padding:8px 12px;border:1px dashed var(--border);border-radius:var(--r);
+  background:var(--bg-2);color:var(--muted);font-size:13px;
+}
+.media-note code{font-family:var(--mono);font-size:12px;color:var(--text-2)}
 
 /* markdown */
 .msg-body p{margin:0 0 .85em}
@@ -1477,10 +1482,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v5.7.2
+   COZY CHAT v5.7.3
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "5.7.2";
+const VERSION = "5.7.3";
 
 const PRESETS = {
   anthropic:  { name:"Claude",     kind:"anthropic", url:"https://api.anthropic.com/v1", model:"claude-sonnet-4-6", ctx:200000, hint:"e.g. claude-sonnet-4-6, claude-opus-4-5" },
@@ -1761,6 +1766,10 @@ let searchArmed = false, pinned = true;
 /* The finger owns the thread while it is down; program scrolls are counted
    so their echo events can be told apart from the user's own. */
 let userTouching = false, coasting = false, coastTimer = null, progScrolls = 0, repaintHook = null;
+/* A Runs API that didn't answer won't answer next message either: remember
+   it per connection for this session, stop knocking, say so once. Editing
+   the connection (or reloading) clears it and tries again. */
+const runsDown = {};
 
 const $  = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
@@ -1842,6 +1851,15 @@ function renderMarkdown(src){
     let m;
     if ((m = ln.match(/^(#{1,6})\s+(.*)$/))){ flush(); const lv = Math.min(m[1].length,4); html += "<h"+lv+">"+inlineFmt(m[2])+"</h"+lv+">"; i++; continue; }
     if (/^\s*(---+|\*\*\*+|___+)\s*$/.test(ln)){ flush(); html += "<hr>"; i++; continue; }
+    let mm;
+    if ((mm = ln.match(/^\s*MEDIA:([^\s<]+\.(?:png|jpe?g|gif|webp|bmp))\s*$/i))){
+      /* A newer Hermes server inlines this as the actual image; an older one
+         leaks the tag. Say what it is and where the cure lives. */
+      flush();
+      html += '<div class="media-note">The agent saved an image on its machine at <code>' + mm[1]
+        + '</code>. Update hermes-agent and it will appear here instead of this note.</div>';
+      i++; continue;
+    }
     if (ln.includes("|") && i+1 < lines.length && /^\s*\|?[\s:|-]*-[\s:|-]*\|?\s*$/.test(lines[i+1]) && lines[i+1].includes("-")){
       flush();
       const cells = r => r.replace(/^\s*\|/,"").replace(/\|\s*$/,"").split("|").map(c=>c.trim());
@@ -2669,7 +2687,7 @@ async function send(userText, mode, forConvo){
        requests back. Images can't ride a run, so a turn with any falls back
        to the plain stream — approvals resume on the next text turn. */
     let useRuns = false, asmR = null;
-    if (reasonStyle(p) === "hermes" && p.hermesRuns){
+    if (reasonStyle(p) === "hermes" && p.hermesRuns && !runsDown[p.id]){
       asmR = assembleMessages("openai", convo);
       useRuns = !asmR.messages.some(function(m){ return typeof m.content !== "string"; });
     }
@@ -2768,7 +2786,8 @@ async function send(userText, mode, forConvo){
         if (!runsGone(err) || (err && err.name === "AbortError")) throw err;
         // a run may have been created before the stream failed — never leave it working unseen
         if (run && base && hh) fetch(base + "/runs/" + run.id + "/stop", { method:"POST", headers:hh }).catch(function(){});
-        toast("The Runs API didn't answer — sent over the plain stream. Approvals sit out this message.");
+        runsDown[p.id] = true;
+        toast("The Runs API didn't answer — using the plain stream from now on. It's tried again after you edit the connection or reload.");
       }
     }
     if (!ranViaRuns){
@@ -2971,6 +2990,7 @@ function saveProv(){
     if (prevChatProv !== data.id) cfgSet("model", null);
     cfgSet("providerId", data.id);
   }
+  delete runsDown[data.id];   // a saved edit is a reason to try the Runs API again
   saveSettings(); renderProvList(); renderThread();
   $("#provEditor").hidden = true; editingProv = null; toast("Connection saved");
 }

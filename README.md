@@ -253,8 +253,10 @@ What you get in the chat:
   images), so approvals resume on the next text message. Runs mode needs a
   Hermes build with the Runs API. **If yours doesn't have it, or the browser
   can't reach it, the message is never lost:** Cozy falls back to the plain
-  stream for that send, tells you once, and stops any run it had already
-  started. A server that has the API and genuinely errors still errors
+  stream, tells you once, stops any run it had already started, and stops
+  knocking — the whole session then uses the plain stream without further
+  nagging. Saving the connection (or reloading the app) tries the Runs API
+  afresh. A server that has the API and genuinely errors still errors
   loudly — the fallback only covers "this transport isn't there". To see
   which case yours is, from Termux:
 
@@ -293,6 +295,11 @@ What you get in the chat:
   can talk about "the images above" instead of guessing.
 - Markdown image syntax now renders too — any model that writes
   `![name](https://…)` shows the picture inline, linked to its source.
+- **A leaked `MEDIA:` tag explains itself.** An older hermes-agent prints
+  `MEDIA:/tmp/….png` as raw text instead of inlining the image — Cozy turns
+  that into a plain note naming the file and the cure (update hermes-agent).
+  For instant pictures of well-known things, the magnifier's image search is
+  one call; the agent hunting them down is twenty.
 - **Hermes' own images render as well.** When the agent downloads or
   *generates* an image, its server inlines the actual bytes as a data-URL
   markdown image (up to 5 MB) — Cozy shows it in the reply. For internet
@@ -377,7 +384,7 @@ network-first, so a refresh always gets the newest version.
 `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`, `swtest.js`,
 `scrolltest.js`, `styletest.js`, `hiddentest.js`, `coherencetest.js` and
 `installtest.sh` — runs under Node with jsdom (`npm i jsdom fake-indexeddb`).
-861 checks across the matching engine, JSON tolerance, prompt assembly,
+867 checks across the matching engine, JSON tolerance, prompt assembly,
 projects, retrieval, streaming, SSE framing and Hermes tool activity,
 stream/chat binding, touch reorder, reader-owned scrolling, backup
 round-trips, migration, and negative tests that deliberately reintroduce
