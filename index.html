@@ -581,6 +581,11 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
   font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
   color:var(--muted);padding:10px 10px 4px;
 }
+.sec-head.proj-head{display:flex;align-items:center;gap:6px;padding-right:8px}
+.proj-head .ph-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.proj-head .ph-n{opacity:.6}
+.proj-head .ph-btn{color:var(--muted);font-family:var(--mono);font-size:12px;line-height:1;padding:3px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-2)}
+.fl-badge{opacity:.55;font-size:9px;letter-spacing:.06em;text-transform:uppercase;margin-left:5px}
 
 /* ---------- diff cards ---------- */
 .edits{
@@ -868,6 +873,7 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
     <div class="convo-list" id="convoList"></div>
 
     <div class="sb-foot">
+      <button id="newProjBtn">+ Project</button>
       <button id="docsBtn">Files</button>
       <button id="promptsBtn">Prompts</button>
       <button id="backupBtn">Back up</button>
@@ -1095,6 +1101,11 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
         <div class="hint" id="effortHint"></div>
       </div>
       <div class="field">
+        <label class="lbl" for="chatProj">Project</label>
+        <select id="chatProj"></select>
+        <div class="hint">A project's instructions and files travel with every chat in it.</div>
+      </div>
+      <div class="field">
         <label class="lbl" for="chatSys">This chat only — extra system text</label>
         <div class="f-wrap"><textarea class="f" id="chatSys" readonly placeholder="Applies to the open conversation only. Added after the instruction set."></textarea></div>
       </div>
@@ -1114,6 +1125,13 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
           <div class="s">Reveal the model's reasoning when it sends any.</div>
         </div>
         <button class="toggle on" id="tgThink" role="switch" aria-checked="true"></button>
+      </div>
+      <div class="switch">
+        <div class="switch-txt">
+          <div class="t">Show tool activity</div>
+          <div class="s">When an agent backend like Hermes uses tools, list each call above the reply.</div>
+        </div>
+        <button class="toggle on" id="tgTools" role="switch" aria-checked="true"></button>
       </div>
       <div class="switch">
         <div class="switch-txt">
@@ -1266,6 +1284,40 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 
 
 <!-- ============ DOCUMENTS ============ -->
+<div class="modal" id="projModal">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h3>Project</h3>
+      <button class="icon-btn" id="closeProj" aria-label="Close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="sheet-body">
+      <div class="field">
+        <label class="lbl" for="projName">Name</label>
+        <input type="text" id="projName" placeholder="Project name">
+      </div>
+      <div class="field">
+        <label class="lbl" for="projInstr">Project instructions</label>
+        <div class="f-wrap"><textarea class="f" id="projInstr" readonly placeholder="Sent with every chat in this project, after the instruction set."></textarea></div>
+      </div>
+      <div class="field">
+        <label class="lbl" for="projPreset">Instruction set for new chats here</label>
+        <select id="projPreset"></select>
+        <div class="hint">Pinned to each chat when it's created, like everywhere else — changing it later only affects new chats.</div>
+      </div>
+      <div class="field">
+        <label class="lbl">Project files</label>
+        <div class="hint" style="margin-bottom:8px">Every chat in the project gets these, and the assistant can edit them. Tap to add or remove.</div>
+        <div id="projFiles"></div>
+      </div>
+      <div class="btn-row" style="margin-top:12px">
+        <button class="btn" id="projDelBtn">Delete project</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="docsModal">
   <div class="sheet">
     <div class="sheet-head">
@@ -1360,10 +1412,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v5.3.0
+   COZY CHAT v5.4.0
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "5.3.0";
+const VERSION = "5.4.0";
 
 const PRESETS = {
   anthropic:  { name:"Claude",     kind:"anthropic", url:"https://api.anthropic.com/v1", model:"claude-sonnet-4-6", ctx:200000, hint:"e.g. claude-sonnet-4-6, claude-opus-4-5" },
@@ -1500,7 +1552,7 @@ const DEFAULTS = {
   presets: [], activePreset: null, prompts: [],
   system: "", injections: [],
   temperature: 1, maxTokens: 4096,
-  showThinking: true, catchThinkTags: true, thinkTags: "think, thinking, reasoning, thought",
+  showThinking: true, showTools: true, catchThinkTags: true, thinkTags: "think, thinking, reasoning, thought",
   enterSends: false, autoTitle: true, theme: "dark", effort: "off", squashSystem: true,
   search: { on:false, provider:"native", key:"", count:5, relay:"", always:false }
 };
@@ -1515,6 +1567,7 @@ function loadSettings(){
     for (const p of out.presets) for (const i of (p.injections || []))
       if (i.pos === "top" || i.pos === "bottom" || i.pos === "depth") i.__oldPos = i.pos;
     out.prompts = raw.prompts || [];
+    out.projects = raw.projects || [];
     // migrate a pre-v3 config: the loose system prompt becomes the first set
     if (!out.presets.length){
       const legacy = (out.injections || []);
@@ -1789,9 +1842,15 @@ async function loadConvos(){
   for (const c of convos) if (!c.cfg){ c.cfg = defaultCfg(); changed.push(c); }
   for (const c of changed) await DB.put(JSON.parse(JSON.stringify(c)));
 }
-function newConvo(seed){
+function newConvo(seed, projectId){
   const c = { id:uid(), title:"New chat", createdAt:Date.now(), updatedAt:Date.now(),
               messages: seed || [], cfg: defaultCfg() };
+  const pr = projectId && (S.projects || []).find(p => p.id === projectId);
+  if (pr){
+    c.projectId = pr.id;
+    // the project's set is pinned at creation, the same law as every other setting
+    if (pr.presetId && S.presets.some(x => x.id === pr.presetId)) c.cfg.presetId = pr.presetId;
+  }
   convos.unshift(c); current = c;
   pinned = true;
   renderSidebar(); renderThread(); closeDrawer(); $("#input").focus();
@@ -1855,18 +1914,29 @@ function renderSidebar(){
 
   const live = convos.filter(c => !c.archived);
   const arch = convos.filter(c => c.archived).length;
+  const projects = S.projects || [];
   /* Archiving the only chat must not read as deletion: the empty state still
      says how many are archived and that search reaches them. */
-  if (!live.length){
+  if (!live.length && !projects.length){
     list.innerHTML = arch
       ? '<div class="sec-head">' + arch + ' archived — search to find them</div>'
       : '<div class="empty-note">Nothing here yet.<br>Start a chat and it\'ll show up.</div>';
     return;
   }
-  const pinned = live.filter(c => c.pinned), rest = live.filter(c => !c.pinned);
+  const pinned = live.filter(c => c.pinned);
+  const hasProj = id => projects.some(p => p.id === id);
+  const rest = live.filter(c => !c.pinned && !hasProj(c.projectId));
   let html = "";
   if (pinned.length) html += '<div class="sec-head">Pinned</div>' + pinned.map(c => convoRow(c, null)).join("");
-  if (rest.length)   html += (pinned.length ? '<div class="sec-head">Recent</div>' : "") + rest.map(c => convoRow(c, null)).join("");
+  for (const p of projects){
+    const rows = live.filter(c => !c.pinned && c.projectId === p.id);
+    html += '<div class="sec-head proj-head" data-proj="' + p.id + '">'
+      + '<span class="ph-name">' + escapeHtml(p.name) + '</span><span class="ph-n">' + rows.length + '</span>'
+      + '<button class="ph-btn" data-projnew="' + p.id + '" aria-label="New chat in ' + escapeHtml(p.name) + '">+</button>'
+      + '<button class="ph-btn" data-projedit="' + p.id + '" aria-label="Project settings">&#9998;</button></div>'
+      + rows.map(c => convoRow(c, null)).join("");
+  }
+  if (rest.length)   html += ((pinned.length || projects.length) ? '<div class="sec-head">Recent</div>' : "") + rest.map(c => convoRow(c, null)).join("");
   if (arch) html += '<div class="sec-head">' + arch + ' archived — search to find them</div>';
   list.innerHTML = html;
 }
@@ -1912,10 +1982,82 @@ function chatDocIds(c){
 function chatDocs(c){ return chatDocIds(c).map(id => docs.find(d => d.id === id)).filter(Boolean); }
 function isAttached(id){ return chatDocIds().indexOf(id) >= 0; }
 
+/* ---------- projects ---------- */
+function projOf(c){
+  c = c || current;
+  if (!c || !c.projectId) return null;
+  return (S.projects || []).find(p => p.id === c.projectId) || null;
+}
+function projDocs(c){
+  const p = projOf(c);
+  if (!p) return [];
+  p.docIds = (p.docIds || []).filter(id => docs.some(d => d.id === id));
+  return p.docIds.map(id => docs.find(d => d.id === id)).filter(Boolean);
+}
+// what the assistant can see and edit here: the chat's own files plus the project's
+function allChatDocs(c){
+  const out = [], seen = {};
+  for (const d of chatDocs(c).concat(projDocs(c))) if (!seen[d.id]){ seen[d.id] = 1; out.push(d); }
+  return out;
+}
+/* ---------- smart context (retrieval) ---------- */
+function docSmart(d){ return d && d.mode === "smart" && String(d.text || "").length > 2000; }
+function lastUserText(c){
+  c = c || current;
+  if (!c) return "";
+  for (let i = c.messages.length - 1; i >= 0; i--)
+    if (c.messages[i].role === "user") return String(c.messages[i].content || "").slice(0, 600);
+  return "";
+}
+/* Pick the parts of a long file that matter for THIS message: paragraph
+   chunks scored by the query's terms weighted by rarity, the winners kept
+   in document order so the excerpt still reads like the file. Pure, so the
+   gate can prove it. */
+function relevantChunks(text, query, budget){
+  text = String(text || ""); budget = budget || 7000;
+  if (text.length <= budget) return text;
+  const paras = text.split(/\n\s*\n/);
+  const chunks = []; let buf = "", start = 0, pos = 0;
+  for (const pa of paras){
+    if (buf && (buf.length + pa.length) > 900){ chunks.push({ t:buf, at:start }); buf = ""; start = pos; }
+    buf += (buf ? "\n\n" : "") + pa;
+    pos += pa.length + 2;
+  }
+  if (buf) chunks.push({ t:buf, at:start });
+  const terms = Array.from(new Set(String(query || "").toLowerCase().match(/[a-z0-9_]{3,}/g) || []));
+  const N = chunks.length, scored = [];
+  if (terms.length){
+    const df = {};
+    for (const t of terms){ df[t] = 0; for (const ch of chunks) if (ch.t.toLowerCase().indexOf(t) >= 0) df[t]++; }
+    for (const ch of chunks){
+      const low = ch.t.toLowerCase(); let sc = 0;
+      for (const t of terms){
+        let n = 0, i = low.indexOf(t);
+        while (i >= 0 && n < 12){ n++; i = low.indexOf(t, i + t.length); }
+        if (n) sc += n * Math.log(1 + N / (1 + df[t]));
+      }
+      if (sc > 0) scored.push({ ch:ch, sc:sc });
+    }
+  }
+  if (!scored.length) return text.slice(0, budget) + "\n\n[\u2026]";
+  scored.sort((a,b) => b.sc - a.sc || a.ch.at - b.ch.at);
+  const take = []; let used = 0;
+  for (const it of scored){
+    if (used + it.ch.t.length > budget) continue;
+    take.push(it.ch); used += it.ch.t.length;
+    if (used > budget * 0.92) break;
+  }
+  if (!take.length) take.push(scored[0].ch);
+  take.sort((a,b) => a.at - b.at);
+  return take.map(ch => ch.t).join("\n\n[\u2026]\n\n");
+}
+
 function renderFileBtn(){
   const btn = $("#fileBtn");
   if (!btn) return;
-  const list = chatDocs();
+  const own = chatDocs();
+  const proj = projDocs().filter(function(d){ return !own.some(function(o){ return o.id === d.id; }); });
+  const list = own.concat(proj);
   const on = !!(current && current.filesOn);
   btn.hidden = false;                      // always reachable, so files can be started
   btn.classList.toggle("on", list.length > 0 || on);
@@ -1924,15 +2066,22 @@ function renderFileBtn(){
 
   $("#fileName").textContent = list.length === 0
     ? (on ? "no files yet — the assistant can make one" : "files are off")
-    : list.length + (list.length === 1 ? " file attached" : " files attached");
+    : list.length + (list.length === 1 ? " file in this chat" : " files in this chat");
 
   const box = $("#fileList");
   if (box){
-    box.innerHTML = list.map(function(d){
+    const modeBtn = function(d){ return '<button data-fmode="' + d.id + '" title="Full sends the whole file. Smart sends only the parts relevant to your message once it grows past 2,000 characters.">' + (d.mode === "smart" ? "smart" : "full") + '</button>'; };
+    box.innerHTML = own.map(function(d){
       const un = (d.undo && d.undo.length) ? "" : " disabled";
       return '<div class="fl-row"><span class="fl-name" data-fopen="' + d.id + '">' + escapeHtml((d.name || "").trim() || "untitled") + '</span>'
+        + modeBtn(d)
         + '<button data-fundo="' + d.id + '"' + un + ' title="Undo last change">undo</button>'
         + '<button data-fdetach="' + d.id + '" title="Stop using it here">remove</button></div>';
+    }).join("") + proj.map(function(d){
+      const un = (d.undo && d.undo.length) ? "" : " disabled";
+      return '<div class="fl-row"><span class="fl-name" data-fopen="' + d.id + '">' + escapeHtml((d.name || "").trim() || "untitled") + '<span class="fl-badge">project</span></span>'
+        + modeBtn(d)
+        + '<button data-fundo="' + d.id + '"' + un + ' title="Undo last change">undo</button></div>';
     }).join("");
     box.hidden = !list.length;
   }
@@ -2011,7 +2160,7 @@ function msgHtml(m, isLastAssistant){
     : renderMarkdown(m.content);
   return '<div class="msg ' + m.role + '" data-mid="' + m.id + '">'
     + '<div class="msg-head"><span class="lbl">' + escapeHtml(label) + '</span>' + swipe + acts + '</div>'
-    + toolLogHtml(m.tools) + think + sourcesHtml(m.sources) + attsHtml(m.attachments)
+    + (S.showTools !== false ? toolLogHtml(m.tools) : "") + think + sourcesHtml(m.sources) + attsHtml(m.attachments)
     + '<div class="msg-body">' + body + '</div>'
     + editCardsHtml(m) + '</div>';
 }
@@ -2042,8 +2191,10 @@ function updateEmber(){
   let used = estTokens(PS().system);
   for (const i of PS().injections) if (i.enabled) used += estTokens(i.text);
   if (current && current.sysExtra) used += estTokens(current.sysExtra);
-  const att = chatDocs();
-  if (att.length){ used += 320; for (const d of att) used += estTokens(d.text) + 12; }
+  const pj = projOf();
+  if (pj && pj.instructions) used += estTokens(pj.instructions);
+  const att = allChatDocs();
+  if (att.length){ used += 340; for (const d of att) used += (docSmart(d) ? Math.min(estTokens(d.text), 1900) : estTokens(d.text)) + 12; }
   else if (current && current.filesOn) used += 320;
   if (current) for (const m of current.messages) used += estTokens(m.content) + 4;
   used += estTokens($("#input").value);
@@ -2145,11 +2296,21 @@ function assembleMessages(kind, c){
   if (tail && tail.role === "assistant" && typeof tail.content === "string")
     tail.content = tail.content.replace(/\s+$/, "");
   let sysParts = topSys.slice();
+  const proj = projOf(c);
+  if (proj && proj.instructions && proj.instructions.trim()) sysParts.push(proj.instructions);
   if (c.sysExtra && c.sysExtra.trim()) sysParts.push(c.sysExtra);
-  const attached = chatDocs(c);
+  const attached = allChatDocs(c);
   if (attached.length){
     sysParts.push(doceditProtocol(attached));
-    for (const d of attached) sysParts.push("[FILE: " + d.name + "]\n" + d.text);
+    let anySmart = false;
+    const q = lastUserText(c);
+    for (const d of attached){
+      if (docSmart(d)){
+        anySmart = true;
+        sysParts.push("[FILE: " + d.name + " \u2014 relevant excerpts, not the whole file]\n" + relevantChunks(d.text, q, 7000));
+      } else sysParts.push("[FILE: " + d.name + "]\n" + d.text);
+    }
+    if (anySmart) sysParts.push("Files marked as excerpts show only their most relevant parts. Never use replace_all on an excerpted file \u2014 you have not seen all of it.");
   } else if (c.filesOn) sysParts.push(doceditProtocol([]));
   const system = sysParts.filter(t => t && t.trim()).join("\n\n");
   return { messages: merged, system: system };
@@ -2342,7 +2503,7 @@ async function send(userText, mode, forConvo){
         }
         tw.textContent = asst.thinking; stickScroll(tw);
       }
-      if (asst.tools && asst.tools.length && paintedRev !== toolsRev){
+      if (S.showTools !== false && asst.tools && asst.tools.length && paintedRev !== toolsRev){
         paintedRev = toolsRev;
         let tl = document.querySelector('[data-mid="' + asst.id + '"] .tool-log');
         if (tl) tl.outerHTML = toolLogHtml(asst.tools);
@@ -2748,6 +2909,13 @@ function setToggle(el, on){ el.classList.toggle("on", !!on); el.setAttribute("ar
 function syncSettingsUI(){
   $("#sysPrompt").value = PS().system;
   $("#chatSys").value = (current && current.sysExtra) || "";
+  const cp = $("#chatProj");
+  if (cp){
+    cp.innerHTML = '<option value="">— none —</option>' + (S.projects || []).map(function(p){
+      return '<option value="' + p.id + '"' + (current && current.projectId === p.id ? " selected" : "") + '>' + escapeHtml(p.name) + '</option>';
+    }).join("");
+    cp.disabled = !current;
+  }
   renderPresetBar();
   const sc = $("#scopeChat");
   if (sc) sc.textContent = current ? (current.title || "this chat") : "new chats";
@@ -2759,6 +2927,7 @@ function syncSettingsUI(){
   setToggle($("#tgSquash"), chatSquash());
   renderEffort();
   setToggle($("#tgThink"), S.showThinking);
+  setToggle($("#tgTools"), S.showTools !== false);
   setToggle($("#tgThinkTags"), S.catchThinkTags);
   setToggle($("#tgEnter"), S.enterSends);
   setToggle($("#tgTitle"), S.autoTitle);
@@ -2893,6 +3062,10 @@ on("#themeBtn", "click", function(){
 });
 
 on("#convoList", "click", async function(e){
+  const pn = e.target.closest("[data-projnew]");
+  if (pn){ newConvo(null, pn.dataset.projnew); return; }
+  const pe = e.target.closest("[data-projedit]");
+  if (pe){ openProjEditor(pe.dataset.projedit); return; }
   const ar = e.target.closest("[data-arch]");
   if (ar){
     e.stopPropagation();
@@ -3456,7 +3629,7 @@ function editCardsHtml(m){
    refused rather than guessed — silently writing into the wrong document
    would be far worse than a failed card. */
 function resolveTarget(e, c){
-  const list = chatDocs(c);
+  const list = allChatDocs(c);
   if (!list.length) return null;
   const want = (e.file || "").trim().toLowerCase();
   if (!want) return list.length === 1 ? list[0] : null;
@@ -3487,6 +3660,12 @@ async function applyEdit(msgId, editId, convo){
     e.note = chatDocs(c).length > 1
       ? (e.file ? 'no attached file called "' + e.file + '"' : "didn't say which file to change")
       : "no file is attached";
+    renderThread(); return;
+  }
+  if (e.type === "replace_all" && docSmart(doc)){
+    // the model only saw excerpts of this file; a rewrite from a partial
+    // view would silently destroy everything it did not see
+    e.status = "failed"; e.note = "this file was shown as excerpts \u2014 full rewrite refused; switch it to Full first";
     renderThread(); return;
   }
   const before = doc.text;
@@ -3955,6 +4134,7 @@ on("#presetDelBtn", "click", function(){
   const id = PS().id;
   S.presets = S.presets.filter(p => p.id !== id);
   if (S.activePreset === id) S.activePreset = S.presets[0].id;
+  for (const pr of (S.projects || [])) if (pr.presetId === id) pr.presetId = null;
   // any chat pointing at the deleted set falls back rather than breaking
   for (const c of convos) if (c.cfg && c.cfg.presetId === id){
     c.cfg.presetId = S.presets[0].id;
@@ -4048,6 +4228,9 @@ on("#docDelBtn", "click", async function(){
   if (!d || !confirm('Delete "' + d.name + '"?')) return;
   await DB.docDel(d.id);
   docs = docs.filter(x => x.id !== d.id);
+  let pTouched = false;
+  for (const pr of (S.projects || [])) if (Array.isArray(pr.docIds) && pr.docIds.indexOf(d.id) >= 0){ pr.docIds = pr.docIds.filter(x => x !== d.id); pTouched = true; }
+  if (pTouched) saveSettings();
   for (const c of convos){
     let touched = false;
     if (Array.isArray(c.docIds) && c.docIds.indexOf(d.id) >= 0){ c.docIds = c.docIds.filter(x => x !== d.id); touched = true; }
@@ -4057,6 +4240,18 @@ on("#docDelBtn", "click", async function(){
   closeDocEdit(); renderDocList(); renderThread(); toast("Deleted");
 });
 on("#fileList", "click", function(e){
+  const md = e.target.closest("[data-fmode]");
+  if (md){
+    const d = docs.find(y => y.id === md.dataset.fmode);
+    if (d){
+      d.mode = d.mode === "smart" ? "full" : "smart";
+      saveDoc(d).then(function(){ renderFileBtn(); updateEmber(); });
+      toast(d.mode === "smart"
+        ? "Smart — sends the parts relevant to your message once the file passes 2,000 characters"
+        : "Full — the whole file is sent");
+    }
+    return;
+  }
   const o = e.target.closest("[data-fopen]");
   if (o){ closeFilePop(); openDocEditor(o.dataset.fopen); return; }
   const u = e.target.closest("[data-fundo]");
@@ -4088,6 +4283,89 @@ on("#docDetachBtn", "click", async function(){
   current.docIds = []; delete current.docId; current.filesOn = false;
   await persist(); renderThread(); renderFileBtn(); renderDocList();
   toast("No files are used in this chat any more — they are still saved");
+});
+
+/* --- projects --- */
+let openProjId = null;
+function curProj(){ return (S.projects || []).find(x => x.id === openProjId); }
+function renderProjFiles(){
+  const p = curProj(); const el = $("#projFiles");
+  if (!p || !el) return;
+  p.docIds = (p.docIds || []).filter(id => docs.some(d => d.id === id));
+  el.innerHTML = docs.length ? docs.map(function(d){
+    const on = p.docIds.indexOf(d.id) >= 0;
+    return '<div class="doc-row' + (on ? " active" : "") + '" data-pdoc="' + d.id + '">'
+      + '<div class="info"><div class="nm">' + escapeHtml(d.name) + '</div>'
+      + '<div class="meta">' + (on ? "in this project — every chat here gets it" : "tap to add") + '</div></div></div>';
+  }).join("") : '<div class="hint">No files yet — make one under Files in the sidebar.</div>';
+}
+function openProjEditor(id){
+  const p = (S.projects || []).find(x => x.id === id);
+  if (!p) return;
+  openProjId = id;
+  $("#projName").value = p.name;
+  $("#projInstr").value = p.instructions || "";
+  $("#projPreset").innerHTML = '<option value="">— chat picks its own —</option>'
+    + S.presets.map(x => '<option value="' + x.id + '"' + (x.id === p.presetId ? " selected" : "") + '>' + escapeHtml(x.name) + '</option>').join("");
+  renderProjFiles();
+  closeDrawer();
+  $("#projModal").classList.add("show"); $("#scrim").classList.add("show");
+}
+function closeProjEditor(){
+  $("#projModal").classList.remove("show");
+  if (!$("#settingsModal").classList.contains("show")) $("#scrim").classList.remove("show");
+  openProjId = null;
+  renderSidebar(); renderFileBtn(); updateEmber();
+}
+on("#newProjBtn", "click", function(){
+  const n = prompt("Name this project", "New project");
+  if (!n) return;
+  S.projects = S.projects || [];
+  const p = { id:uid(), name:(n.trim() || "Project"), instructions:"", presetId:null, docIds:[] };
+  S.projects.push(p);
+  saveSettings(); renderSidebar(); syncSettingsUI();
+  openProjEditor(p.id);
+});
+on("#closeProj", "click", closeProjEditor);
+on("#projName", "change", function(e){
+  const p = curProj(); if (!p) return;
+  p.name = e.target.value.trim() || "Project";
+  saveSettings(); renderSidebar(); syncSettingsUI();
+});
+on("#projPreset", "change", function(e){
+  const p = curProj(); if (!p) return;
+  p.presetId = e.target.value || null;
+  saveSettings();
+});
+on("#projInstr", "click", function(e){ openBigText(e.target, "Project instructions"); });
+on("#projInstr", "change", function(e){
+  const p = curProj(); if (!p) return;
+  p.instructions = e.target.value;
+  saveSettings(); updateEmber();
+});
+on("#projFiles", "click", function(e){
+  const r = e.target.closest("[data-pdoc]");
+  if (!r) return;
+  const p = curProj(); if (!p) return;
+  const i = p.docIds.indexOf(r.dataset.pdoc);
+  if (i >= 0) p.docIds.splice(i, 1); else p.docIds.push(r.dataset.pdoc);
+  saveSettings(); renderProjFiles(); renderFileBtn(); updateEmber();
+});
+on("#projDelBtn", "click", function(){
+  const p = curProj();
+  if (!p || !confirm('Delete the project "' + p.name + '"? Its chats stay, just outside any project.')) return;
+  S.projects = S.projects.filter(x => x.id !== p.id);
+  for (const c of convos) if (c.projectId === p.id){ delete c.projectId; DB.put(JSON.parse(JSON.stringify(c))); }
+  saveSettings(); closeProjEditor(); syncSettingsUI(); renderThread();
+});
+on("#chatProj", "change", async function(e){
+  if (!current) return;
+  if (e.target.value) current.projectId = e.target.value; else delete current.projectId;
+  await persist(); renderSidebar(); renderFileBtn(); updateEmber();
+});
+on("#tgTools", "click", function(e){
+  S.showTools = S.showTools === false;
+  setToggle(e.currentTarget, S.showTools); saveSettings(); renderThread();
 });
 
 /* --- edit cards --- */

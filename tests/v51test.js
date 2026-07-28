@@ -39,7 +39,7 @@ console.log('=== 1. A CHAT HOLDS SEVERAL FILES ===');
   ck('the icon shows a count', d.querySelector('#fileCount').textContent==='2',
      d.querySelector('#fileCount').textContent);
   ck('the popover lists both', d.querySelectorAll('#fileList .fl-row').length===2);
-  ck('it says how many', /2 files attached/.test(d.querySelector('#fileName').textContent),
+  ck('it says how many', /2 files/.test(d.querySelector('#fileName').textContent),
      d.querySelector('#fileName').textContent);
 }
 

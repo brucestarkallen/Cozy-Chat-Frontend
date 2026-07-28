@@ -91,6 +91,29 @@ Tap **Test** before saving.
 - The file icon shows a count when more than one is attached; tap it to open,
   undo, or remove any of them individually.
 
+**Projects** (sidebar → **+ Project**)
+- A project groups chats and gives them shared ground: its own **instructions**,
+  an **instruction set** for new chats born inside it, and **project files** every
+  chat in it can read — and the assistant can edit.
+- Chats in a project sit under its own heading in the sidebar; **+** on the
+  heading starts a chat there, **✎** opens the project's settings.
+- Move any chat in or out under Settings → Chat → **Project**.
+- Project instructions are live — edit them once, every chat in the project
+  follows. The instruction set is pinned per chat at creation, the same rule
+  as every other setting.
+- Deleting a project never deletes anything else: its chats stay, its files stay.
+
+**Smart context** (retrieval)
+- Any file can be switched between **Full** and **Smart** in the file card —
+  tap the file icon in the top bar, then the mode button on its row.
+- Full sends the whole file. Smart, once a file passes 2,000 characters, sends
+  only the parts relevant to your latest message: paragraph chunks scored by
+  your message's rarer words, the winners kept in document order with […]
+  marking the gaps.
+- Excerpted files are labelled as excerpts to the model, and a **replace_all**
+  against one is refused — a model that saw part of a file must not rewrite
+  all of it. Switch the file to Full when you want a ground-up rewrite.
+
 **Instruction sets** (Settings → Instructions)
 - Save any number of named sets and switch between them instantly
 - Each holds its own system prompt, its own blocks, **and their order**
@@ -214,6 +237,19 @@ What you get in the chat:
 - **Session continuity, free.** Hermes recognises a conversation by its system
   prompt and first message, so every Cozy chat maps to one agent session (and
   one sandbox) with no setup.
+- **Show or hide it.** Settings → Chat → *Show tool activity*. Hidden still
+  records — flip it back on and past activity reappears.
+- **Approvals.** Hermes gates dangerous commands behind an approval prompt
+  that only its Runs API can answer — the plain chat stream Cozy uses can't,
+  so a gated command will sit waiting. If you want the agent free to act from
+  here, set `HERMES_YOLO_MODE=1` in `~/.hermes/.env` (Hermes' hardline
+  destructive-command floor still applies and cannot be bypassed), or
+  pre-approve specific commands with "always" once from the Hermes CLI.
+  A proper approval card in Cozy means speaking the Runs API — on the list,
+  not built yet.
+- **Search links.** Hermes doesn't put result URLs on the wire — the activity
+  row shows *what* was searched. Links appear when the agent cites them in
+  its reply, where they're tappable like any other link.
 - **Session headers, opt-in.** Each connection has a *Hermes session headers*
   switch that sends `X-Hermes-Session-Id` (pinned to the chat, survives
   editing the first message) and a stable `X-Hermes-Session-Key` for long-term
@@ -296,10 +332,11 @@ network-first, so a refresh always gets the newest version.
 `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`, `swtest.js`,
 `scrolltest.js`, `styletest.js`, `hiddentest.js`, `coherencetest.js` and
 `installtest.sh` — runs under Node with jsdom (`npm i jsdom fake-indexeddb`).
-755 checks across the matching engine, JSON tolerance, prompt assembly,
-streaming, SSE framing and Hermes tool activity, stream/chat binding, touch
-reorder, reader-owned scrolling, backup round-trips, migration, and negative
-tests that deliberately reintroduce fixed bugs to prove the guards fire.
+789 checks across the matching engine, JSON tolerance, prompt assembly,
+projects, retrieval, streaming, SSE framing and Hermes tool activity,
+stream/chat binding, touch reorder, reader-owned scrolling, backup
+round-trips, migration, and negative tests that deliberately reintroduce
+fixed bugs to prove the guards fire.
 
 ---
 

@@ -63,7 +63,7 @@ console.log('\n=== 3. ATTACHED FILE LIVES IN THE TOP BAR ===');
   ck('tapping opens it', d.querySelector('#filePop').classList.contains('show'));
   ck('names the attached file in the list',
      /spec\.md/.test(d.querySelector('#fileList').textContent), d.querySelector('#fileList').textContent.trim());
-  ck('and summarises the count', /1 file attached/.test(d.querySelector('#fileName').textContent),
+  ck('and summarises the count', /1 file/.test(d.querySelector('#fileName').textContent),
      d.querySelector('#fileName').textContent);
   const labels=Array.from(d.querySelectorAll('#filePop button')).map(b=>b.textContent.trim());
   ck('actions are worded plainly, no "Detach"',
