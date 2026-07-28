@@ -269,6 +269,12 @@ button{background:none;border:0;cursor:pointer;padding:0}
 .appr-btns button:first-child{border-color:var(--ember);color:var(--ember)}
 .appr:not(.pending){opacity:.65;border-left-color:var(--border)}
 
+/* images — in markdown and from search */
+.md-img{max-width:min(100%,340px);max-height:280px;border-radius:10px;display:block;margin:6px 0}
+.img-strip{display:flex;gap:8px;overflow-x:auto;padding:4px 0 6px;-webkit-overflow-scrolling:touch}
+.img-strip a{flex:none}
+.img-strip img{height:112px;width:auto;border-radius:9px;border:1px solid var(--border);display:block}
+
 /* markdown */
 .msg-body p{margin:0 0 .85em}
 .msg-body p:last-child{margin-bottom:0}
@@ -1271,6 +1277,13 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
         </div>
         <div class="switch">
           <div class="switch-txt">
+            <div class="t">Show image results</div>
+            <div class="s">A strip of pictures under your message. Tavily includes them free; Serper spends one extra credit per search; Exa reuses page images.</div>
+          </div>
+          <button class="toggle on" id="tgSearchImgs" role="switch" aria-checked="true"></button>
+        </div>
+        <div class="switch">
+          <div class="switch-txt">
             <div class="t">Search every message</div>
             <div class="s">Off means you tap the magnifier when you want it.</div>
           </div>
@@ -1464,10 +1477,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v5.6.0
+   COZY CHAT v5.7.0
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "5.6.0";
+const VERSION = "5.7.0";
 
 const PRESETS = {
   anthropic:  { name:"Claude",     kind:"anthropic", url:"https://api.anthropic.com/v1", model:"claude-sonnet-4-6", ctx:200000, hint:"e.g. claude-sonnet-4-6, claude-opus-4-5" },
@@ -1606,7 +1619,7 @@ const DEFAULTS = {
   temperature: 1, maxTokens: 4096,
   showThinking: true, showTools: true, catchThinkTags: true, thinkTags: "think, thinking, reasoning, thought",
   enterSends: false, autoTitle: true, theme: "dark", effort: "off", squashSystem: true,
-  search: { on:false, provider:"native", key:"", count:5, relay:"", always:false }
+  search: { on:false, provider:"native", key:"", count:5, relay:"", always:false, images:true }
 };
 let S = loadSettings();
 function loadSettings(){
@@ -1795,6 +1808,7 @@ function trimPartialTag(s){
 function inlineFmt(s){
   const links = [];
   const stash = h => { links.push(h); return "\u0000L" + (links.length - 1) + "\u0000"; };
+  s = s.replace(/!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/g, (m,t,u) => stash('<a href="'+u+'" target="_blank" rel="noopener"><img class="md-img" src="'+u+'" alt="'+t+'" loading="lazy"></a>'));
   s = s.replace(/\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/g, (m,t,u) => stash('<a href="'+u+'" target="_blank" rel="noopener">'+(t||u)+'</a>'));
   s = s.replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, (m,p,u) => p + stash('<a href="'+u+'" target="_blank" rel="noopener">'+u+'</a>'));
   s = s.replace(/\*\*\*([^*]+)\*\*\*/g, "<strong><em>$1</em></strong>");
@@ -2170,6 +2184,13 @@ function welcomeHtml(){
     + '<p>' + escapeHtml(connLabel(p)) + '</p>'
     + '<div class="starter-grid">' + st.map(s=>'<button class="starter" data-starter="'+escapeHtml(s)+'">'+escapeHtml(s)+'</button>').join("") + '</div></div>';
 }
+function imagesHtml(list){
+  if (!list || !list.length) return "";
+  return '<div class="img-strip">' + list.map(function(im){
+    return '<a href="' + escapeHtml(im.link || im.full || im.url) + '" target="_blank" rel="noopener">'
+      + '<img src="' + escapeHtml(im.url) + '" alt="' + escapeHtml(im.title || "") + '" loading="lazy"></a>';
+  }).join("") + '</div>';
+}
 function sourcesHtml(list){
   if (!list || !list.length) return "";
   return '<details class="sources"><summary>' + list.length + ' source' + (list.length===1?"":"s") + '</summary><div class="src-list">'
@@ -2231,7 +2252,7 @@ function msgHtml(m, isLastAssistant){
     : renderMarkdown(m.content);
   return '<div class="msg ' + m.role + '" data-mid="' + m.id + '">'
     + '<div class="msg-head"><span class="lbl">' + escapeHtml(label) + '</span>' + swipe + acts + '</div>'
-    + (S.showTools !== false ? toolLogHtml(m.tools) : "") + approvalHtml(m) + think + sourcesHtml(m.sources) + attsHtml(m.attachments)
+    + (S.showTools !== false ? toolLogHtml(m.tools) : "") + approvalHtml(m) + think + sourcesHtml(m.sources) + imagesHtml(m.images) + attsHtml(m.attachments)
     + '<div class="msg-body">' + body + '</div>'
     + editCardsHtml(m) + '</div>';
 }
@@ -2290,6 +2311,11 @@ function assembleMessages(kind, c){
       if (m.role === "user" && m.sources && m.sources.length){
         c += "\n\n<web_results>\n" + m.sources.map((s,i) =>
           "[" + (i+1) + "] " + s.title + "\n" + s.url + "\n" + (s.snippet || "")).join("\n\n") + "\n</web_results>";
+      }
+      if (m.role === "user" && m.images && m.images.length){
+        c += "\n\n<image_results note=\"these images are already shown to the user above your reply\">\n"
+          + m.images.map((im,i) => "[" + (i+1) + "] " + (im.title || "image") + " \u2014 " + (im.full || im.url)).join("\n")
+          + "\n</image_results>";
       }
       const atts = m.attachments || [];
       for (const a of atts) if (a.kind === "text"){
@@ -2440,11 +2466,12 @@ async function runSearch(query){
   const c = S.search, n = Number(c.count) || 5;
   const relay = (c.relay || "").replace(/\/+$/,"");
   const at = b => relay ? relay + new URL(b).pathname : b;
+  const wantImgs = c.images !== false;
   let url, opts;
   if (c.provider === "tavily"){
     url = at("https://api.tavily.com/search");
     opts = { method:"POST", headers:{ "content-type":"application/json", authorization:"Bearer "+c.key },
-             body: JSON.stringify({ query:query, max_results:n }) };
+             body: JSON.stringify({ query:query, max_results:n, include_images: wantImgs }) };
   } else if (c.provider === "exa"){
     url = at("https://api.exa.ai/search");
     opts = { method:"POST", headers:{ "content-type":"application/json", "x-api-key":c.key },
@@ -2462,11 +2489,38 @@ async function runSearch(query){
   const res = await fetch(url, opts);
   if (!res.ok) throw new Error("Search failed (" + res.status + ")");
   const j = await res.json();
-  if (c.provider === "tavily") return (j.results||[]).map(r => ({ title:r.title, url:r.url, snippet:(r.content||"").slice(0,600) }));
-  if (c.provider === "exa")    return (j.results||[]).map(r => ({ title:r.title, url:r.url, snippet:(r.text||"").slice(0,600) }));
-  if (c.provider === "serper") return (j.organic||[]).map(r => ({ title:r.title, url:r.link, snippet:r.snippet }));
-  if (c.provider === "brave")  return ((j.web&&j.web.results)||[]).map(r => ({ title:r.title, url:r.url, snippet:r.description }));
-  return [];
+  let results = [], images = [];
+  if (c.provider === "tavily"){
+    results = (j.results||[]).map(r => ({ title:r.title, url:r.url, snippet:(r.content||"").slice(0,600) }));
+    if (wantImgs) images = (j.images||[]).slice(0,6).map(function(u){
+      return typeof u === "string" ? { url:u, link:u, title:"" } : { url:u.url, link:u.url, title:u.description || "" };
+    });
+  } else if (c.provider === "exa"){
+    results = (j.results||[]).map(r => ({ title:r.title, url:r.url, snippet:(r.text||"").slice(0,600) }));
+    if (wantImgs) images = (j.results||[]).filter(r => r.image).slice(0,6)
+      .map(r => ({ url:r.image, link:r.url, title:r.title || "" }));
+  } else if (c.provider === "serper"){
+    results = (j.organic||[]).map(r => ({ title:r.title, url:r.link, snippet:r.snippet }));
+    if (wantImgs){
+      /* Google image results live on their own endpoint; one extra credit,
+         only spent when image results are switched on. Its failure never
+         takes the text results down with it. */
+      try {
+        const ir = await fetch(at("https://google.serper.dev/images"),
+          { method:"POST", headers:{ "content-type":"application/json", "X-API-KEY":c.key },
+            body: JSON.stringify({ q:query, num:6 }) });
+        if (ir.ok){
+          const ij = await ir.json();
+          images = (ij.images||[]).slice(0,6).map(function(i){
+            return { url:i.thumbnailUrl || i.imageUrl, full:i.imageUrl, link:i.link || i.imageUrl, title:i.title || "" };
+          });
+        }
+      } catch(_){}
+    }
+  } else if (c.provider === "brave"){
+    results = ((j.web&&j.web.results)||[]).map(r => ({ title:r.title, url:r.url, snippet:r.description }));
+  }
+  return { results: results, images: images };
 }
 
 /* ==========================================================
@@ -2509,8 +2563,10 @@ async function send(userText, mode, forConvo){
         node.parentNode.appendChild(ind); scrollDown();
       }
       try {
-        um.sources = await runSearch(userText);
-        if (!um.sources.length) toast("Search came back empty");
+        const sr = await runSearch(userText);
+        um.sources = sr.results;
+        if (sr.images && sr.images.length) um.images = sr.images;
+        if (!um.sources.length && !(um.images && um.images.length)) toast("Search came back empty");
       } catch (e){ toast(String(e.message || e)); }
       renderThread(); await persistConvo(convo);
     }
@@ -3099,6 +3155,7 @@ function syncSettingsUI(){
   setToggle($("#tgTitle"), S.autoTitle);
   setToggle($("#tgSearch"), S.search.on);
   setToggle($("#tgAlwaysSearch"), S.search.always);
+  setToggle($("#tgSearchImgs"), S.search.images !== false);
   $("#searchCfg").hidden = !S.search.on;
   $("#sProvider").value = S.search.provider;
   $("#sKey").value = S.search.key;
@@ -3453,6 +3510,7 @@ on("#tgSearch", "click", function(e){
   $("#searchCfg").hidden = !S.search.on; saveSettings(); syncSearchBtn();
 });
 on("#tgAlwaysSearch", "click", function(e){ S.search.always=!S.search.always; setToggle(e.currentTarget,S.search.always); saveSettings(); syncSearchBtn(); });
+on("#tgSearchImgs", "click", function(e){ S.search.images = S.search.images === false; setToggle(e.currentTarget, S.search.images); saveSettings(); });
 on("#sProvider", "change", function(e){
   S.search.provider = e.target.value; saveSettings();
   $("#sHint").textContent = SEARCH_HINTS[e.target.value] || "";

@@ -262,6 +262,19 @@ What you get in the chat:
   allow-list rejects those headers in preflight — turn it on only if your
   Hermes build allows them, or you route through a relay that does.
 
+**Image results** (Settings → Search → *Show image results*, on by default)
+- Search comes back with pictures where the provider has them: a strip of
+  tappable thumbnails under your message, each opening its source. "What do
+  Bleach characters look like" gets faces, not just prose.
+- Tavily includes images free on the same request. Serper spends one extra
+  credit per search on its images endpoint — and if that call fails, the text
+  results land anyway. Exa reuses each page's own image. Claude's native
+  search doesn't return images.
+- The model is told exactly which pictures you're already looking at, so it
+  can talk about "the images above" instead of guessing.
+- Markdown image syntax now renders too — any model that writes
+  `![name](https://…)` shows the picture inline, linked to its source.
+
 **Look**
 Six themes: Hearth, Parchment, Cyber, Normandy, Terminal, Dusk.
 Settings → App, or tap the moon icon to cycle.
@@ -337,7 +350,7 @@ network-first, so a refresh always gets the newest version.
 `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`, `swtest.js`,
 `scrolltest.js`, `styletest.js`, `hiddentest.js`, `coherencetest.js` and
 `installtest.sh` — runs under Node with jsdom (`npm i jsdom fake-indexeddb`).
-832 checks across the matching engine, JSON tolerance, prompt assembly,
+852 checks across the matching engine, JSON tolerance, prompt assembly,
 projects, retrieval, streaming, SSE framing and Hermes tool activity,
 stream/chat binding, touch reorder, reader-owned scrolling, backup
 round-trips, migration, and negative tests that deliberately reintroduce
