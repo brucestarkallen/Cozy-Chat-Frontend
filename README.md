@@ -214,12 +214,14 @@ On the Hermes side, in `~/.hermes/.env`:
 ```
 API_SERVER_ENABLED=true
 API_SERVER_KEY=pick-something
-API_SERVER_CORS_ORIGINS=http://localhost:8080,http://127.0.0.1:8080
+API_SERVER_CORS_ORIGINS=http://localhost:8787,http://127.0.0.1:8787
 ```
 
 then `hermes gateway`. The CORS line matters: Cozy Chat calls Hermes straight
 from the browser, and the two run on different ports, so Hermes must allow
-Cozy's origin (add your port if you changed `COZY_PORT`). This only works from
+Cozy's origin — `8787` is Cozy's default local port; whichever host the
+address bar shows is the one that counts, so list both spellings. Change the
+numbers if you changed `COZY_PORT`. This only works from
 the **local** copy — a page served over https, like the github.io version,
 is not allowed to call a plain-http localhost server, and the browser blocks
 it before Hermes ever sees the request.
@@ -249,9 +251,26 @@ What you get in the chat:
   never left with live-looking buttons. One limit: a message carrying an
   image falls back to the plain stream for that turn (runs don't take
   images), so approvals resume on the next text message. Runs mode needs a
-  Hermes build with the Runs API; leave it off for the plain stream, or set
-  `HERMES_YOLO_MODE=1` server-side if you'd rather skip approvals entirely
-  (the hardline destructive-command floor still applies either way).
+  Hermes build with the Runs API. **If yours doesn't have it, or the browser
+  can't reach it, the message is never lost:** Cozy falls back to the plain
+  stream for that send, tells you once, and stops any run it had already
+  started. A server that has the API and genuinely errors still errors
+  loudly — the fallback only covers "this transport isn't there". To see
+  which case yours is, from Termux:
+
+  ```
+  curl -i -X POST http://127.0.0.1:8642/v1/runs \
+    -H "Origin: http://127.0.0.1:8787" \
+    -H "Authorization: Bearer YOUR_KEY" \
+    -H "Content-Type: application/json" -d '{"input":"hi"}'
+  ```
+
+  `404` means your Hermes predates the Runs API — update it. A `2xx` with a
+  `run_id` means the API exists and the browser path is the problem: check
+  the `Access-Control-Allow-Origin` in that reply matches Cozy's address bar
+  exactly. Prefer no approvals at all? Leave runs mode off, or set
+  `HERMES_YOLO_MODE=1` server-side (the hardline destructive-command
+  floor still applies either way).
 - **Search links.** Hermes doesn't put result URLs on the wire — the activity
   row shows *what* was searched. Links appear when the agent cites them in
   its reply, where they're tappable like any other link.
@@ -358,7 +377,7 @@ network-first, so a refresh always gets the newest version.
 `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`, `swtest.js`,
 `scrolltest.js`, `styletest.js`, `hiddentest.js`, `coherencetest.js` and
 `installtest.sh` — runs under Node with jsdom (`npm i jsdom fake-indexeddb`).
-855 checks across the matching engine, JSON tolerance, prompt assembly,
+861 checks across the matching engine, JSON tolerance, prompt assembly,
 projects, retrieval, streaming, SSE framing and Hermes tool activity,
 stream/chat binding, touch reorder, reader-owned scrolling, backup
 round-trips, migration, and negative tests that deliberately reintroduce

@@ -1477,10 +1477,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v5.7.1
+   COZY CHAT v5.7.2
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "5.7.1";
+const VERSION = "5.7.2";
 
 const PRESETS = {
   anthropic:  { name:"Claude",     kind:"anthropic", url:"https://api.anthropic.com/v1", model:"claude-sonnet-4-6", ctx:200000, hint:"e.g. claude-sonnet-4-6, claude-opus-4-5" },
@@ -2673,9 +2673,20 @@ async function send(userText, mode, forConvo){
       asmR = assembleMessages("openai", convo);
       useRuns = !asmR.messages.some(function(m){ return typeof m.content !== "string"; });
     }
+    let ranViaRuns = false;
     if (useRuns){
-      const base = (p.proxy || p.url).replace(/\/+$/,"");
-      const hh = { "content-type":"application/json", "authorization":"Bearer " + p.apiKey };
+      /* The run is an upgrade, not a requirement: a server whose Runs API is
+         missing, older, or unreachable from a browser must not cost the
+         message. Anything that reads as "this transport isn't there" falls
+         back to the plain stream, says so once, and approvals sit out this
+         turn. A server that HAS the API and errors still errors loudly. */
+      const runsGone = function(err){
+        return !!(err && (err.__runsFallback || /Failed to fetch|NetworkError|Load failed/i.test(String(err.message || err))));
+      };
+      let run = null, hh = null, base = null;
+      try {
+      base = (p.proxy || p.url).replace(/\/+$/,"");
+      hh = { "content-type":"application/json", "authorization":"Bearer " + p.apiKey };
       const msgs = asmR.messages;
       const lastM = msgs[msgs.length - 1];
       const tailIsUser = !!(lastM && lastM.role === "user");
@@ -2687,20 +2698,28 @@ async function send(userText, mode, forConvo){
           session_id: "cozy-" + convo.id
         }) });
       if (!cr.ok){
+        if (cr.status === 404 || cr.status === 405){
+          const gone = new Error("no runs api"); gone.__runsFallback = true; throw gone;
+        }
         let detail = "";
         try { const j = await cr.json(); detail = (j.error && (j.error.message || j.error.type)) || JSON.stringify(j).slice(0,300); }
         catch(_) { detail = (await cr.text().catch(function(){ return ""; })).slice(0,300); }
         throw new Error(p.name + " said no (" + cr.status + ") to starting the run.\n\n" + (detail || "No details given."));
       }
       const rj = await cr.json();
-      const run = { id: rj.run_id, base: base, key: p.apiKey };
+      run = { id: rj.run_id, base: base, key: p.apiKey };
       ctrl.run = run; ctrl.asstId = asst.id;
       // stopping the stream must also stop the agent, or it keeps working unseen
       ctrl.signal.addEventListener("abort", function(){
         fetch(base + "/runs/" + run.id + "/stop", { method:"POST", headers:hh }).catch(function(){});
       }, { once:true });
       const res = await fetch(base + "/runs/" + run.id + "/events", { headers:hh, signal:ctrl.signal });
-      if (!res.ok) throw new Error(p.name + " said no (" + res.status + ") to the run stream.");
+      if (!res.ok){
+        if (res.status === 404 || res.status === 405){
+          const gone = new Error("no runs stream"); gone.__runsFallback = true; throw gone;
+        }
+        throw new Error(p.name + " said no (" + res.status + ") to the run stream.");
+      }
       const reader = res.body.getReader(), dec = new TextDecoder();
       let buf = "", finished = false;
       while (!finished){
@@ -2744,7 +2763,15 @@ async function send(userText, mode, forConvo){
           if (finished) break;
         }
       }
-    } else {
+      ranViaRuns = true;
+      } catch (err){
+        if (!runsGone(err) || (err && err.name === "AbortError")) throw err;
+        // a run may have been created before the stream failed — never leave it working unseen
+        if (run && base && hh) fetch(base + "/runs/" + run.id + "/stop", { method:"POST", headers:hh }).catch(function(){});
+        toast("The Runs API didn't answer — sent over the plain stream. Approvals sit out this message.");
+      }
+    }
+    if (!ranViaRuns){
     const req = buildPayload({ search: wantSearch }, convo);
     const res = await fetch(req.url, { method:"POST", headers:req.headers, body:JSON.stringify(req.body), signal:ctrl.signal });
     if (!res.ok){

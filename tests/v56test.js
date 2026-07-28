@@ -179,6 +179,70 @@ console.log('=== 4. A FAILED RUN IS AN ERROR, AND IMAGES FALL BACK ===');
   ck('and still gets its reply', w.eval('current.messages[1].content')==='plain path');
 }
 
+console.log('=== 5. A MISSING RUNS API COSTS NOTHING BUT THE CARDS ===');
+{
+  // the server has /chat/completions but no /v1/runs at all — network-level refusal
+  const dom=await boot(base(),w=>{
+    w.__calls=[];
+    return (url,opts)=>{
+      w.__calls.push(String(url));
+      if(/\/runs/.test(url)) return Promise.reject(new TypeError('Failed to fetch'));
+      const sig=opts&&opts.signal;let sent=false;
+      return Promise.resolve({ok:true,body:{getReader(){return{read(){
+        return new Promise(res=>{ if(sent){res({done:true});return;} sent=true;
+          res({done:false,value:new TextEncoder().encode('data: '+JSON.stringify({choices:[{delta:{content:'fell back fine'}}]})+'\n\n')}); });
+      }};}}});
+    };
+  });
+  const w=dom.window,d=w.document;
+  w.eval('newConvo()');
+  d.querySelector('#input').value='go'; ev(w,d.querySelector('#input'),'input');
+  ev(w,d.querySelector('#sendBtn'),'click');
+  await sleep(600);
+  const msgs=w.eval('current.messages');
+  ck('the message still sends over the plain stream', msgs[1]&&msgs[1].content==='fell back fine', JSON.stringify(msgs[1]&&msgs[1].content));
+  ck('no error row for a missing upgrade', !msgs.some(m=>m.role==='error'));
+  ck('the plain endpoint was actually used', w.__calls.some(u=>/chat\/completions$/.test(u)));
+}
+{
+  // /runs exists (created the run) but its event stream is refused — the run must be stopped
+  const dom=await boot(base(),w=>{
+    w.__calls=[];
+    return (url,opts)=>{
+      w.__calls.push(String(url));
+      if(/\/runs$/.test(url)) return Promise.resolve({ok:true,json:async()=>({run_id:'run_9',status:'started'})});
+      if(/\/stop$/.test(url)){ w.__stopped=true; return Promise.resolve({ok:true,json:async()=>({})}); }
+      if(/\/events$/.test(url)) return Promise.resolve({ok:false,status:404,json:async()=>({}),text:async()=>''});
+      const sig=opts&&opts.signal;let sent=false;
+      return Promise.resolve({ok:true,body:{getReader(){return{read(){
+        return new Promise(res=>{ if(sent){res({done:true});return;} sent=true;
+          res({done:false,value:new TextEncoder().encode('data: '+JSON.stringify({choices:[{delta:{content:'reply'}}]})+'\n\n')}); });
+      }};}}});
+    };
+  });
+  const w=dom.window,d=w.document;
+  w.eval('newConvo()');
+  d.querySelector('#input').value='go'; ev(w,d.querySelector('#input'),'input');
+  ev(w,d.querySelector('#sendBtn'),'click');
+  await sleep(600);
+  ck('the orphaned run was stopped, not left working unseen', w.__stopped===true);
+  ck('and the message completed anyway', w.eval('current.messages[1].content')==='reply');
+}
+{
+  // a server that HAS the API and fails on it still fails loudly — no silent downgrade
+  const dom=await boot(base(),w=>(url,opts)=>{
+    if(/\/runs$/.test(url)) return Promise.resolve({ok:false,status:500,json:async()=>({error:{message:'runs backend exploded'}}),text:async()=>''});
+    return Promise.resolve({ok:true,body:{getReader(){return{read(){return Promise.resolve({done:true});}};}}});
+  });
+  const w=dom.window,d=w.document;
+  w.eval('newConvo()');
+  d.querySelector('#input').value='go'; ev(w,d.querySelector('#input'),'input');
+  ev(w,d.querySelector('#sendBtn'),'click');
+  await sleep(500);
+  const last=w.eval('current.messages[current.messages.length-1]');
+  ck('a real runs failure surfaces as an error', last.role==='error' && /runs backend exploded/.test(last.content), JSON.stringify(last.content));
+}
+
 console.log('');
 console.log(fail?('FAILED '+fail):'ALL PASS','('+(pass+fail)+' checks)');
 process.exit(fail?1:0);
