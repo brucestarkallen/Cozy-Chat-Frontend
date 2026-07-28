@@ -1477,10 +1477,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v5.7.0
+   COZY CHAT v5.7.1
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "5.7.0";
+const VERSION = "5.7.1";
 
 const PRESETS = {
   anthropic:  { name:"Claude",     kind:"anthropic", url:"https://api.anthropic.com/v1", model:"claude-sonnet-4-6", ctx:200000, hint:"e.g. claude-sonnet-4-6, claude-opus-4-5" },
@@ -1808,6 +1808,11 @@ function trimPartialTag(s){
 function inlineFmt(s){
   const links = [];
   const stash = h => { links.push(h); return "\u0000L" + (links.length - 1) + "\u0000"; };
+  /* Hermes inlines images it downloaded or generated as data-URL markdown;
+     strict mimes and base64 charset only, no link wrap — browsers refuse to
+     navigate to data: anyway. */
+  s = s.replace(/!\[([^\]]*)\]\((data:image\/(?:png|jpe?g|gif|webp|bmp);base64,[A-Za-z0-9+\/=]+)\)/g,
+    (m,t,u) => stash('<img class="md-img" src="'+u+'" alt="'+t+'">'));
   s = s.replace(/!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/g, (m,t,u) => stash('<a href="'+u+'" target="_blank" rel="noopener"><img class="md-img" src="'+u+'" alt="'+t+'" loading="lazy"></a>'));
   s = s.replace(/\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/g, (m,t,u) => stash('<a href="'+u+'" target="_blank" rel="noopener">'+(t||u)+'</a>'));
   s = s.replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, (m,p,u) => p + stash('<a href="'+u+'" target="_blank" rel="noopener">'+u+'</a>'));

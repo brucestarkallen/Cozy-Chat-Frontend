@@ -274,6 +274,14 @@ What you get in the chat:
   can talk about "the images above" instead of guessing.
 - Markdown image syntax now renders too — any model that writes
   `![name](https://…)` shows the picture inline, linked to its source.
+- **Hermes' own images render as well.** When the agent downloads or
+  *generates* an image, its server inlines the actual bytes as a data-URL
+  markdown image (up to 5 MB) — Cozy shows it in the reply. For internet
+  pictures, tell the agent once, in the connection's instruction set:
+  *"When the user asks what something looks like, include direct image URLs
+  as markdown images: `![name](https://…)`. Prefer stable static hosts like
+  wiki CDNs."* Some sites refuse hotlinking — the picture's link still opens
+  the source either way.
 
 **Look**
 Six themes: Hearth, Parchment, Cyber, Normandy, Terminal, Dusk.
@@ -350,7 +358,7 @@ network-first, so a refresh always gets the newest version.
 `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`, `swtest.js`,
 `scrolltest.js`, `styletest.js`, `hiddentest.js`, `coherencetest.js` and
 `installtest.sh` — runs under Node with jsdom (`npm i jsdom fake-indexeddb`).
-852 checks across the matching engine, JSON tolerance, prompt assembly,
+855 checks across the matching engine, JSON tolerance, prompt assembly,
 projects, retrieval, streaming, SSE framing and Hermes tool activity,
 stream/chat binding, touch reorder, reader-owned scrolling, backup
 round-trips, migration, and negative tests that deliberately reintroduce

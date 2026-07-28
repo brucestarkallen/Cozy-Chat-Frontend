@@ -49,6 +49,12 @@ console.log('=== 1. MARKDOWN IMAGES RENDER ===');
   ck('plain links stay links, not images', /<a href="https:\/\/x\.y\/z"[^>]*>a link<\/a>/.test(md) && (md.match(/<img/g)||[]).length===1);
   const bad=w.eval(`renderMarkdown("![x](javascript:alert(1))")`);
   ck('a non-http target never becomes an image', bad.indexOf('<img')<0, bad);
+  // Hermes inlines downloaded/generated images as data-URL markdown
+  const du=w.eval(`renderMarkdown("Here: ![image](data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==)")`);
+  ck('a data-URL image renders as an image', /<img class="md-img" src="data:image\/png;base64,iVBORw0KGgoAAAANSUhEUg==/.test(du), du.slice(0,120));
+  ck('without a pointless data: link around it', du.indexOf('<a href="data:')<0);
+  const dbad=w.eval(`renderMarkdown("![x](data:text/html;base64,PHNjcmlwdD4=)")`);
+  ck('only image mimes qualify', dbad.indexOf('<img')<0, dbad);
 }
 
 console.log('=== 2. TAVILY: PICTURES RIDE THE SAME REQUEST ===');
