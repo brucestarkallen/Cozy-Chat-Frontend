@@ -211,12 +211,44 @@ console.log('=== 5. A MISSING RUNS API COSTS NOTHING BUT THE CARDS ===');
   await sleep(500);
   ck('a down Runs API is not knocked on twice', runsCalls()===before, String(runsCalls()));
   ck('and the second message still completes', w.eval('current.messages[3].content')==='fell back fine');
-  // editing the connection is the reason to try again
-  w.eval('editProv("h1");saveProv()');
+  ck('the mark is written on the connection itself',
+     !!w.eval('JSON.parse(localStorage.getItem("cozychat:settings")).providers[0].runsDownAt'));
+  ck('and shows where the setting lives', (function(){
+    w.eval('editProv("h1")');
+    const el=d.querySelector('#pRunsStat');
+    return el && !el.hidden && /plain stream is in use/.test(el.textContent);
+  })());
+  // saving the connection is the deliberate act that tries again
+  w.eval('saveProv()');
+  ck('saving clears the mark', !w.eval('JSON.parse(localStorage.getItem("cozychat:settings")).providers[0].runsDownAt'));
   d.querySelector('#input').value='third'; ev(w,d.querySelector('#input'),'input');
   ev(w,d.querySelector('#sendBtn'),'click');
   await sleep(500);
-  ck('a saved edit tries the Runs API afresh', runsCalls()===before+1, String(runsCalls()));
+  ck('and the Runs API is tried afresh', runsCalls()===before+1, String(runsCalls()));
+}
+{
+  // the memory survives a reload: a fresh boot with the mark set never knocks
+  const marked=base();
+  marked.providers[0].runsDownAt=123456789;
+  const dom=await boot(marked,w=>{
+    w.__calls=[];
+    return (url,opts)=>{
+      w.__calls.push(String(url));
+      if(/\/runs/.test(url)) return Promise.reject(new TypeError('Failed to fetch'));
+      let sent=false;
+      return Promise.resolve({ok:true,body:{getReader(){return{read(){
+        return new Promise(res=>{ if(sent){res({done:true});return;} sent=true;
+          res({done:false,value:new TextEncoder().encode('data: '+JSON.stringify({choices:[{delta:{content:'quiet'}}]})+'\n\n')}); });
+      }};}}});
+    };
+  });
+  const w=dom.window,d=w.document;
+  w.eval('newConvo()');
+  d.querySelector('#input').value='hi'; ev(w,d.querySelector('#input'),'input');
+  ev(w,d.querySelector('#sendBtn'),'click');
+  await sleep(500);
+  ck('after a reload the dead endpoint stays unknocked', !w.__calls.some(u=>/\/runs$/.test(u)), w.__calls.join(' '));
+  ck('the message just goes, silently', w.eval('current.messages[1].content')==='quiet');
 }
 {
   // /runs exists (created the run) but its event stream is refused — the run must be stopped

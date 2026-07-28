@@ -1105,6 +1105,7 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
             <option value="on">On — approval cards in the chat</option>
           </select>
           <div class="hint">Hermes connections only. Uses the agent's Runs API, so when a command needs permission you answer with a tap here instead of in the terminal. Messages with images fall back to the plain stream for that turn.</div>
+          <div class="hint" id="pRunsStat" hidden style="color:var(--ember)"></div>
         </div>
         <div class="field">
           <label class="lbl" for="pCtx">Context window (tokens)</label>
@@ -1482,10 +1483,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v5.7.3
+   COZY CHAT v5.7.4
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "5.7.3";
+const VERSION = "5.7.4";
 
 const PRESETS = {
   anthropic:  { name:"Claude",     kind:"anthropic", url:"https://api.anthropic.com/v1", model:"claude-sonnet-4-6", ctx:200000, hint:"e.g. claude-sonnet-4-6, claude-opus-4-5" },
@@ -1766,10 +1767,20 @@ let searchArmed = false, pinned = true;
 /* The finger owns the thread while it is down; program scrolls are counted
    so their echo events can be told apart from the user's own. */
 let userTouching = false, coasting = false, coastTimer = null, progScrolls = 0, repaintHook = null;
-/* A Runs API that didn't answer won't answer next message either: remember
-   it per connection for this session, stop knocking, say so once. Editing
-   the connection (or reloading) clears it and tries again. */
-const runsDown = {};
+/* A Runs API that didn't answer won't answer next message either — and it
+   won't answer tomorrow either. The memory lives on the connection itself,
+   so the toast happens once EVER per connection, the knocking stops across
+   reloads, and the state shows in the connection editor. Saving the
+   connection is the deliberate act that clears it and tries again. */
+function runsIsDown(p){ return !!(p && S.providers.some(function(x){ return x.id === p.id && x.runsDownAt; })); }
+function markRunsDown(p){
+  const real = S.providers.find(function(x){ return x.id === p.id; });
+  if (!real) return true;
+  const first = !real.runsDownAt;
+  real.runsDownAt = Date.now();
+  saveSettings();
+  return first;
+}
 
 const $  = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
@@ -2687,7 +2698,7 @@ async function send(userText, mode, forConvo){
        requests back. Images can't ride a run, so a turn with any falls back
        to the plain stream — approvals resume on the next text turn. */
     let useRuns = false, asmR = null;
-    if (reasonStyle(p) === "hermes" && p.hermesRuns && !runsDown[p.id]){
+    if (reasonStyle(p) === "hermes" && p.hermesRuns && !runsIsDown(p)){
       asmR = assembleMessages("openai", convo);
       useRuns = !asmR.messages.some(function(m){ return typeof m.content !== "string"; });
     }
@@ -2786,8 +2797,8 @@ async function send(userText, mode, forConvo){
         if (!runsGone(err) || (err && err.name === "AbortError")) throw err;
         // a run may have been created before the stream failed — never leave it working unseen
         if (run && base && hh) fetch(base + "/runs/" + run.id + "/stop", { method:"POST", headers:hh }).catch(function(){});
-        runsDown[p.id] = true;
-        toast("The Runs API didn't answer — using the plain stream from now on. It's tried again after you edit the connection or reload.");
+        if (markRunsDown(p))
+          toast("The Runs API didn't answer — using the plain stream from now on. Save the connection to try it again.");
       }
     }
     if (!ranViaRuns){
@@ -2959,9 +2970,14 @@ function editProv(id){
     $("#pReason").value = p.reason || "auto";
     $("#pHdrs").value = p.hermesHeaders ? "on" : "";
     $("#pRuns").value = p.hermesRuns ? "on" : "";
+    const prs = $("#pRunsStat");
+    if (prs){
+      prs.hidden = !p.runsDownAt;
+      if (p.runsDownAt) prs.textContent = "Last time, the Runs API didn't answer — the plain stream is in use. Saving this connection tries it again.";
+    }
     $("#modelHint").textContent = PRESETS[preset].hint;
     fillModelList(p.models || []);
-  } else { applyPreset("anthropic"); $("#pReason").value = "auto"; $("#pHdrs").value = ""; $("#pRuns").value = ""; fillModelList([]); }
+  } else { applyPreset("anthropic"); $("#pReason").value = "auto"; $("#pHdrs").value = ""; $("#pRuns").value = ""; const prs2 = $("#pRunsStat"); if (prs2) prs2.hidden = true; fillModelList([]); }
   $("#delProvBtn").hidden = !p;
   $("#provEditor").hidden = false;
   if ($("#provEditor").scrollIntoView) $("#provEditor").scrollIntoView({ behavior:"smooth", block:"nearest" });
@@ -2990,7 +3006,8 @@ function saveProv(){
     if (prevChatProv !== data.id) cfgSet("model", null);
     cfgSet("providerId", data.id);
   }
-  delete runsDown[data.id];   // a saved edit is a reason to try the Runs API again
+  // a saved edit is a reason to try the Runs API again — data was rebuilt
+  // from the fields above, so any runsDownAt mark is gone with it
   saveSettings(); renderProvList(); renderThread();
   $("#provEditor").hidden = true; editingProv = null; toast("Connection saved");
 }

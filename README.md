@@ -253,10 +253,12 @@ What you get in the chat:
   images), so approvals resume on the next text message. Runs mode needs a
   Hermes build with the Runs API. **If yours doesn't have it, or the browser
   can't reach it, the message is never lost:** Cozy falls back to the plain
-  stream, tells you once, stops any run it had already started, and stops
-  knocking — the whole session then uses the plain stream without further
-  nagging. Saving the connection (or reloading the app) tries the Runs API
-  afresh. A server that has the API and genuinely errors still errors
+  stream, tells you **once ever**, stops any run it had already started, and
+  stops knocking for good — across reloads too. The connection editor shows
+  the state next to the Runs mode setting, and **saving the connection** is
+  the deliberate act that tries the API afresh (do that after updating
+  hermes-agent). If you're keeping an older server, just switch runs mode
+  Off — the plain stream is what you're getting anyway, minus the note. A server that has the API and genuinely errors still errors
   loudly — the fallback only covers "this transport isn't there". To see
   which case yours is, from Termux:
 
@@ -384,7 +386,7 @@ network-first, so a refresh always gets the newest version.
 `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`, `swtest.js`,
 `scrolltest.js`, `styletest.js`, `hiddentest.js`, `coherencetest.js` and
 `installtest.sh` — runs under Node with jsdom (`npm i jsdom fake-indexeddb`).
-867 checks across the matching engine, JSON tolerance, prompt assembly,
+872 checks across the matching engine, JSON tolerance, prompt assembly,
 projects, retrieval, streaming, SSE framing and Hermes tool activity,
 stream/chat binding, touch reorder, reader-owned scrolling, backup
 round-trips, migration, and negative tests that deliberately reintroduce
