@@ -295,6 +295,11 @@ What you get in the chat:
   search doesn't return images.
 - The model is told exactly which pictures you're already looking at, so it
   can talk about "the images above" instead of guessing.
+- **Asking for a picture fetches pictures.** "Give me an image of X", "pics
+  of Y", "what does Z look like" — phrasings like these run the image search
+  by themselves, no magnifier tap. Needs Search switched on with a provider
+  key (Tavily's free tier is enough); turn the reflex off under Settings →
+  Search if you'd rather arm it by hand.
 - Markdown image syntax now renders too — any model that writes
   `![name](https://…)` shows the picture inline, linked to its source.
 - **A leaked `MEDIA:` tag explains itself.** An older hermes-agent prints
@@ -307,8 +312,9 @@ What you get in the chat:
   markdown image (up to 5 MB) — Cozy shows it in the reply. For internet
   pictures, tell the agent once, in the connection's instruction set:
   *"When the user asks what something looks like, include direct image URLs
-  as markdown images: `![name](https://…)`. Prefer stable static hosts like
-  wiki CDNs."* Some sites refuse hotlinking — the picture's link still opens
+  as markdown images: `![name](https://…)` — but only URLs that appear in
+  your search results or that you fetched and verified. Never construct an
+  image URL from memory: a guessed URL shows a logo or the wrong picture."* Some sites refuse hotlinking — the picture's link still opens
   the source either way.
 
 **Look**
@@ -386,7 +392,7 @@ network-first, so a refresh always gets the newest version.
 `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`, `swtest.js`,
 `scrolltest.js`, `styletest.js`, `hiddentest.js`, `coherencetest.js` and
 `installtest.sh` — runs under Node with jsdom (`npm i jsdom fake-indexeddb`).
-872 checks across the matching engine, JSON tolerance, prompt assembly,
+879 checks across the matching engine, JSON tolerance, prompt assembly,
 projects, retrieval, streaming, SSE framing and Hermes tool activity,
 stream/chat binding, touch reorder, reader-owned scrolling, backup
 round-trips, migration, and negative tests that deliberately reintroduce

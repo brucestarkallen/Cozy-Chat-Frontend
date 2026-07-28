@@ -1290,6 +1290,13 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
         </div>
         <div class="switch">
           <div class="switch-txt">
+            <div class="t">Fetch pictures when you ask for them</div>
+            <div class="s">"Give me an image of X" or "what does X look like" runs the search by itself — no magnifier tap needed.</div>
+          </div>
+          <button class="toggle on" id="tgSearchAuto" role="switch" aria-checked="true"></button>
+        </div>
+        <div class="switch">
+          <div class="switch-txt">
             <div class="t">Search every message</div>
             <div class="s">Off means you tap the magnifier when you want it.</div>
           </div>
@@ -1483,10 +1490,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v5.7.4
+   COZY CHAT v5.8.0
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "5.7.4";
+const VERSION = "5.8.0";
 
 const PRESETS = {
   anthropic:  { name:"Claude",     kind:"anthropic", url:"https://api.anthropic.com/v1", model:"claude-sonnet-4-6", ctx:200000, hint:"e.g. claude-sonnet-4-6, claude-opus-4-5" },
@@ -1625,7 +1632,7 @@ const DEFAULTS = {
   temperature: 1, maxTokens: 4096,
   showThinking: true, showTools: true, catchThinkTags: true, thinkTags: "think, thinking, reasoning, thought",
   enterSends: false, autoTitle: true, theme: "dark", effort: "off", squashSystem: true,
-  search: { on:false, provider:"native", key:"", count:5, relay:"", always:false, images:true }
+  search: { on:false, provider:"native", key:"", count:5, relay:"", always:false, images:true, auto:true }
 };
 let S = loadSettings();
 function loadSettings(){
@@ -2496,6 +2503,15 @@ function buildPayload(opts, c){
 /* ==========================================================
    WEB SEARCH
    ========================================================== */
+/* "Give me an image of X" is a search request in plain clothes. When it
+   reads like one, the image search runs by itself — real URLs from a real
+   image index, instead of a model guessing at one and landing on a logo. */
+const IMG_INTENT = /\b(image|images|picture|pictures|photo|photos|pic|pics|wallpaper|wallpapers|poster|posters)\s+(of|for)\b|\bwhat(?:'s| is| does)\b.{0,60}\blooks? like\b|\bshow me\b.{0,40}\b(image|images|picture|pictures|photo|photos|pic|pics)\b/i;
+function asksForImages(text){
+  return S.search.on && S.search.provider !== "native" && !!S.search.key
+    && S.search.images !== false && S.search.auto !== false
+    && !!text && IMG_INTENT.test(text);
+}
 async function runSearch(query){
   const c = S.search, n = Number(c.count) || 5;
   const relay = (c.relay || "").replace(/\/+$/,"");
@@ -2579,7 +2595,7 @@ async function send(userText, mode, forConvo){
   if (!p || !p.apiKey){ openSettings(); toast("Add a connection first"); return; }
   if (!p.model){ openSettings(); toast("Set a model name first"); return; }
 
-  const wantSearch = S.search.on && (S.search.always || searchArmed);
+  const wantSearch = S.search.on && (S.search.always || searchArmed || asksForImages(userText));
   searchArmed = false; syncSearchBtn();
 
   if (userText != null){
@@ -3225,6 +3241,7 @@ function syncSettingsUI(){
   setToggle($("#tgSearch"), S.search.on);
   setToggle($("#tgAlwaysSearch"), S.search.always);
   setToggle($("#tgSearchImgs"), S.search.images !== false);
+  setToggle($("#tgSearchAuto"), S.search.auto !== false);
   $("#searchCfg").hidden = !S.search.on;
   $("#sProvider").value = S.search.provider;
   $("#sKey").value = S.search.key;
@@ -3580,6 +3597,7 @@ on("#tgSearch", "click", function(e){
 });
 on("#tgAlwaysSearch", "click", function(e){ S.search.always=!S.search.always; setToggle(e.currentTarget,S.search.always); saveSettings(); syncSearchBtn(); });
 on("#tgSearchImgs", "click", function(e){ S.search.images = S.search.images === false; setToggle(e.currentTarget, S.search.images); saveSettings(); });
+on("#tgSearchAuto", "click", function(e){ S.search.auto = S.search.auto === false; setToggle(e.currentTarget, S.search.auto); saveSettings(); });
 on("#sProvider", "change", function(e){
   S.search.provider = e.target.value; saveSettings();
   $("#sHint").textContent = SEARCH_HINTS[e.target.value] || "";

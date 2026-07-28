@@ -160,6 +160,33 @@ console.log('=== 5. EXA: THE PAGES\u2019 OWN PICTURES ===');
   ck('only results that carry an image contribute one', imgs.length===1 && imgs[0].url==='https://img.x/a.png' && imgs[0].link==='https://a.x');
 }
 
+console.log('=== 6. ASKING FOR A PICTURE FETCHES PICTURES ===');
+{
+  let searchCalls=0;
+  const st=base({search:{on:true,provider:'tavily',key:'tk',count:3,relay:'',always:false,images:true,auto:true}});
+  const dom=await boot(st,w=>(url,opts)=>{
+    if(String(url).includes('tavily')){searchCalls++;
+      return Promise.resolve({ok:true,json:async()=>({results:[{title:'w',url:'https://w.x',content:'c'}],images:['https://img.x/ichigo.jpg']})});}
+    w.__chat=JSON.parse(opts.body); return Promise.resolve(okChat());
+  });
+  const w=dom.window,d=w.document;
+  w.eval('newConvo()');
+  await ask(w,d,'Can you give me a image of ichigo from bleach');
+  ck('the ask fired the search on its own', searchCalls===1, String(searchCalls));
+  ck('real pictures landed under the message', !!d.querySelector('.msg.user .img-strip img'));
+  ck('and their true URLs reached the model', JSON.stringify(w.__chat).indexOf('https://img.x/ichigo.jpg')>=0);
+  await ask(w,d,'thanks, he looks cool');
+  ck('an ordinary message does not search', searchCalls===1, String(searchCalls));
+  await ask(w,d,'what does rukia look like');
+  ck('a looks-like question does', searchCalls===2, String(searchCalls));
+  w.eval('S.search.auto=false;saveSettings()');
+  await ask(w,d,'picture of zaraki');
+  ck('the toggle really turns it off', searchCalls===2, String(searchCalls));
+  ck('the intent reader is not trigger-happy', w.eval('asksForImages("imagine a world")')===false
+     && w.eval('asksForImages("picture this scenario")')===false
+     && w.eval('S.search.auto=true, asksForImages("send pics of rukia")')===true);
+}
+
 console.log('');
 console.log(fail?('FAILED '+fail):'ALL PASS','('+(pass+fail)+' checks)');
 process.exit(fail?1:0);
