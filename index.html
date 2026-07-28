@@ -248,6 +248,27 @@ button{background:none;border:0;cursor:pointer;padding:0}
 .tool-row.stopped{opacity:.55}
 @keyframes toolpulse{50%{opacity:.3}}
 
+/* agent approval cards (Hermes runs mode) */
+.appr-wrap{margin-bottom:10px;display:flex;flex-direction:column;gap:8px}
+.appr{
+  border:1px solid var(--border);border-left:3px solid var(--ember);
+  border-radius:var(--r);background:var(--bg-2);padding:10px 12px;
+}
+.appr-head{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:6px;
+}
+.appr-tool{opacity:.7;text-transform:none;letter-spacing:0}
+.appr-cmd{margin-bottom:8px;overflow-x:auto}
+.appr-cmd code{font-family:var(--mono);font-size:12.5px;white-space:pre-wrap;word-break:break-word;color:var(--text-2)}
+.appr-btns{display:flex;flex-wrap:wrap;gap:7px}
+.appr-btns button{
+  font-size:12.5px;padding:6px 12px;border:1px solid var(--border);
+  border-radius:8px;background:var(--bg);color:var(--text-2);
+}
+.appr-btns button:first-child{border-color:var(--ember);color:var(--ember)}
+.appr:not(.pending){opacity:.65;border-left-color:var(--border)}
+
 /* markdown */
 .msg-body p{margin:0 0 .85em}
 .msg-body p:last-child{margin-bottom:0}
@@ -1067,6 +1088,14 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
           <div class="hint">Hermes connections only. The stock server's browser allow-list rejects these headers, so leave this off unless yours allows them or a relay adds them.</div>
         </div>
         <div class="field">
+          <label class="lbl" for="pRuns">Hermes runs mode</label>
+          <select id="pRuns">
+            <option value="">Off — plain chat stream</option>
+            <option value="on">On — approval cards in the chat</option>
+          </select>
+          <div class="hint">Hermes connections only. Uses the agent's Runs API, so when a command needs permission you answer with a tap here instead of in the terminal. Messages with images fall back to the plain stream for that turn.</div>
+        </div>
+        <div class="field">
           <label class="lbl" for="pCtx">Context window (tokens)</label>
           <input type="number" id="pCtx" min="1000" step="1000" placeholder="200000">
           <div class="hint">Sets the scale of the ember bar above the message box.</div>
@@ -1435,10 +1464,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v5.5.0
+   COZY CHAT v5.6.0
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "5.5.0";
+const VERSION = "5.6.0";
 
 const PRESETS = {
   anthropic:  { name:"Claude",     kind:"anthropic", url:"https://api.anthropic.com/v1", model:"claude-sonnet-4-6", ctx:200000, hint:"e.g. claude-sonnet-4-6, claude-opus-4-5" },
@@ -1836,13 +1865,13 @@ function renderMarkdown(src){
    VARIANTS (swipes)
    ========================================================== */
 function variantsOf(m){
-  if (!m.variants || !m.variants.length) m.variants = [{ content:m.content||"", thinking:m.thinking||"", model:m.model, sources:m.sources, tools:m.tools }];
+  if (!m.variants || !m.variants.length) m.variants = [{ content:m.content||"", thinking:m.thinking||"", model:m.model, sources:m.sources, tools:m.tools, approvals:m.approvals }];
   if (m.vi == null || m.vi >= m.variants.length) m.vi = m.variants.length - 1;
   return m.variants;
 }
 function syncVariant(m){
   const v = variantsOf(m)[m.vi];
-  m.content = v.content; m.thinking = v.thinking; m.model = v.model; m.sources = v.sources; m.tools = v.tools;
+  m.content = v.content; m.thinking = v.thinking; m.model = v.model; m.sources = v.sources; m.tools = v.tools; m.approvals = v.approvals;
 }
 function lastAssistantIdx(){
   if (!current) return -1;
@@ -2158,6 +2187,25 @@ function toolLogHtml(list){
       + '<span class="tl-st">' + (st === "running" ? "\u2026" : st) + '</span></div>';
   }).join("") + '</div>';
 }
+const APPROVE_LABELS = { once:"Allow once", session:"This chat", always:"Always allow", deny:"Deny" };
+function approvalHtml(m){
+  if (!m.approvals || !m.approvals.length) return "";
+  return '<div class="appr-wrap">' + m.approvals.map(function(a){
+    const head = '<div class="appr-head">'
+      + (a.status === "pending" ? "The agent asks permission"
+        : a.status === "expired" ? "Permission — the run ended first"
+        : "Permission — " + escapeHtml(APPROVE_LABELS[a.status] || a.status))
+      + (a.tool ? ' <span class="appr-tool">· ' + escapeHtml(a.tool) + '</span>' : "") + '</div>';
+    const cmd = a.command ? '<div class="appr-cmd"><code>' + escapeHtml(a.command) + '</code></div>' : "";
+    const btns = a.status === "pending"
+      ? '<div class="appr-btns">' + a.choices.map(function(c){
+          return '<button' + (c === "deny" ? ' class="danger"' : "") + ' data-approve="' + m.id + '|' + a.id + '|' + c + '">'
+            + escapeHtml(APPROVE_LABELS[c] || c) + '</button>';
+        }).join("") + '</div>'
+      : "";
+    return '<div class="appr' + (a.status === "pending" ? " pending" : "") + '">' + head + cmd + btns + '</div>';
+  }).join("") + '</div>';
+}
 function msgHtml(m, isLastAssistant){
   const label = m.role === "user" ? "You" : (m.role === "error" ? "Couldn't send" : (m.model || "Assistant"));
   const think = (m.thinking && S.showThinking)
@@ -2183,7 +2231,7 @@ function msgHtml(m, isLastAssistant){
     : renderMarkdown(m.content);
   return '<div class="msg ' + m.role + '" data-mid="' + m.id + '">'
     + '<div class="msg-head"><span class="lbl">' + escapeHtml(label) + '</span>' + swipe + acts + '</div>'
-    + (S.showTools !== false ? toolLogHtml(m.tools) : "") + think + sourcesHtml(m.sources) + attsHtml(m.attachments)
+    + (S.showTools !== false ? toolLogHtml(m.tools) : "") + approvalHtml(m) + think + sourcesHtml(m.sources) + attsHtml(m.attachments)
     + '<div class="msg-body">' + body + '</div>'
     + editCardsHtml(m) + '</div>';
 }
@@ -2490,7 +2538,7 @@ async function send(userText, mode, forConvo){
   streaming = ctrl;
   setSending(true);
 
-  let painting = false, done = false, toolsRev = 0, paintedRev = -1;
+  let painting = false, done = false, toolsRev = 0, paintedRev = -1, apRev = 0, apPainted = -1;
   /* A paint scheduled on the last chunk can fire after the stream has
      finished and been finalized — overwriting the stripped, settled message
      with the raw text again. Once done, every queued frame bails. */
@@ -2537,6 +2585,17 @@ async function send(userText, mode, forConvo){
           node.parentNode.insertBefore(holder.firstChild, thinkEl || node);
         }
       }
+      if (asst.approvals && asst.approvals.length && apPainted !== apRev){
+        apPainted = apRev;
+        let aw = document.querySelector('[data-mid="' + asst.id + '"] .appr-wrap');
+        if (aw) aw.outerHTML = approvalHtml(asst);
+        else {
+          const holder = document.createElement("div");
+          holder.innerHTML = approvalHtml(asst);
+          const thinkEl = document.querySelector('[data-mid="' + asst.id + '"] .think');
+          node.parentNode.insertBefore(holder.firstChild, thinkEl || node);
+        }
+      }
       scrollDown(); updateEmber();
     });
   };
@@ -2544,6 +2603,87 @@ async function send(userText, mode, forConvo){
   repaintHook = paint;
   const sources = [];
   try {
+    /* Runs mode: the same conversation goes to the agent's Runs API instead
+       of the chat stream, because only that transport carries approval
+       requests back. Images can't ride a run, so a turn with any falls back
+       to the plain stream — approvals resume on the next text turn. */
+    let useRuns = false, asmR = null;
+    if (reasonStyle(p) === "hermes" && p.hermesRuns){
+      asmR = assembleMessages("openai", convo);
+      useRuns = !asmR.messages.some(function(m){ return typeof m.content !== "string"; });
+    }
+    if (useRuns){
+      const base = (p.proxy || p.url).replace(/\/+$/,"");
+      const hh = { "content-type":"application/json", "authorization":"Bearer " + p.apiKey };
+      const msgs = asmR.messages;
+      const lastM = msgs[msgs.length - 1];
+      const tailIsUser = !!(lastM && lastM.role === "user");
+      const cr = await fetch(base + "/runs", { method:"POST", headers:hh, signal:ctrl.signal,
+        body: JSON.stringify({
+          input: tailIsUser ? String(lastM.content) : "",
+          conversation_history: (tailIsUser ? msgs.slice(0, -1) : msgs).map(function(m){ return { role:m.role, content:String(m.content) }; }),
+          instructions: asmR.system || undefined,
+          session_id: "cozy-" + convo.id
+        }) });
+      if (!cr.ok){
+        let detail = "";
+        try { const j = await cr.json(); detail = (j.error && (j.error.message || j.error.type)) || JSON.stringify(j).slice(0,300); }
+        catch(_) { detail = (await cr.text().catch(function(){ return ""; })).slice(0,300); }
+        throw new Error(p.name + " said no (" + cr.status + ") to starting the run.\n\n" + (detail || "No details given."));
+      }
+      const rj = await cr.json();
+      const run = { id: rj.run_id, base: base, key: p.apiKey };
+      ctrl.run = run; ctrl.asstId = asst.id;
+      // stopping the stream must also stop the agent, or it keeps working unseen
+      ctrl.signal.addEventListener("abort", function(){
+        fetch(base + "/runs/" + run.id + "/stop", { method:"POST", headers:hh }).catch(function(){});
+      }, { once:true });
+      const res = await fetch(base + "/runs/" + run.id + "/events", { headers:hh, signal:ctrl.signal });
+      if (!res.ok) throw new Error(p.name + " said no (" + res.status + ") to the run stream.");
+      const reader = res.body.getReader(), dec = new TextDecoder();
+      let buf = "", finished = false;
+      while (!finished){
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        buf += dec.decode(chunk.value, { stream:true });
+        const parts = buf.split("\n\n"); buf = parts.pop();
+        for (const part of parts){
+          let evName = "";
+          const dataLines = [];
+          for (const line of part.split("\n")){
+            if (line.indexOf("event:") === 0) evName = line.slice(6).trim();
+            else if (line.indexOf("data:") === 0) dataLines.push(line.slice(5).replace(/^ /, ""));
+          }
+          if (!dataLines.length) continue;
+          const rawline = dataLines.join("\n").trim();
+          if (!rawline || rawline === "[DONE]") continue;
+          let d; try { d = JSON.parse(rawline); } catch(_) { continue; }
+          const ev = d.event || evName;
+          if (ev === "message.delta"){ raw += d.delta || ""; }
+          else if (ev === "reasoning.available"){ asst.thinking += d.text || ""; }
+          else if (ev === "tool.started"){
+            asst.tools = asst.tools || [];
+            asst.tools.push({ id:uid(), tool:d.tool || "", emoji:"", label:d.preview || d.tool || "tool", status:"running" });
+            toolsRev++;
+          } else if (ev === "tool.completed"){
+            const t = (asst.tools || []).filter(function(x){ return x.status === "running" && x.tool === d.tool; }).pop()
+                   || (asst.tools || []).filter(function(x){ return x.status === "running"; }).pop();
+            if (t){ t.status = "done"; toolsRev++; }
+          } else if (ev === "approval.request"){
+            asst.approvals = asst.approvals || [];
+            asst.approvals.push({ id:uid(), command:d.command || "", tool:d.tool || "",
+              choices:(Array.isArray(d.choices) && d.choices.length) ? d.choices : ["once","session","always","deny"],
+              status:"pending" });
+            apRev++;
+          } else if (ev === "run.completed" || ev === "run.cancelled"){ finished = true; }
+          else if (ev === "run.failed"){
+            throw new Error((d.error && (d.error.message || d.error)) || "The run failed");
+          }
+          paint();
+          if (finished) break;
+        }
+      }
+    } else {
     const req = buildPayload({ search: wantSearch }, convo);
     const res = await fetch(req.url, { method:"POST", headers:req.headers, body:JSON.stringify(req.body), signal:ctrl.signal });
     if (!res.ok){
@@ -2617,6 +2757,7 @@ async function send(userText, mode, forConvo){
         paint();
       }
     }
+    }
     done = true;
     const fin = splitReasoning(raw);
     asst.content = fin.text;
@@ -2646,9 +2787,10 @@ async function send(userText, mode, forConvo){
     if (streaming === ctrl){ streaming = null; setSending(false); }
     if (repaintHook === paint) repaintHook = null;
     if (asst) delete asst.pending;
+    if (asst && asst.approvals) for (const a of asst.approvals) if (a.status === "pending") a.status = "expired";
     if (asst && asst.role === "assistant"){
       asst.variants = asst.variants || [];
-      const snap = { content:asst.content, thinking:asst.thinking, model:asst.model, sources:asst.sources, tools:asst.tools };
+      const snap = { content:asst.content, thinking:asst.thinking, model:asst.model, sources:asst.sources, tools:asst.tools, approvals:asst.approvals };
       if (continuing && asst.variants.length) asst.variants[asst.vi] = snap;
       else { asst.variants.push(snap); asst.vi = asst.variants.length - 1; }
     }
@@ -2709,9 +2851,10 @@ function editProv(id){
     $("#pModel").value=p.model||""; $("#pCtx").value=p.ctx||128000; $("#pProxy").value=p.proxy||"";
     $("#pReason").value = p.reason || "auto";
     $("#pHdrs").value = p.hermesHeaders ? "on" : "";
+    $("#pRuns").value = p.hermesRuns ? "on" : "";
     $("#modelHint").textContent = PRESETS[preset].hint;
     fillModelList(p.models || []);
-  } else { applyPreset("anthropic"); $("#pReason").value = "auto"; $("#pHdrs").value = ""; fillModelList([]); }
+  } else { applyPreset("anthropic"); $("#pReason").value = "auto"; $("#pHdrs").value = ""; $("#pRuns").value = ""; fillModelList([]); }
   $("#delProvBtn").hidden = !p;
   $("#provEditor").hidden = false;
   if ($("#provEditor").scrollIntoView) $("#provEditor").scrollIntoView({ behavior:"smooth", block:"nearest" });
@@ -2730,7 +2873,7 @@ function saveProv(){
     name:$("#pName").value.trim()||PRESETS[preset].name, url:$("#pUrl").value.trim(),
     apiKey:$("#pKey").value.trim(), model:$("#pModel").value.trim(),
     ctx:Number($("#pCtx").value)||128000, proxy:$("#pProxy").value.trim(),
-    reason:$("#pReason").value, hermesHeaders:$("#pHdrs").value === "on", models:(editingProv && (S.providers.find(x=>x.id===editingProv)||{}).models) || [] };
+    reason:$("#pReason").value, hermesHeaders:$("#pHdrs").value === "on", hermesRuns:$("#pRuns").value === "on", models:(editingProv && (S.providers.find(x=>x.id===editingProv)||{}).models) || [] };
   if (!data.url){ toast("Address can't be empty"); return; }
   const i = S.providers.findIndex(p=>p.id===data.id);
   if (i>=0) S.providers[i]=data; else S.providers.push(data);
@@ -3118,6 +3261,27 @@ on("#convoList", "click", async function(e){
 
 on("#threadInner", "click", async function(e){
   if (e.target.closest("[data-open-settings]")){ openSettings(); return; }
+  const av = e.target.closest("[data-approve]");
+  if (av){
+    const parts = av.dataset.approve.split("|");
+    const m = current && current.messages.find(function(x){ return x.id === parts[0]; });
+    const a = m && m.approvals && m.approvals.find(function(x){ return x.id === parts[1]; });
+    if (!m || !a || a.status !== "pending") return;
+    if (!streaming || !streaming.run || streaming.asstId !== m.id){
+      a.status = "expired"; renderThread(); await persist();
+      toast("That run already ended"); return;
+    }
+    const run = streaming.run;
+    try {
+      const r = await fetch(run.base + "/runs/" + run.id + "/approval", { method:"POST",
+        headers:{ "content-type":"application/json", "authorization":"Bearer " + run.key },
+        body: JSON.stringify({ choice: parts[2] }) });
+      if (!r.ok) throw new Error("the server said " + r.status);
+      a.status = parts[2];
+      renderThread(); await persist();
+    } catch(err){ toast("Couldn't send the answer — " + String(err.message || err)); }
+    return;
+  }
   const st = e.target.closest("[data-starter]");
   if (st){ input.value = st.dataset.starter; autoGrow(); input.focus(); $("#sendBtn").disabled = false; return; }
   const cc = e.target.closest("[data-copycode]");

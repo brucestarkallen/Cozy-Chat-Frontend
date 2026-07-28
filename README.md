@@ -239,14 +239,19 @@ What you get in the chat:
   one sandbox) with no setup.
 - **Show or hide it.** Settings → Chat → *Show tool activity*. Hidden still
   records — flip it back on and past activity reappears.
-- **Approvals.** Hermes gates dangerous commands behind an approval prompt
-  that only its Runs API can answer — the plain chat stream Cozy uses can't,
-  so a gated command will sit waiting. If you want the agent free to act from
-  here, set `HERMES_YOLO_MODE=1` in `~/.hermes/.env` (Hermes' hardline
-  destructive-command floor still applies and cannot be bypassed), or
-  pre-approve specific commands with "always" once from the Hermes CLI.
-  A proper approval card in Cozy means speaking the Runs API — on the list,
-  not built yet.
+- **Approvals, answered in the chat.** Turn on **Hermes runs mode** on the
+  connection (edit it → *Hermes runs mode*). Sends then travel the agent's
+  Runs API, and when a command needs permission a card appears right in the
+  stream — the exact command, and the choices the server offers: **Allow
+  once**, **This chat**, **Always allow**, **Deny**. Tap one and the run
+  carries on; no terminal. Stopping the stream also stops the agent
+  server-side. A card left unanswered when its run ends is marked expired,
+  never left with live-looking buttons. One limit: a message carrying an
+  image falls back to the plain stream for that turn (runs don't take
+  images), so approvals resume on the next text message. Runs mode needs a
+  Hermes build with the Runs API; leave it off for the plain stream, or set
+  `HERMES_YOLO_MODE=1` server-side if you'd rather skip approvals entirely
+  (the hardline destructive-command floor still applies either way).
 - **Search links.** Hermes doesn't put result URLs on the wire — the activity
   row shows *what* was searched. Links appear when the agent cites them in
   its reply, where they're tappable like any other link.
@@ -332,7 +337,7 @@ network-first, so a refresh always gets the newest version.
 `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`, `swtest.js`,
 `scrolltest.js`, `styletest.js`, `hiddentest.js`, `coherencetest.js` and
 `installtest.sh` — runs under Node with jsdom (`npm i jsdom fake-indexeddb`).
-809 checks across the matching engine, JSON tolerance, prompt assembly,
+832 checks across the matching engine, JSON tolerance, prompt assembly,
 projects, retrieval, streaming, SSE framing and Hermes tool activity,
 stream/chat binding, touch reorder, reader-owned scrolling, backup
 round-trips, migration, and negative tests that deliberately reintroduce
