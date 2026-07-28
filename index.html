@@ -231,6 +231,23 @@ button{background:none;border:0;cursor:pointer;padding:0}
   white-space:pre-wrap;line-height:1.6;max-height:340px;overflow-y:auto;
 }
 
+/* agent tool activity (Hermes) */
+.tool-log{
+  margin-bottom:10px;border:1px dashed var(--border);border-radius:var(--r);
+  background:var(--bg-2);padding:7px 12px;display:flex;flex-direction:column;gap:4px;
+}
+.tool-row{
+  font-family:var(--mono);font-size:11px;color:var(--muted);
+  display:flex;align-items:baseline;gap:7px;min-width:0;
+}
+.tool-row .tl-dot{flex:none}
+.tool-row .tl-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.tool-row .tl-st{flex:none;font-size:10px;letter-spacing:.06em;text-transform:uppercase;opacity:.7}
+.tool-row.running .tl-label{color:var(--text-2)}
+.tool-row.running .tl-dot{animation:toolpulse 1.1s ease-in-out infinite}
+.tool-row.stopped{opacity:.55}
+@keyframes toolpulse{50%{opacity:.3}}
+
 /* markdown */
 .msg-body p{margin:0 0 .85em}
 .msg-body p:last-child{margin-bottom:0}
@@ -987,6 +1004,7 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
             <option value="zai">Z.ai (GLM)</option>
             <option value="google">Google Gemini</option>
             <option value="deepseek">DeepSeek</option>
+            <option value="hermes">Hermes Agent (local)</option>
             <option value="custom">Custom — anything OpenAI-compatible</option>
           </select>
           <div class="hint">Pick "Custom" for NeuralWatt, Wafer, or any endpoint that speaks the OpenAI format.</div>
@@ -1025,9 +1043,18 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
             <option value="zai">GLM / Z.ai — thinking: enabled</option>
             <option value="qwen">Qwen — enable_thinking</option>
             <option value="openrouter">OpenRouter — reasoning object</option>
+            <option value="hermes">Hermes agent — reasoning object</option>
             <option value="none">Don't send anything</option>
           </select>
           <div class="hint">Every service spells this differently. Leave it on the first option unless thinking doesn't turn on.</div>
+        </div>
+        <div class="field">
+          <label class="lbl" for="pHdrs">Hermes session headers</label>
+          <select id="pHdrs">
+            <option value="">Off — Hermes derives the session from the conversation</option>
+            <option value="on">On — send X-Hermes-Session-Id and -Key</option>
+          </select>
+          <div class="hint">Hermes connections only. The stock server's browser allow-list rejects these headers, so leave this off unless yours allows them or a relay adds them.</div>
         </div>
         <div class="field">
           <label class="lbl" for="pCtx">Context window (tokens)</label>
@@ -1333,10 +1360,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v5.2.3
+   COZY CHAT v5.3.0
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "5.2.3";
+const VERSION = "5.3.0";
 
 const PRESETS = {
   anthropic:  { name:"Claude",     kind:"anthropic", url:"https://api.anthropic.com/v1", model:"claude-sonnet-4-6", ctx:200000, hint:"e.g. claude-sonnet-4-6, claude-opus-4-5" },
@@ -1345,6 +1372,7 @@ const PRESETS = {
   zai:        { name:"Z.ai GLM",   kind:"openai",    url:"https://api.z.ai/api/paas/v4", model:"glm-4.6",          ctx:200000, hint:"e.g. glm-4.6, glm-4.5-air" },
   google:     { name:"Gemini",     kind:"openai",    url:"https://generativelanguage.googleapis.com/v1beta/openai", model:"gemini-2.5-pro", ctx:1000000, hint:"e.g. gemini-2.5-pro, gemini-2.5-flash" },
   deepseek:   { name:"DeepSeek",   kind:"openai",    url:"https://api.deepseek.com/v1",  model:"deepseek-chat",    ctx:128000, hint:"e.g. deepseek-chat, deepseek-reasoner" },
+  hermes:     { name:"Hermes Agent", kind:"openai",   url:"http://127.0.0.1:8642/v1",     model:"hermes-agent",     ctx:200000, hint:"hermes-agent — or a profile's name" },
   custom:     { name:"Custom",     kind:"openai",    url:"",                             model:"",                 ctx:128000, hint:"Whatever the endpoint calls it" }
 };
 
@@ -1372,6 +1400,7 @@ function reasonStyle(p){
   if (s !== "auto") return s;
   const m = (p.model || "").toLowerCase();
   if (p.kind === "anthropic") return "anthropic";
+  if (p.preset === "hermes" || m === "hermes-agent") return "hermes";
   if (p.preset === "openrouter") return "openrouter";
   if (p.preset === "zai" || /\bglm\b|^glm|glm-/.test(m)) return "zai";
   if (/qwen/.test(m)) return "qwen";
@@ -1385,6 +1414,7 @@ const EFFORT_HINTS = {
   zai: "Sends thinking: enabled/disabled, plus an effort level above Low.",
   qwen: "Sends enable_thinking.",
   openrouter: "Sends a reasoning object with an effort level.",
+  hermes: "Sends a reasoning object the Hermes agent understands. Off sends nothing — the agent decides for itself.",
   none: "Nothing extra is sent — the model decides on its own."
 };
 function applyReasoning(body, p, c){
@@ -1403,6 +1433,11 @@ function applyReasoning(body, p, c){
     const max = chatMaxTok();
     body.thinking = { type:"enabled", budget_tokens: Math.max(1024, Math.min(budget, max - 512)) };
     if (body.max_tokens <= body.thinking.budget_tokens) body.max_tokens = body.thinking.budget_tokens + 1024;
+    return;
+  }
+  if (style === "hermes"){
+    if (eff === "off") return;                       // omit → the agent decides
+    body.model_options = Object.assign({}, body.model_options, { reasoning: { enabled:true, effort:eff } });
     return;
   }
   if (style === "zai"){
@@ -1725,13 +1760,13 @@ function renderMarkdown(src){
    VARIANTS (swipes)
    ========================================================== */
 function variantsOf(m){
-  if (!m.variants || !m.variants.length) m.variants = [{ content:m.content||"", thinking:m.thinking||"", model:m.model, sources:m.sources }];
+  if (!m.variants || !m.variants.length) m.variants = [{ content:m.content||"", thinking:m.thinking||"", model:m.model, sources:m.sources, tools:m.tools }];
   if (m.vi == null || m.vi >= m.variants.length) m.vi = m.variants.length - 1;
   return m.variants;
 }
 function syncVariant(m){
   const v = variantsOf(m)[m.vi];
-  m.content = v.content; m.thinking = v.thinking; m.model = v.model; m.sources = v.sources;
+  m.content = v.content; m.thinking = v.thinking; m.model = v.model; m.sources = v.sources; m.tools = v.tools;
 }
 function lastAssistantIdx(){
   if (!current) return -1;
@@ -1941,6 +1976,16 @@ function sourcesHtml(list){
       + (s.snippet ? '<div class="snip">' + escapeHtml(s.snippet) + '</div>' : "") + '</div>').join("")
     + '</div></details>';
 }
+function toolLogHtml(list){
+  if (!list || !list.length) return "";
+  return '<div class="tool-log">' + list.map(function(t){
+    const st = t.status === "running" ? "running" : (t.status === "stopped" ? "stopped" : "done");
+    return '<div class="tool-row ' + st + '">'
+      + '<span class="tl-dot">' + escapeHtml(t.emoji || "\u2699") + '</span>'
+      + '<span class="tl-label">' + escapeHtml(t.label || t.tool || "tool") + '</span>'
+      + '<span class="tl-st">' + (st === "running" ? "\u2026" : st) + '</span></div>';
+  }).join("") + '</div>';
+}
 function msgHtml(m, isLastAssistant){
   const label = m.role === "user" ? "You" : (m.role === "error" ? "Couldn't send" : (m.model || "Assistant"));
   const think = (m.thinking && S.showThinking)
@@ -1966,7 +2011,7 @@ function msgHtml(m, isLastAssistant){
     : renderMarkdown(m.content);
   return '<div class="msg ' + m.role + '" data-mid="' + m.id + '">'
     + '<div class="msg-head"><span class="lbl">' + escapeHtml(label) + '</span>' + swipe + acts + '</div>'
-    + think + sourcesHtml(m.sources) + attsHtml(m.attachments)
+    + toolLogHtml(m.tools) + think + sourcesHtml(m.sources) + attsHtml(m.attachments)
     + '<div class="msg-body">' + body + '</div>'
     + editCardsHtml(m) + '</div>';
 }
@@ -2137,9 +2182,21 @@ function buildPayload(opts, c){
     messages: asm.system ? [{ role:"system", content:asm.system }].concat(asm.messages) : asm.messages
   };
   applyReasoning(body, p, c);
+  const headers = { "content-type":"application/json", "authorization":"Bearer " + p.apiKey };
+  /* Hermes already keeps one agent session per conversation by hashing the
+     system prompt and first user message, so continuity needs no headers.
+     The explicit headers pin identity through edits and give long-term
+     memory a stable scope — but the stock server's browser allow-list
+     rejects them in preflight, so they are opt-in for patched servers
+     and relays. */
+  if (reasonStyle(p) === "hermes" && p.hermesHeaders){
+    if (!S.hermesKey){ S.hermesKey = "cozy-" + uid(); saveSettings(); }
+    if (c && c.id) headers["X-Hermes-Session-Id"] = "cozy-" + c.id;
+    headers["X-Hermes-Session-Key"] = S.hermesKey;
+  }
   return {
     url: (p.proxy || p.url).replace(/\/+$/,"") + "/chat/completions",
-    headers: { "content-type":"application/json", "authorization":"Bearer " + p.apiKey },
+    headers: headers,
     body: body
   };
 }
@@ -2249,7 +2306,7 @@ async function send(userText, mode, forConvo){
   streaming = ctrl;
   setSending(true);
 
-  let painting = false, done = false;
+  let painting = false, done = false, toolsRev = 0, paintedRev = -1;
   /* A paint scheduled on the last chunk can fire after the stream has
      finished and been finalized — overwriting the stripped, settled message
      with the raw text again. Once done, every queued frame bails. */
@@ -2285,6 +2342,17 @@ async function send(userText, mode, forConvo){
         }
         tw.textContent = asst.thinking; stickScroll(tw);
       }
+      if (asst.tools && asst.tools.length && paintedRev !== toolsRev){
+        paintedRev = toolsRev;
+        let tl = document.querySelector('[data-mid="' + asst.id + '"] .tool-log');
+        if (tl) tl.outerHTML = toolLogHtml(asst.tools);
+        else {
+          const holder = document.createElement("div");
+          holder.innerHTML = toolLogHtml(asst.tools);
+          const thinkEl = document.querySelector('[data-mid="' + asst.id + '"] .think');
+          node.parentNode.insertBefore(holder.firstChild, thinkEl || node);
+        }
+      }
       scrollDown(); updateEmber();
     });
   };
@@ -2309,31 +2377,60 @@ async function send(userText, mode, forConvo){
       buf += dec.decode(chunk.value, { stream:true });
       const parts = buf.split("\n\n"); buf = parts.pop();
       for (const part of parts){
+        /* One SSE frame: an optional event name plus one or more data lines,
+           which the spec joins with newlines into a single payload. Parsing
+           each data line on its own would shred a payload the server split
+           across lines, and threw away the event name Hermes uses to mark
+           tool activity. */
+        let evName = "";
+        const dataLines = [];
         for (const line of part.split("\n")){
-          if (line.indexOf("data:") !== 0) continue;
-          const rawline = line.slice(5).trim();
-          if (!rawline || rawline === "[DONE]") continue;
-          let d; try { d = JSON.parse(rawline); } catch(_) { continue; }
-
-          if (d.type === "content_block_start" && d.content_block){
-            if (d.content_block.type === "server_tool_use") toast("Searching the web…");
-            if (d.content_block.type === "web_search_tool_result"){
-              const rs = d.content_block.content || [];
-              for (const r of rs) if (r.url) sources.push({ title:r.title || r.url, url:r.url, snippet:"" });
-            }
-          } else if (d.type === "content_block_delta" && d.delta){
-            if (d.delta.type === "text_delta")     raw += d.delta.text || "";
-            if (d.delta.type === "thinking_delta") asst.thinking += d.delta.thinking || "";
-          } else if (d.choices && d.choices[0]){
-            const dl = d.choices[0].delta || {};
-            if (dl.content)           raw += dl.content;
-            if (dl.reasoning_content) asst.thinking += dl.reasoning_content;
-            if (dl.reasoning)         asst.thinking += dl.reasoning;
-          } else if (d.type === "error"){
-            throw new Error((d.error && d.error.message) || "Stream error");
-          }
-          paint();
+          if (line.indexOf("event:") === 0) evName = line.slice(6).trim();
+          else if (line.indexOf("data:") === 0) dataLines.push(line.slice(5).replace(/^ /, ""));
         }
+        if (!dataLines.length) continue;
+        const rawline = dataLines.join("\n").trim();
+        if (!rawline || rawline === "[DONE]") continue;
+        let d; try { d = JSON.parse(rawline); } catch(_) { continue; }
+
+        if (evName === "hermes.tool.progress"){
+          /* The agent narrates its tool use out of band, one running event
+             and one completed event per call, correlated by toolCallId —
+             shown live and kept on the message, never mixed into its text. */
+          if (d && d.toolCallId){
+            asst.tools = asst.tools || [];
+            const ex = asst.tools.find(function(t){ return t.id === d.toolCallId; });
+            if (d.status === "completed"){ if (ex) ex.status = "done"; }
+            else if (!ex) asst.tools.push({ id:d.toolCallId, tool:d.tool || "", emoji:d.emoji || "", label:d.label || d.tool || "tool", status:"running" });
+            toolsRev++; paint();
+          }
+          continue;
+        }
+
+        if (d.type === "content_block_start" && d.content_block){
+          if (d.content_block.type === "server_tool_use") toast("Searching the web…");
+          if (d.content_block.type === "web_search_tool_result"){
+            /* On failure this is an error object, not a list — iterating it
+               threw and turned the whole reply into an error. */
+            const rs = Array.isArray(d.content_block.content) ? d.content_block.content : [];
+            for (const r of rs) if (r.url) sources.push({ title:r.title || r.url, url:r.url, snippet:"" });
+          }
+        } else if (d.type === "content_block_delta" && d.delta){
+          if (d.delta.type === "text_delta")     raw += d.delta.text || "";
+          if (d.delta.type === "thinking_delta") asst.thinking += d.delta.thinking || "";
+        } else if (d.choices && d.choices[0]){
+          const dl = d.choices[0].delta || {};
+          if (dl.content)           raw += dl.content;
+          if (dl.reasoning_content) asst.thinking += dl.reasoning_content;
+          if (dl.reasoning)         asst.thinking += dl.reasoning;
+        } else if (d.type === "error"){
+          throw new Error((d.error && d.error.message) || "Stream error");
+        } else if (d.error){
+          /* OpenAI-compatible services report mid-stream failures as a bare
+             error object; swallowing it left the reply looking merely short. */
+          throw new Error(d.error.message || d.error.type || "Stream error");
+        }
+        paint();
       }
     }
     done = true;
@@ -2341,6 +2438,7 @@ async function send(userText, mode, forConvo){
     asst.content = fin.text;
     if (fin.think) asst.thinking = fin.think;
     if (sources.length) asst.sources = sources;
+    if (asst.tools) for (const t of asst.tools) if (t.status === "running") t.status = "done";
     if (chatDocIds(convo).length || convo.filesOn){
       const pd = parseDocEdits(asst.content);
       if (pd.edits.length){ asst.edits = pd.edits; asst.content = stripDocEdits(asst.content); }
@@ -2353,6 +2451,7 @@ async function send(userText, mode, forConvo){
     if (err.name === "AbortError"){
       const fin = splitReasoning(raw);
       asst.content = fin.text; if (fin.think) asst.thinking = fin.think;
+      if (asst.tools) for (const t of asst.tools) if (t.status === "running") t.status = "stopped";
       if (!asst.content && !asst.thinking) asst.content = "_(stopped)_";
     } else {
       if (!continuing) convo.messages = convo.messages.filter(m => m.id !== asst.id);
@@ -2365,7 +2464,7 @@ async function send(userText, mode, forConvo){
     if (asst) delete asst.pending;
     if (asst && asst.role === "assistant"){
       asst.variants = asst.variants || [];
-      const snap = { content:asst.content, thinking:asst.thinking, model:asst.model, sources:asst.sources };
+      const snap = { content:asst.content, thinking:asst.thinking, model:asst.model, sources:asst.sources, tools:asst.tools };
       if (continuing && asst.variants.length) asst.variants[asst.vi] = snap;
       else { asst.variants.push(snap); asst.vi = asst.variants.length - 1; }
     }
@@ -2425,9 +2524,10 @@ function editProv(id){
     $("#pName").value=p.name; $("#pUrl").value=p.url; $("#pKey").value=p.apiKey||"";
     $("#pModel").value=p.model||""; $("#pCtx").value=p.ctx||128000; $("#pProxy").value=p.proxy||"";
     $("#pReason").value = p.reason || "auto";
+    $("#pHdrs").value = p.hermesHeaders ? "on" : "";
     $("#modelHint").textContent = PRESETS[preset].hint;
     fillModelList(p.models || []);
-  } else { applyPreset("anthropic"); $("#pReason").value = "auto"; fillModelList([]); }
+  } else { applyPreset("anthropic"); $("#pReason").value = "auto"; $("#pHdrs").value = ""; fillModelList([]); }
   $("#delProvBtn").hidden = !p;
   $("#provEditor").hidden = false;
   if ($("#provEditor").scrollIntoView) $("#provEditor").scrollIntoView({ behavior:"smooth", block:"nearest" });
@@ -2446,7 +2546,7 @@ function saveProv(){
     name:$("#pName").value.trim()||PRESETS[preset].name, url:$("#pUrl").value.trim(),
     apiKey:$("#pKey").value.trim(), model:$("#pModel").value.trim(),
     ctx:Number($("#pCtx").value)||128000, proxy:$("#pProxy").value.trim(),
-    reason:$("#pReason").value, models:(editingProv && (S.providers.find(x=>x.id===editingProv)||{}).models) || [] };
+    reason:$("#pReason").value, hermesHeaders:$("#pHdrs").value === "on", models:(editingProv && (S.providers.find(x=>x.id===editingProv)||{}).models) || [] };
   if (!data.url){ toast("Address can't be empty"); return; }
   const i = S.providers.findIndex(p=>p.id===data.id);
   if (i>=0) S.providers[i]=data; else S.providers.push(data);

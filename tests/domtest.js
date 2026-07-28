@@ -31,7 +31,11 @@ setTimeout(()=>{
     ['ember bar', !!d.querySelector('#emberFill')],
     ['ctx label filled', d.querySelector('#ctxLabel').textContent.includes('tokens')],
     ['settings modal', !!d.querySelector('#settingsModal')],
-    ['presets in select', d.querySelectorAll('#pPreset option').length===7],
+    ['presets in select', (function(){
+      const opts=Array.from(d.querySelectorAll('#pPreset option')).map(o=>o.value).sort();
+      const keys=Object.keys(dom.window.eval('PRESETS')).sort();
+      return opts.length===keys.length && opts.every((v,i)=>v===keys[i]);
+    })()],
     ['every tab has a matching pane', (()=>{
         const tabs=[...d.querySelectorAll('.tab')].map(t=>t.dataset.tab);
         const panes=[...d.querySelectorAll('[data-panel]')].map(p=>p.dataset.panel);

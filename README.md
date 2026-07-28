@@ -38,8 +38,8 @@ Pick one as your main, or move everything across with **Back up** / **Restore**.
 ## Setting up a connection
 
 Gear icon → **Add a connection**. Presets fill in the address for you:
-Claude, OpenAI, OpenRouter, Z.ai, Gemini, DeepSeek. For **NeuralWatt** or
-**Wafer**, choose **Custom** and paste their base URL.
+Claude, OpenAI, OpenRouter, Z.ai, Gemini, DeepSeek, Hermes Agent. For
+**NeuralWatt** or **Wafer**, choose **Custom** and paste their base URL.
 
 Tap **Test** before saving.
 
@@ -177,6 +177,50 @@ assistant turn is never merged.
 Google's Programmable Search (the one TypingMind used) is closed to new signups
 and shuts down 1 Jan 2027, so it isn't offered here.
 
+**Hermes Agent** (a whole agent as your backend)
+
+[Hermes Agent](https://hermes-agent.nousresearch.com/) exposes itself as an
+OpenAI-compatible endpoint, which turns Cozy Chat into a frontend for a full
+agent — terminal, files, web search, browser, memory, skills — including one
+running your Claude Max subscription. Pick the **Hermes Agent** preset; the
+address is already the API server's default, `http://127.0.0.1:8642/v1`, and
+the key is whatever you set as `API_SERVER_KEY`.
+
+On the Hermes side, in `~/.hermes/.env`:
+
+```
+API_SERVER_ENABLED=true
+API_SERVER_KEY=pick-something
+API_SERVER_CORS_ORIGINS=http://localhost:8080,http://127.0.0.1:8080
+```
+
+then `hermes gateway`. The CORS line matters: Cozy Chat calls Hermes straight
+from the browser, and the two run on different ports, so Hermes must allow
+Cozy's origin (add your port if you changed `COZY_PORT`). This only works from
+the **local** copy — a page served over https, like the github.io version,
+is not allowed to call a plain-http localhost server, and the browser blocks
+it before Hermes ever sees the request.
+
+What you get in the chat:
+
+- **Live tool activity.** While the agent works, each tool call appears as a
+  row above the reply — running with a pulse, then settled — and stays on the
+  message afterwards, so you can see what a reply cost in actions, not just
+  read its text. Stopping mid-tool marks the unfinished call *stopped* rather
+  than leaving it spinning.
+- **Reasoning control.** The same Off / Low / Medium / High switch every other
+  service uses, sent in the shape the Hermes agent understands. Off sends
+  nothing, so the agent's own configuration decides.
+- **Session continuity, free.** Hermes recognises a conversation by its system
+  prompt and first message, so every Cozy chat maps to one agent session (and
+  one sandbox) with no setup.
+- **Session headers, opt-in.** Each connection has a *Hermes session headers*
+  switch that sends `X-Hermes-Session-Id` (pinned to the chat, survives
+  editing the first message) and a stable `X-Hermes-Session-Key` for long-term
+  memory scoping. It's off by default because the stock server's browser
+  allow-list rejects those headers in preflight — turn it on only if your
+  Hermes build allows them, or you route through a relay that does.
+
 **Look**
 Six themes: Hearth, Parchment, Cyber, Normandy, Terminal, Dusk.
 Settings → App, or tap the moon icon to cycle.
@@ -243,6 +287,7 @@ network-first, so a refresh always gets the newest version.
 | `loadModels()` | Fetches the model dropdown from `/models` |
 | `connLabel()` | Shows the model once instead of connection name + model |
 | `runSearch()` | Web search calls per service |
+| `toolLogHtml()` | The agent tool-activity log on a message |
 | `renderMarkdown()` | Markdown → HTML |
 | `send()` | Sends and reads the streaming reply |
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
@@ -251,8 +296,9 @@ network-first, so a refresh always gets the newest version.
 `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`, `swtest.js`,
 `scrolltest.js`, `styletest.js`, `hiddentest.js`, `coherencetest.js` and
 `installtest.sh` — runs under Node with jsdom (`npm i jsdom fake-indexeddb`).
-723 checks across the matching engine, JSON tolerance, prompt assembly,
-streaming, stream/chat binding, touch reorder, reader-owned scrolling, backup round-trips, migration, and negative
+755 checks across the matching engine, JSON tolerance, prompt assembly,
+streaming, SSE framing and Hermes tool activity, stream/chat binding, touch
+reorder, reader-owned scrolling, backup round-trips, migration, and negative
 tests that deliberately reintroduce fixed bugs to prove the guards fire.
 
 ---

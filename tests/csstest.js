@@ -101,7 +101,7 @@ console.log('\n=== 2. THE SCREENSHOT BUG: TEXT AND NAME HIT THE EDGE ===');
 ck('message keeps a side gutter',cs(ai).paddingLeft==='16px'&&cs(ai).paddingRight==='16px',cs(ai).paddingLeft+' / '+cs(ai).paddingRight);
 ck('name row not pushed outside',cs(ai.querySelector('.ch_name')).marginLeft==='0px',cs(ai.querySelector('.ch_name')).marginLeft);
 ck('no max-width on the name row',['none',''].includes(cs(ai.querySelector('.ch_name')).maxWidth),cs(ai.querySelector('.ch_name')).maxWidth);
-ck('measure on the message, centred',cs(ai).maxWidth==='46rem'&&cs(ai).marginLeft==='auto',cs(ai).maxWidth+' m:'+cs(ai).marginLeft);
+ck('measure on the message, centred',(cs(ai).maxWidth==='46rem'||cs(ai).maxWidth==='736px')&&cs(ai).marginLeft==='auto',cs(ai).maxWidth+' m:'+cs(ai).marginLeft);
 ck('inner block no longer indents for a hidden avatar',cs(ai.querySelector('.mes_block')).paddingLeft==='0px',cs(ai.querySelector('.mes_block')).paddingLeft);
 
 console.log('\n=== 3. THE THEME CARD IS GONE ===');
