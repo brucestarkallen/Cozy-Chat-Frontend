@@ -10,7 +10,7 @@ const base=(o={})=>Object.assign({
   activeProvider:'p1',presets:[{id:'default',name:'Default',system:'',injections:[]}],activePreset:'default',
   prompts:[],temperature:1,maxTokens:100,showThinking:true,catchThinkTags:true,
   thinkTags:'think, thinking, reasoning, thought',enterSends:false,autoTitle:true,theme:'dark',
-  search:{on:false,provider:'native',key:'',count:5,relay:'',always:false}},o);
+  search:{on:false,provider:'native',key:'',count:5,relay:'',always:false},seeded513:true},o);
 function boot(settings,fetchImpl){
   return new Promise(res=>{
     const dom=new JSDOM(html,{runScripts:'dangerously',pretendToBeVisual:true,url:'https://x.com/',

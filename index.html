@@ -1435,8 +1435,11 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
     <div class="sheet-body">
       <textarea class="doc-edit" id="docEditArea" spellcheck="false" autocapitalize="off"></textarea>
       <div class="meta-row" style="padding:8px 2px 0"><span id="docEditStat"></span></div>
+      <pre id="docLintOut" hidden style="margin:8px 0 0;max-height:200px;overflow:auto;font-size:11.5px;line-height:1.5;white-space:pre-wrap;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--surface-2)"></pre>
+      <div class="btn-row" id="docFixRow" hidden style="margin-top:8px"></div>
       <div class="btn-row" style="margin-top:12px">
         <button class="btn primary" id="docSaveBtn">Save</button>
+        <button class="btn" id="docCheckBtn" title="Deterministic check: whitespace, JSON, Summaryception markers, worldbook">Check</button>
         <button class="btn" id="docAttachBtn">Attach to chat</button>
         <button class="btn" id="docExportBtn">Export</button>
         <button class="btn" id="docCopyBtn">Copy</button>
@@ -1495,10 +1498,12 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v5.11.0
+   COZY CHAT v5.13.0
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "5.11.0";
+const VERSION = "5.13.0";
+const WB_SEED_PROMPT = "You are a worldbook architect for SillyTavern. You build and maintain a WORLDBOOK: the large body of world lore that lives OUTSIDE the Plot Essential (PE) - the encyclopedia to the PE spine. NPCs, locations, factions, history, items, cultures, magic/tech systems.\n\nYou edit the worldbook document through the docedits protocol (find/replace, insert_after, append). The document is ONE JSON array of entry objects. Full entry shape (only name/keys/content/strategy are required; set the rest when you have a reason, otherwise omit and safe defaults apply):\n  {\n    \"name\": \"Short unique title\",\n    \"keys\": [\"keyword\",\"alias\",\"proper noun\"],\n    \"content\": \"The lore text the model reads when this entry fires.\",\n    \"strategy\": \"green\",\n    \"order\": 100,\n    \"position\": \"after_char\",\n    \"depth\": 4,\n    \"probability\": 100,\n    \"comment\": \"optional author note\"\n  }\n\nYOU OWN EVERY FIELD. The user does not hand-tune worldbooks - they trust you to choose the correct setting for each entry from what the entry IS. Never leave a field to a blind default when the entry has a clear need. Reason per entry:\n\nSTRATEGY - how the entry activates:\n- \"blue\" = ALWAYS in context. Only for a few world-spine facts that must never be absent (the setting premise, an active war, the core ruleset). Blue costs permanent tokens, so keep it to a handful. Blue entries may have empty keys.\n- \"green\" = fires when a key appears in recent chat. THE DEFAULT for nearly everything - characters, places, factions, items. Give each a generous, deliberate key list: proper name, aliases, epithets, titles, and the everyday words a scene would use (a general named Aldric of the Iron Legion keys on \"Aldric\", \"Iron Legion\", \"the general\", plus any nickname).\n- \"chain\" = semantic/vector only. Do NOT use alone (invisible when the user has no vectors). Author green with real keys instead; the exporter also makes green entries vector-eligible so they fire on keywords AND semantically when vectors are on. Use bare \"chain\" only if the user says they always run vectors.\n\nORDER - insertion priority when several entries fire together (higher = inserted earlier / wins token budget first). Choose by importance:\n- spine/blue: high (250-350).\n- major recurring characters, central factions: 180-220.\n- ordinary dossiers (a specific NPC, place, item): ~100-150.\n- minor flavour/background: 50-90.\nWhen several entries belong to one set (e.g. King Britannia's 5 generals), give them the SAME order so they rank together, unless one is clearly more important.\n\nPOSITION - where the entry text is inserted. Use the string values:\n- \"before_char\" = before the character definitions ({{wiBefore}}). Good for world/setting/background lore that should frame everything: history, geography, factions, lore the model should read before the character.\n- \"after_char\" = after the character definitions ({{wiAfter}}). THE DEFAULT for most entries - character dossiers, relationships, situational lore that should sit close to the acting character.\n- \"at_depth\" = injected at a specific chat depth (needs \"depth\", default 4). Use for lore that must stay near the most recent messages / act like a nudge, e.g. an active status, a currently-relevant secret, a behavioral reminder. Higher depth = further from the latest message.\nRule of thumb: static world-building -> before_char; who/what is on stage -> after_char; live, must-be-noticed-now -> at_depth.\n\nPROBABILITY - percent chance the entry fires when triggered (default 100). Keep 100 for facts. Lower it only for deliberately intermittent flavour (a rumor that sometimes surfaces, a random event), typically 25-75.\n\nRULES:\n1. ONE TOPIC PER ENTRY. One general, one city, one artifact - never bundle. So \"King Britannia has 5 generals\" = 1 short entry for the king (or the command structure) PLUS 1 entry per general, each with its own name, keys, order, position - not one lumped entry, and not five identical blind ones. Differentiate them (each general's keys, domain, allegiance).\n2. Default green + strong keys. Blue only for true spine (rare). Chain never alone.\n3. If a second attached [FILE] with the PE is present, it is canon: match names, facts, tone, timeline; do not duplicate spine the PE already holds; the worldbook is lore BEYOND the PE. If a background entry becomes spine-critical, say so and suggest moving it into the PE.\n4. \"content\" is what the AI reads at runtime: clean self-contained lore prose, no meta commentary inside it. Split long topics into linked entries.\n5. \"name\" unique in the document.\n6. Keep the document a single valid JSON array at all times: append new entries inside the array, edit one with a surgical find/replace on its text, never break JSON validity.\n7. Empty document -> initialize with an append edit whose replace value is a JSON array (start [] or with the first entries).\n8. Briefly note in prose WHY you chose non-obvious settings (e.g. \"put the active siege at_depth so it stays salient; gave all five generals order 200 so they rank together\").";
+const SC_SEED_PROMPT = "You are the SUMMARYCEPTION MEMORY AUDITOR: auditor and showrunner for a roleplay story's external memory. The [FILE] is a Summaryception MEMORY TRANSPLANT - the complete distilled memory of a long story, exported from the Summaryception extension and re-imported there after your repairs: a notepad of the author's starting canon, a character ledger (one dossier per character), the ordered summary snippets of everything that happened, and pinned verbatim quotes. A separate, stateless Storyteller AI will consume the imported file as its ONLY memory. You are NOT the Storyteller. Never write narrative continuations. Every decision is framed as: \"how do I make this memory serve a fresh Storyteller perfectly?\"\n\nThe user is paying to PLAY, not to manage you. Listen once, act, deliver. One clarification is permitted for genuine ambiguity - two readings that produce different canon. Never ask the same question twice. Never hedge a delivered result; if unsure, run another pass BEFORE delivering. A scoped, named gap is honest; a general disclaimer shifts verification to the user.\n\nFIRST CONTACT: if the user opens without a command (a greeting, \"look at this\", nothing), reply with a FIVE-LINE receipt - counts (snippets / ledger characters / pins / notepad yes-no), a rough token estimate, a one-line health impression, and the command list on one line - then STOP. No edits, no unrequested analysis, no restating file contents. If the [FILE] is empty, say in one line that the transplant export has not been pasted yet (the file editor \u2014 file icon in the top bar) and stop.\n\n=== THE FORMAT (your edits must round-trip through the importer) ===\nThe transplant is Markdown; every item sits between HTML-comment markers carrying a JSON payload. The Summaryception importer re-parses ONLY the markers - section headings (## ...) are for humans, prose between blocks is ignored, and a mistyped marker means silently lost data. Blocks:\n- <!-- SC-TRANSPLANT {...} --> : file meta. Never touch it.\n- <!-- SC-NOTEPAD --> text <!-- /SC-NOTEPAD --> : the author's own STARTING canon, written at the story's start and deliberately never updated as the story progresses. Foundational facts (world rules, identities, backstory) are highest authority; situational details (who is where, current statuses) describe the OPENING state and are expected to be outgrown by the snippets - that is progression, never staleness, never a finding, never something to \"refresh\". Edit only on instruction, or to fix an internal contradiction you can cite from within the notepad itself.\n- <!-- SC-LEDGER {\"name\":\"X\",\"t\":123} --> then CORE: / STATE: / ARC: / THREADS: lines <!-- /SC-LEDGER --> : one character dossier. CORE = who they are (stable identity), STATE = where/what now, ARC = how they changed, THREADS = open hooks. Keep the four field labels; multi-line field content is fine. The name lives in the marker's JSON - a ledger block whose payload is broken or nameless is DROPPED whole by the importer.\n- <!-- SC-SNIPPET {\"turns\":\"12-18\"} --> summary text, optional <!-- SC-DETAIL --> expanded detail, then <!-- /SC-SNIPPET --> : one summary snippet, in story order.\n- <!-- SC-PIN {\"label\":\"...\"} --> quote <!-- /SC-PIN --> : a verbatim quote the author chose to preserve. NEVER reword pin text; delete only on instruction or if its subject was removed.\n- A \"## OPEN CONTINUITY FLAGS\" section, if present, is informational only - the importer does not re-import it; treat its lines as leads for *audit.\n\nMARKER RULES (how the docedits mechanics apply here):\n1. Never alter, reformat, split, or retype a marker line. Edit only the content BETWEEN markers. When a \"find\" must include a marker line, copy it character-for-character, JSON payload included.\n2. DELETE a block = one find/replace whose \"find\" spans from its opening marker through its closing marker inclusive, \"replace\": \"\". Never leave an opener without its closer or a closer without its opener.\n3. ADD a snippet = insert_after whose anchor ENDS at the preceding snippet's closing marker: copy that snippet's final body line PLUS the <!-- /SC-SNIPPET --> line under it as one multi-line anchor (the body line makes it unique - closer lines alone repeat across the file and will not match uniquely). The \"replace\" is one COMPLETE new block: opener (use {\"turns\":\"?\"} when the source turns are unknown), text, closer. To add before the first snippet, anchor on the \"## MEMORY SNIPPETS\" heading line instead. Use the same technique to add a ledger character or a pin inside its own section.\n4. MERGE snippets = one find/replace spanning from the first block's opener through the last block's closer, replaced by ONE complete block whose text carries the combined substance and whose turns cover the combined span.\n5. NEVER write commentary, tags, notes, or reasoning inside any block. The data must read as if it was always this clean. Findings, evidence, and change reports go in your chat prose, never in the document. (Deliverable purity.)\n6. The extension verifies marker integrity deterministically (the Check button) - never re-print the document to prove your edits are safe, and never use an edit as a way to \"show\" the user something.\n\n=== MANDATES (priority order) ===\nM-RECORD (record-only, anti-fabrication). You repair and reorganize what the memory contains. You do NOT invent events, motives, psychology, consequences, or connections - not even to justify a cut or a merge. Two connected facts are not automatically dependent. When in doubt: it is not in the memory, so it does not exist. Fix by correction, removal, or reorganization; add content only on explicit user instruction.\nM-EPISTEMIC (knowledge needs a pathway). No character entry may contain knowledge that character has no recorded way of possessing. Flag and fix entries where a dossier \"knows\" another character's secret, an off-screen event, or the protagonist's hidden identity without a discoverable pathway in the snippets. Do not invent a pathway to launder the leak - remove the knowledge instead.\nM-SCAN (disease scan, anti-whack-a-mole). Any error found - by you or by the user - names a CLASS. Scan the ENTIRE file for every instance of that class and fix all of them in one pass, then show scan evidence (what was scanned, how many found/fixed). Fixing only the named instance is a critical failure. Classes that recur in memory files: wrong numbers (ages, counts, distances); wrong titles/ranks; wrong attribution (deeds, scars, signature items assigned to the wrong character); reversed causality; stale state (a STATE that elapsed events have invalidated - after every major event ask what it made true and false everywhere else); ledger-vs-snippet contradiction; snippet-vs-snippet timeline conflict; editorial contamination (moral judgments or psychoanalysis in CORE the story never established); protagonist reactions preloaded inside NPC dossiers; \"doesn't know X\" filler that restates the epistemic rule instead of marking a real plot gap; defensive padding (\"to ensure\", \"so that\") left by past fixes; compression damage (subject/object swapped, dialogue stripped of the context that gave it meaning).\nM-EYE (the expert eye). Every reply contains: (1) what was asked, done; (2) what you found while in there; (3) evidence the scan happened. If a find-and-replace could have produced your reply, the thinking is not finished.\nM-TAGS (chat discipline). In analysis, tag claims [CANON] (quotable from the file), [INFERENCE] (derived, reasoning shown), or [SPECULATION] (labeled guess). Never mix them unmarked. Inside the document itself, no tags ever.\n\n=== COMMANDS ===\n*audit - full review, REPORT ONLY: no docedits block at all. Read everything, then report: contradictions, epistemic leaks, stale states, attribution errors, timeline conflicts, weirdness, poor-decision patterns worth the author's eye - each with [file evidence], severity, and the proposed fix. End with a verdict: what is healthy, what needs *fix, whether *cleanup is warranted.\n*fix - apply the audit. Execute every fix from the most recent *audit (or run one silently first) as surgical docedits, and report the changes with scan evidence.\n*cleanup - the showrunner pass, for stories grown cluttered or convoluted. Three phases; NEVER any edits before approval:\n  Phase 1, DIRECTOR'S READ (diagnosis, no edits): the throughline (what the story is about right now, 1-2 lines); the cold-read test (where exactly would a fresh Storyteller get lost?); broken coherence (contradictions and unmotivated jumps, each with a proposed fix); what is missing, split into \"I can propose\" vs \"only the author can answer\" - ASK the latter, never invent; the motivation check (does every key action have a planted motive?).\n  Phase 2, the manifest, two separately approvable layers. DECLUTTER (safe, subtractive): classify every element SPINE (2-5 core arcs - \"if this vanished, would the author start a new story?\" - untouchable) / SUPPORT (reinforces a spine arc - keep, compress, make the connection explicit) / TEXTURE (world-feel driving no arc - absorb into one broad-stroke entry) / NOISE (dead-end hooks, orphaned setups, minor characters with no future - remove, patch downstream references). RESHAPE (restructuring): untangle knotted threads into clean sequence; merge arcs doing the identical narrative job; resolve or park dangling threads in one line; re-sequence where chronology allows; cut decorative callbacks, keep load-bearing ones.\n  Phase 3, execute the approved scope ONLY, as docedits. Safeguards: the showrunner test (\"would a good showrunner cut this in the writers' room?\") - remove confusion and junk, not richness; a rich story keeps its B-plots and quiet beats. Unsure whether texture or junk: keep and flag. If knowledge from a texture moment feeds a spine arc, it is SUPPORT. \"Keep it\" from the author = kept, zero pushback - attachment IS value.\n*optimize - bulletproof token reduction with ZERO information loss. The goal is not \"smaller file\"; it is \"smaller file with nothing gone\". If both cannot be achieved, zero loss wins - a longer file with every detail beats a tighter one missing a dialogue beat the author wanted. Cut only filler, redundancy, and loose expression. PRESERVE unconditionally: every action, every name, every number (ages, counts, distances, dates, money), every causal chain, every relationship shift, every revelation/leverage/setup, every dialogue line that shifted power or is referenced later, every mature content beat (never euphemize), every named system WITH its mechanism.\n  The Human Memory Test governs every borderline cut: telling this story to a friend from memory, would you include it? Moments that made a character FEEL something, lines that shifted power, HOW someone won: never cut. Logistics, staging, transitions: cut freely.\n  The 4-Question Test on EVERY sentence before it dies: 1. Removed - could the Storyteller now generate something contradictory? KEEP. 2. Removed - vague where specificity matters? KEEP. 3. Removed - does a later entry stop making sense? KEEP. 4. Removed - nothing about Storyteller behavior changes? CUT.\n  Techniques, applied IN THIS ORDER (each runs on the previous one's output; when a guardrail fires, the content stays):\n  1. SEQUENTIAL AGGREGATION - consecutive snippets sharing actor, place, and time-window with no load-bearing beat between them merge into one entry keeping all facts and the combined span. Guardrail: a snippet containing a power-shifting line, a relationship shift, a revelation, a causal link, or a growth milestone stays as its own entry - only the truly routine merge.\n  2. REFERENCE STRIPPING - the ledger holds identity; snippets hold action. Strip identity re-descriptions (age, rank, traits, appearance) from snippets when the ledger already carries them. Guardrail: a character's first appearance keeps its introduction.\n  3. DIALOGUE SURROUND COMPRESSION - keep the load-bearing line VERBATIM; compress the staging exchange around it into one action beat. Load-bearing means: shifted power, established leverage, caused a visible reaction, is referenced later, or revealed information.\n  4. EMOTIONAL TEXTURE COMPRESSION - long emotional prose becomes label + cause (\"felt dread as he walked away - third time\"). Guardrail: a FIRST-time emotion, or one contradicting the character's CORE plot-relevantly, keeps its full texture.\n  5. SPATIAL/STAGING COMPRESSION - travel becomes origin to destination + anything significant en route. Guardrail: an encounter, observation, or realization during the travel stays as its own beat.\n  6. CAUSAL CHAIN NOTATION - multi-step strategies compress to arrow notation keeping every concrete lever: \"scouts -> blocked pass -> burning depot (urgency) -> archer bait -> cavalry flank\". Guardrail: the mechanism of each step must remain inferable; \"plan -> executed -> won\" is loss, not compression.\n  7. REDUNDANT RESTATEMENT STRIPPING - if a ledger field restates what a snippet already records (or vice versa), the source of truth keeps it and the restatement keeps only what the other could not convey.\n  8. NOTATION COMPRESSION - last, pure notation tightening with zero information content (filler transitions, double-framing, restated headers). Guardrail: never introduce parsing ambiguity; marker lines are untouchable.\n  ZERO-LOSS VERIFICATION (mandatory, after all techniques - \"same entry count\" is the WRONG test, aggregation reduces count by design). Verify instead: every load-bearing dialogue line present verbatim; every relationship shift still captured; every causal chain's mechanism inferable; every named character still appears; every scale-defining number present; every revelation/leverage/setup described; every mature beat present un-euphemized; the causal web still lets a reader reconstruct what happened, why, and what it changed. ANY check fails: the compression was not smart enough - restore the missing content and re-compress without losing it. Report estimated tokens before/after and the verification result as scan evidence.\n*brief - write a short handoff paragraph IN CHAT (no docedits, never in the document) telling a fresh Storyteller where the story stands and what is in motion, for use as the first message of a new session.\nFree-form (\"change X\", \"retcon Y\", \"Alaric should never have learned Z\") - the minimal correct edit, then the M-SCAN class pass across the whole file, then the edits.\n\n=== HOW YOU DELIVER ===\nYou never output the file and never produce downloads - the extension applies your docedits as reviewable diff cards with undo, and the user exports/imports the document themselves. Prefer several surgical edits (the author reviews each one) over rewrites. \"replace_all\" is permitted ONLY for *optimize and an approved full-scope *cleanup - those commands ARE the user explicitly requesting a full rewrite - and its \"replace\" must then be the COMPLETE document with every kept block present: never a diff, never \"unchanged sections omitted\", never \"rest as before\" - an omitted block is a silently deleted block.\nIn chat alongside the edits: the change report - what changed and why, scan evidence, estimated token delta when size changed. Reference content by character name or snippet turns plus a SHORT quote; never paste whole snippets or dossiers into the report; never echo the document back; never re-explain these instructions; never ask whether to proceed on a command already given. Every token you print is the user's budget: spend it on findings and fixes, not narration.";
 
 const PRESETS = {
   anthropic:  { name:"Claude",     kind:"anthropic", url:"https://api.anthropic.com/v1", model:"claude-sonnet-4-6", ctx:200000, hint:"e.g. claude-sonnet-4-6, claude-opus-4-5" },
@@ -1640,6 +1645,19 @@ const DEFAULTS = {
   search: { on:false, provider:"native", key:"", count:5, relay:"", always:false, images:true, auto:true }
 };
 let S = loadSettings();
+/* Two working agent briefs ship built-in — the Worldbook Maker and the
+   Summaryception Auditor — seeded ONCE as ordinary instruction sets. They
+   are fully editable and renamable, and deleting one sticks: the flag, not
+   the id, decides seeding, so nothing resurrects behind the user's back. */
+(function seedSets(){
+  if (S.seeded513) return;
+  S.seeded513 = true;
+  if (!S.presets.some(p => p.id === "seed-wb"))
+    S.presets.push({ id:"seed-wb", name:"Worldbook Maker", system: WB_SEED_PROMPT, injections: [] });
+  if (!S.presets.some(p => p.id === "seed-sc"))
+    S.presets.push({ id:"seed-sc", name:"Summaryception Auditor", system: SC_SEED_PROMPT, injections: [] });
+  try { saveSettings(); } catch(_){}
+})();
 function loadSettings(){
   try {
     const raw = JSON.parse(localStorage.getItem("cozychat:settings") || "{}");
@@ -3824,6 +3842,213 @@ function stripDocEdits(text){
   return out.trim();
 }
 
+/* ---------- worldbook (SillyTavern World Info export) ---------- */
+function numOr(v, d){ const n = Number(v); return Number.isFinite(n) ? n : d; }
+function normalizePosition(p){ p = String(p || "").toLowerCase(); return (p === "before_char" || p === "at_depth") ? p : "after_char"; }
+function positionToST(pos){ if (pos === "before_char") return 0; if (pos === "at_depth") return 4; return 1; }
+function parseWorldbook(text){
+  const raw = String(text || "").trim();
+  if (!raw) return { entries: [] };
+  let data;
+  try { data = JSON.parse(raw); }
+  catch (e){
+    try { data = JSON.parse(stripTrailingCommasOutsideStrings(raw)); }
+    catch (e2){ return { entries: [], error: "not valid JSON: " + e2.message }; }
+  }
+  let arr = null;
+  if (Array.isArray(data)) arr = data;
+  else if (data && Array.isArray(data.entries)) arr = data.entries;
+  else if (data && data.entries && typeof data.entries === "object") arr = Object.values(data.entries);
+  if (!arr) return { entries: [], error: "expected a JSON array of entries" };
+  const entries = [];
+  for (const e of arr){
+    if (!e || typeof e !== "object") continue;
+    const name = String(e.name != null ? e.name : (e.comment != null ? e.comment : "")).trim();
+    let keys = [];
+    if (Array.isArray(e.keys)) keys = e.keys.map(k => String(k).trim()).filter(Boolean);
+    else if (typeof e.keys === "string") keys = e.keys.split(",").map(k => k.trim()).filter(Boolean);
+    else if (Array.isArray(e.key)) keys = e.key.map(k => String(k).trim()).filter(Boolean);
+    let strat = String(e.strategy || "").toLowerCase();
+    if (!["blue","green","chain"].includes(strat)){
+      if (e.constant === true) strat = "blue";
+      else if (e.vectorized === true && !keys.length) strat = "chain";
+      else strat = "green";
+    }
+    entries.push({
+      name: name || "(unnamed)", keys,
+      content: String(e.content != null ? e.content : "").trim(),
+      strategy: strat, order: numOr(e.order, 100),
+      position: normalizePosition(e.position),
+      depth: Math.max(0, Math.round(numOr(e.depth, 4))),
+      probability: Math.max(0, Math.min(100, numOr(e.probability, 100))),
+      comment: String(e.comment != null ? e.comment : "").trim(),
+    });
+  }
+  return { entries };
+}
+function lintWorldbook(entries){
+  const warns = [], seen = new Map();
+  entries.forEach((e, i) => {
+    const label = '"' + (e.name || ("#" + (i + 1))) + '"';
+    if (e.strategy === "green" && !e.keys.length) warns.push(label + ": green entry has no keys \u2014 it will never fire on keywords.");
+    if (!e.content) warns.push(label + ": empty content.");
+    const k = (e.name || "").toLowerCase();
+    if (k){ if (seen.has(k)) warns.push("duplicate name " + label + "."); else seen.set(k, i); }
+  });
+  return warns;
+}
+function worldbookToST(entries){
+  const out = { entries: {} };
+  entries.forEach((e, i) => {
+    const blue = e.strategy === "blue", chain = e.strategy === "chain";
+    const keys = (blue || chain) ? [] : e.keys.slice();
+    const pos = positionToST(e.position);
+    const prob = Number.isFinite(e.probability) ? e.probability : 100;
+    out.entries[String(i)] = {
+      uid: i, key: keys, keysecondary: [], comment: e.name || "", content: e.content || "",
+      constant: blue, vectorized: chain || (!blue), selective: !blue && keys.length > 0,
+      selectiveLogic: 0, addMemo: true, order: Number.isFinite(e.order) ? e.order : 100,
+      position: pos, disable: false, excludeRecursion: false, preventRecursion: false,
+      delayUntilRecursion: false, probability: prob, useProbability: prob !== 100,
+      depth: pos === 4 ? (Number.isFinite(e.depth) ? e.depth : 4) : 4,
+      group: "", groupOverride: false, groupWeight: 100, scanDepth: null,
+      caseSensitive: null, matchWholeWords: null, useGroupScoring: null,
+      automationId: "", role: null, sticky: 0, cooldown: 0, delay: 0, displayIndex: i,
+    };
+  });
+  return out;
+}
+
+/* ---------- deterministic file check ---------- */
+/* Language models cannot perceive whitespace and cannot see marker damage in
+   their own edits, so these checks live in code. The transplant lint mirrors
+   the Summaryception importer's parser move-for-move — case-sensitive
+   markers, opener-to-next-opener segments, first-closer-of-the-same-kind
+   wins, payload-JSON strictness — and flags exactly what that importer
+   would SILENTLY drop or misfile. The comment scan is a linear indexOf walk,
+   never a nested-unbounded regex: a vandalized 150KB paste must lint in
+   milliseconds, not freeze the phone. */
+const SC_OPEN_RE = /<!--\s*SC-(TRANSPLANT|NOTEPAD|LEDGER|SNIPPET|PIN)\s*(\{[\s\S]*?\})?\s*-->/g;
+const SC_CLOSE_RE = /<!--\s*\/SC-(TRANSPLANT|NOTEPAD|LEDGER|SNIPPET|PIN)\s*-->/g;
+const SC_DETAIL_RE = /<!--\s*SC-DETAIL\s*-->/g;
+function _lineIndex(t){ const ix = [0]; for (let i = 0; i < t.length; i++) if (t.charCodeAt(i) === 10) ix.push(i + 1); return ix; }
+function _lineOf(ix, pos){ let lo = 0, hi = ix.length - 1; while (lo < hi){ const mid = (lo + hi + 1) >> 1; if (ix[mid] <= pos) lo = mid; else hi = mid - 1; } return lo + 1; }
+function scTransplantLint(text){
+  const t = String(text || "").replace(/\r\n?/g, "\n");
+  const ix = _lineIndex(t);
+  const issues = [];
+  const say = (pos, sev, msg) => issues.push({ line: _lineOf(ix, pos), sev, msg });
+  const openers = [], closers = [], details = [];
+  let m;
+  SC_OPEN_RE.lastIndex = 0;
+  while ((m = SC_OPEN_RE.exec(t)) !== null){
+    let pay = null, payBad = false;
+    if (m[2]){ try { pay = JSON.parse(m[2]); } catch(_) { payBad = true; } }
+    openers.push({ kind: m[1], pay, payBad, hasPay: !!m[2], start: m.index, bodyAt: m.index + m[0].length, end: m.index + m[0].length });
+  }
+  SC_CLOSE_RE.lastIndex = 0;
+  while ((m = SC_CLOSE_RE.exec(t)) !== null) closers.push({ kind: m[1], start: m.index, end: m.index + m[0].length, used: false });
+  SC_DETAIL_RE.lastIndex = 0;
+  while ((m = SC_DETAIL_RE.exec(t)) !== null) details.push({ start: m.index, end: m.index + m[0].length, inSnippet: false });
+
+  // mirror the importer's segmentation, collecting what it would keep
+  const counts = { snippets: 0, ledger: 0, pins: 0, notepad: false };
+  const ledgerNames = new Map();
+  for (let i = 0; i < openers.length; i++){
+    const mk = openers[i];
+    if (mk.payBad) say(mk.start, "error", "SC-" + mk.kind + " payload is not valid JSON \u2014 " + (mk.kind === "LEDGER" ? "the whole dossier will be silently dropped on import" : "the payload is silently ignored"));
+    if (mk.kind === "TRANSPLANT") continue;
+    const hardEnd = (i + 1 < openers.length) ? openers[i + 1].start : t.length;
+    let close = null;
+    for (const c of closers) if (!c.used && c.kind === mk.kind && c.start >= mk.bodyAt && c.start < hardEnd){ close = c; c.used = true; break; }
+    if (!close && mk.kind !== "NOTEPAD") say(mk.start, "warn", "SC-" + mk.kind + " has no closer before the next marker \u2014 everything up to it is absorbed as this block's body");
+    let body = t.slice(mk.bodyAt, close ? close.start : hardEnd).trim();
+    if (mk.kind === "NOTEPAD"){ counts.notepad = counts.notepad || !!body; }
+    else if (mk.kind === "LEDGER"){
+      const name = mk.pay && typeof mk.pay.name === "string" ? mk.pay.name.trim() : "";
+      if (!name){ if (!mk.payBad) say(mk.start, "error", "SC-LEDGER has no name in its payload \u2014 the whole dossier is silently dropped on import"); continue; }
+      const entry = {}; const fm = /^(CORE|STATE|ARC|THREADS):[ \t]*/;
+      let cur = null;
+      for (const line of body.split("\n")){
+        const f = fm.exec(line);
+        if (f){ cur = f[1]; entry[cur] = line.slice(f[0].length); }
+        else if (cur) entry[cur] += "\n" + line;
+      }
+      let fields = 0; for (const k of Object.keys(entry)) if (entry[k].trim()) fields++;
+      if (!fields){ say(mk.start, "error", 'SC-LEDGER "' + name + '" has no CORE/STATE/ARC/THREADS fields \u2014 the dossier is silently dropped on import'); continue; }
+      if (ledgerNames.has(name)) say(mk.start, "warn", 'duplicate SC-LEDGER "' + name + '" \u2014 the later one silently overwrites the earlier on import');
+      else { ledgerNames.set(name, 1); counts.ledger++; }
+    }
+    else if (mk.kind === "SNIPPET"){
+      for (const d2 of details) if (d2.start >= mk.bodyAt && d2.start < (close ? close.start : hardEnd)) d2.inSnippet = true;
+      const dm = /<!--\s*SC-DETAIL\s*-->/.exec(body);
+      const text2 = (dm ? body.slice(0, dm.index) : body).trim();
+      if (!text2) say(mk.start, "error", "SC-SNIPPET has no summary text \u2014 it is silently dropped on import" + (dm ? " (its SC-DETAIL dies with it)" : ""));
+      else counts.snippets++;
+    }
+    else if (mk.kind === "PIN"){
+      if (!body) say(mk.start, "error", "SC-PIN is empty \u2014 it is silently dropped on import");
+      else counts.pins++;
+    }
+  }
+  for (const c of closers) if (!c.used) say(c.start, "warn", "stray /SC-" + c.kind + " closer with no open " + c.kind + " block \u2014 it becomes plain body text of whatever contains it");
+  for (const d2 of details) if (!d2.inSnippet) say(d2.start, "warn", "SC-DETAIL outside any SC-SNIPPET \u2014 dead text the importer ignores");
+
+  // linear dead-marker scan: sc-ish comments the strict importer will not see
+  const recognized = openers.map(o => [o.start, o.bodyAt]).concat(closers.map(c => [c.start, c.end])).concat(details.map(d2 => [d2.start, d2.end]));
+  let at = 0;
+  while (true){
+    const a = t.indexOf("<!--", at);
+    if (a === -1) break;
+    const b = t.indexOf("-->", a + 4);
+    if (b === -1){
+      if (/sc-/i.test(t.slice(a))) say(a, "error", "unterminated <!-- comment mentioning SC \u2014 the importer sees none of it");
+      break;
+    }
+    const spanEnd = b + 3;
+    if (/sc-/i.test(t.slice(a, spanEnd))){
+      let dead = t.slice(a, spanEnd);
+      for (const [rs, re2] of recognized){
+        if (rs >= a && re2 <= spanEnd) dead = dead.replace(t.slice(rs, re2), "");
+      }
+      if (/sc-/i.test(dead)) say(a, "error", "marker-looking text the importer will IGNORE (wrong case, unknown kind, or malformed) \u2014 whatever it was meant to hold is silently lost");
+    }
+    at = spanEnd;
+  }
+  issues.sort((x, y) => x.line - y.line);
+  return { issues, counts };
+}
+function lintDoc(name, text){
+  const t = String(text || "");
+  const ix = _lineIndex(t);
+  const issues = [];
+  let m;
+  const dbl = /([^\n ]) {2,}(?=\S)/g; let dblCount = 0;
+  while ((m = dbl.exec(t)) !== null){ dblCount++; if (dblCount <= 5) issues.push({ line: _lineOf(ix, m.index), sev: "note", msg: "double space (shown as \u00b7\u00b7): \u2026" + t.slice(Math.max(0, m.index - 12), m.index + 1) + "\u00b7\u00b7" + t.slice(m.index + 3, m.index + 13).replace(/\n.*/s, "") + "\u2026" }); }
+  if (dblCount > 5) issues.push({ line: 0, sev: "note", msg: "\u2026and " + (dblCount - 5) + " more double spaces" });
+  const trail = /[ \t]+\n/g; let trailCount = 0, firstTrail = -1;
+  while ((m = trail.exec(t)) !== null){ trailCount++; if (firstTrail < 0) firstTrail = m.index; }
+  if (trailCount) issues.push({ line: _lineOf(ix, firstTrail), sev: "note", msg: trailCount + " line(s) end in trailing whitespace" });
+  const tab = t.indexOf("\t");
+  if (tab !== -1) issues.push({ line: _lineOf(ix, tab), sev: "note", msg: "contains tab characters" });
+  let jsonBad = false, jsonish = /\.json$/i.test(name || "") || /^\s*[\[{]/.test(t);
+  if (jsonish){
+    try { JSON.parse(t); issues.push({ line: 0, sev: "ok", msg: "valid JSON" }); }
+    catch (e){ jsonBad = true; issues.push({ line: 0, sev: "error", msg: "invalid JSON: " + e.message }); }
+  }
+  let sc = null;
+  if (/<!--\s*\/?sc-/i.test(t)) sc = scTransplantLint(t);
+  let wb = null;
+  if (jsonish && !jsonBad){ const p = parseWorldbook(t); if (!p.error && p.entries.length) wb = p; }
+  return { issues, dblCount, jsonBad, sc, wb };
+}
+function fixDoubles(t){ return String(t || "").replace(/([^\n ]) {2,}(?=\S)/g, "$1 "); }
+function fixJsonText(t){
+  let r = stripTrailingCommasOutsideStrings(String(t || ""));
+  r = escapeRawControlsInStrings(r);
+  try { JSON.parse(r); return r; } catch(_) { return null; }
+}
+
 /* ---------- proposal supersede ---------- */
 /* The reported class this retires mechanically: the assistant proposes an
    edit, the user asks again WITHOUT applying it, the next reply proposes
@@ -4072,6 +4297,7 @@ function editCardsHtml(m){
   if (m.editError) return '<div class="edits"><div class="edit-card"><div class="why">' + escapeHtml(m.editError) + '</div></div></div>';
   if (!m.edits || !m.edits.length) return "";
   const left = m.edits.filter(e => e.status === "pending").length;
+  const lastBatch = (m.edits.slice().reverse().find(e => e.status === "applied" && e.batch) || {}).batch;
   const cards = m.edits.map(e => {
     const del = (e.type === "replace" || e.type === "insert")
       ? '<div class="del">' + escapeHtml(clip(e.find, 700)) + '</div>' : "";
@@ -4092,6 +4318,7 @@ function editCardsHtml(m){
   return '<div class="edits"><div class="edits-head"><span class="t">'
     + m.edits.length + ' proposed change' + (m.edits.length === 1 ? "" : "s") + '</span>'
     + (left ? '<button data-applyall="' + m.id + '">Apply all</button>' : "")
+    + (lastBatch ? '<button data-undobatch="' + lastBatch + '" title="Revert this batch on every file it touched">Undo</button>' : "")
     + '<button data-dismiss="' + m.id + '">Dismiss</button></div>' + cards + '</div>';
 }
 /* Which attached file does this action change? With one attached it is
@@ -4108,7 +4335,7 @@ function resolveTarget(e, c){
       || list.find(d => base(d.name) === base(want))
       || null;
 }
-async function applyEdit(msgId, editId, convo){
+async function applyEdit(msgId, editId, convo, batchId){
   const c = convo || current;
   const m = c && c.messages.find(x => x.id === msgId);
   const e = m && m.edits && m.edits.find(x => x.id === editId);
@@ -4142,8 +4369,10 @@ async function applyEdit(msgId, editId, convo){
   const r = applyEditToText(doc.text, e);
   if (r.text === null){ e.status = "failed"; e.note = r.note; }
   else {
+    const bid = batchId || e.id;
+    e.batch = bid;
     doc.undo = doc.undo || [];
-    doc.undo.push({ text: before, at: Date.now() });
+    doc.undo.push({ text: before, at: Date.now(), batch: bid });
     if (doc.undo.length > 8) doc.undo.shift();
     doc.text = r.text; doc.updatedAt = Date.now();
     e.status = "applied"; e.note = r.note;
@@ -4151,12 +4380,31 @@ async function applyEdit(msgId, editId, convo){
   }
   renderThread(); renderFileBtn(); await persistConvo(c);
 }
+/* One press reverts the most recent applied batch on EVERY file it touched.
+   Strict top-match only: a file changed since the batch (any newer undo entry
+   on top) is skipped with a note rather than silently unwinding work the
+   batch never did — per-file undo still reaches it. */
+async function undoBatch(batchId){
+  let done = 0, skipped = 0;
+  for (const d of docs){
+    const st = d.undo || [];
+    if (st.length && st[st.length - 1].batch === batchId){
+      d.text = st.pop().text; d.updatedAt = Date.now();
+      await DB.docPut(JSON.parse(JSON.stringify(d))); done++;
+    } else if (st.some(u => u.batch === batchId)) skipped++;
+  }
+  renderThread(); renderDocList(); updateEmber();
+  toast(done ? ("Undid " + done + " file" + (done === 1 ? "" : "s")
+          + (skipped ? " · " + skipped + " changed since — skipped" : ""))
+      : (skipped ? "That batch is buried under newer changes — use per-file undo" : "Nothing to undo"));
+}
 async function applyAll(msgId){
   const c = current;
   const m = c && c.messages.find(x => x.id === msgId);
   if (!m || !m.edits) return;
   const todo = m.edits.filter(e => e.status === "pending");
-  for (const e of todo) await applyEdit(msgId, e.id, c);
+  const bid = uid();
+  for (const e of todo) await applyEdit(msgId, e.id, c, bid);
   const done = todo.filter(e => e.status === "applied").length;
   const bad  = todo.filter(e => e.status === "failed").length;
   toast(done + " applied" + (bad ? ", " + bad + " couldn't be matched" : ""));
@@ -4683,6 +4931,64 @@ on("#docCopyBtn", "click", function(){
   navigator.clipboard.writeText($("#docEditArea").value).then(function(){ toast("Copied"); },
     function(){ toast("Couldn't copy"); });
 });
+function runDocCheck(){
+  const d = docs.find(x => x.id === openDocId); if (!d) return;
+  const text = $("#docEditArea").value;
+  const r = lintDoc(d.name, text);
+  const out = $("#docLintOut"), row = $("#docFixRow");
+  const lines = [];
+  for (const i of r.issues) lines.push((i.line ? "L" + i.line + "  " : "") + (i.sev === "error" ? "\u2716 " : i.sev === "warn" ? "\u26a0 " : i.sev === "ok" ? "\u2713 " : "\u00b7 ") + i.msg);
+  if (r.sc){
+    lines.push("");
+    lines.push("Summaryception transplant \u2014 what re-imports exactly as written:");
+    lines.push("  " + r.sc.counts.snippets + " snippet(s) \u00b7 " + r.sc.counts.ledger + " character dossier(s) \u00b7 " + r.sc.counts.pins + " pin(s) \u00b7 notepad: " + (r.sc.counts.notepad ? "yes" : "no"));
+    const shown = r.sc.issues.slice(0, 200);
+    for (const i of shown) lines.push("  L" + i.line + "  " + (i.sev === "error" ? "\u2716 " : "\u26a0 ") + i.msg);
+    if (r.sc.issues.length > 200) lines.push("  \u2026and " + (r.sc.issues.length - 200) + " more");
+    if (!r.sc.issues.length) lines.push("  \u2713 no marker damage \u2014 what you see is exactly what re-imports");
+  }
+  if (r.wb){
+    lines.push("");
+    const warns = lintWorldbook(r.wb.entries);
+    lines.push("Worldbook: " + r.wb.entries.length + " entr" + (r.wb.entries.length === 1 ? "y" : "ies") + " \u2014 exportable to SillyTavern World Info");
+    for (const w2 of warns.slice(0, 8)) lines.push("  \u26a0 " + w2);
+    if (warns.length > 8) lines.push("  \u2026and " + (warns.length - 8) + " more");
+  }
+  if (!lines.length) lines.push("\u2713 clean \u2014 no double spaces, no trailing whitespace, no tabs");
+  out.hidden = false; out.textContent = lines.join("\n");
+  row.innerHTML = "";
+  const mk = (label, fn) => { const b = document.createElement("button"); b.className = "btn"; b.textContent = label; b.addEventListener("click", fn); row.appendChild(b); };
+  if (r.dblCount) mk("Collapse double spaces", function(){ applyLintFix(d.id, "spaces"); });
+  if (r.jsonBad) mk("Repair JSON", function(){ applyLintFix(d.id, "json"); });
+  if (r.wb) mk("Export ST worldbook", function(){ exportWorldbookST(d.id); });
+  row.hidden = !row.children.length;
+}
+on("#docCheckBtn", "click", runDocCheck);
+async function applyLintFix(id, kind){
+  const d = docs.find(x => x.id === id); if (!d) return;
+  const cur = $("#docEditArea").value;
+  const next = kind === "spaces" ? fixDoubles(cur) : fixJsonText(cur);
+  if (next == null){ toast("Couldn't repair \u2014 the break needs a hand (or the agent)"); return; }
+  if (next === cur){ toast("Nothing to fix"); return; }
+  d.undo = d.undo || [];
+  d.undo.push({ text: d.text, at: Date.now() });
+  if (d.undo.length > 8) d.undo.shift();
+  d.text = next; d.updatedAt = Date.now();
+  $("#docEditArea").value = next;
+  await DB.docPut(JSON.parse(JSON.stringify(d)));
+  renderDocList(); toast(kind === "spaces" ? "Double spaces collapsed \u2014 undoable" : "JSON repaired \u2014 undoable");
+  runDocCheck();
+}
+function exportWorldbookST(id){
+  const d = docs.find(x => x.id === id); if (!d) return;
+  const p = parseWorldbook($("#docEditArea").value);
+  if (p.error || !p.entries.length){ toast(p.error ? "Not a valid worldbook: " + p.error : "No worldbook entries found"); return; }
+  const st = worldbookToST(p.entries);
+  const base = d.name.replace(/\.json$/i, "");
+  download(base + ".st-worldinfo.json", JSON.stringify(st, null, 2), "application/json;charset=utf-8");
+  const counts = p.entries.reduce((a, e) => { a[e.strategy] = (a[e.strategy] || 0) + 1; return a; }, {});
+  toast("Exported " + p.entries.length + " entr" + (p.entries.length === 1 ? "y" : "ies") + " (" + Object.entries(counts).map(([k, v]) => v + " " + k).join(", ") + ") \u2014 import via ST \u2192 World Info \u2192 Import");
+}
 on("#docRenameBtn", "click", async function(){
   const d = docs.find(x => x.id === openDocId);
   if (!d) return;
@@ -4917,6 +5223,8 @@ on("#threadInner", "click", async function(e){
   }
   const aa = e.target.closest("[data-applyall]");
   if (aa){ await applyAll(aa.dataset.applyall); return; }
+  const ub = e.target.closest("[data-undobatch]");
+  if (ub){ await undoBatch(ub.dataset.undobatch); return; }
   const ds = e.target.closest("[data-dismiss]");
   if (ds){
     const m = current.messages.find(x => x.id === ds.dataset.dismiss);

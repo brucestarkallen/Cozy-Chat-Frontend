@@ -101,6 +101,25 @@ Tap **Test** before saving.
   version's proposals with their own applied/pending states — one version's
   prose never sits over another version's cards, and regenerating no longer
   drops the cards the old version proposed.
+- **Undo a whole batch.** After Apply all, one Undo on the reply's edit
+  header reverts that batch on every file it touched. A file you've changed
+  since is skipped with a note — never silently unwound — and per-file undo
+  still reaches anything buried.
+- **Check, deterministically.** A Check button in the file editor lints what
+  a language model can't perceive: double spaces, trailing whitespace, tabs,
+  invalid JSON — with one-tap undoable fixes that keep your content — plus a
+  Summaryception transplant check that mirrors the real importer
+  move-for-move and flags exactly what it would silently drop (dead
+  wrong-case markers, nameless or fieldless dossiers, broken payloads,
+  duplicate names, empty snippets and pins, unclosed blocks, stray closers),
+  each with a line number and an inventory of what re-imports.
+- **Worldbook to SillyTavern.** Keep lore as a plain JSON file, and Check
+  offers Export ST worldbook: blue/green/chain strategies map to
+  constant/selective/vectorized World Info entries — position, order, depth,
+  probability all carried — ready for ST → World Info → Import.
+- **Two working briefs built in.** Instruction sets ship with a Worldbook
+  Maker and a Summaryception Auditor — full working agent briefs, editable
+  like any set, and deleting one sticks.
 - **Rename in one card.** The assistant can mark a find/replace with
   `"all": true` and every exact occurrence in the file changes in a single
   undoable edit — the card reads **Replace everywhere** and reports how many
@@ -413,11 +432,11 @@ network-first, so a refresh always gets the newest version.
 | `send()` | Sends and reads the streaming reply |
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
-**Tests.** Everything in `tests/` — `v511test.js` down to `v2test.js`, plus
+**Tests.** Everything in `tests/` — `v513test.js` down to `v2test.js`, plus
 `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`, `swtest.js`,
 `scrolltest.js`, `styletest.js`, `hiddentest.js`, `coherencetest.js` and
 `installtest.sh` — runs under Node with jsdom (`npm i jsdom fake-indexeddb`).
-935 checks across the matching engine, JSON tolerance, prompt assembly,
+986 checks across the matching engine, JSON tolerance, prompt assembly,
 proposal supersede,
 projects, retrieval, streaming, SSE framing and Hermes tool activity,
 stream/chat binding, touch reorder, reader-owned scrolling, backup
