@@ -101,6 +101,19 @@ Tap **Test** before saving.
   version's proposals with their own applied/pending states — one version's
   prose never sits over another version's cards, and regenerating no longer
   drops the cards the old version proposed.
+- **Ask again is one tap.** A failed card, an unreadable edit block, or a
+  batch that got cut off each carry a button that sends the re-request for
+  you — naming the exact failure, demanding the anchor be copied
+  character-for-character, and scoping it to only what's missing. You never
+  have to type the correction yourself.
+- **A long block can't be lost to one bad character.** Every complete edit in
+  a broken block is salvaged and staged; only the unreadable ones are
+  reported and re-asked. A block cut off by the token limit — which used to
+  vanish silently, no cards and no error — now stages what arrived and says
+  what didn't.
+- **The assistant knows it edited your file.** Applied changes are announced
+  on the file itself, so it never apologizes for an edit it made or offers to
+  redo work already done.
 - **Edits can't hide in thinking.** Reasoning models sometimes emit the
   docedits block inside their thinking or on a separate reasoning channel;
   those blocks are now parsed, staged as normal confirmation cards, and
@@ -439,11 +452,11 @@ network-first, so a refresh always gets the newest version.
 | `send()` | Sends and reads the streaming reply |
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
-**Tests.** Everything in `tests/` — `v5131test.js` down to `v2test.js`, plus
+**Tests.** Everything in `tests/` — `v514test.js` down to `v2test.js`, plus
 `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`, `swtest.js`,
 `scrolltest.js`, `styletest.js`, `hiddentest.js`, `coherencetest.js` and
 `installtest.sh` — runs under Node with jsdom (`npm i jsdom fake-indexeddb`).
-1003 checks across the matching engine, JSON tolerance, prompt assembly,
+1039 checks across the matching engine, JSON tolerance, prompt assembly,
 proposal supersede,
 projects, retrieval, streaming, SSE framing and Hermes tool activity,
 stream/chat binding, touch reorder, reader-owned scrolling, backup

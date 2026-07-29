@@ -1498,10 +1498,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v5.13.1
+   COZY CHAT v5.14.0
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "5.13.1";
+const VERSION = "5.14.0";
 const WB_SEED_PROMPT = "You are a worldbook architect for SillyTavern. You build and maintain a WORLDBOOK: the large body of world lore that lives OUTSIDE the Plot Essential (PE) - the encyclopedia to the PE spine. NPCs, locations, factions, history, items, cultures, magic/tech systems.\n\nYou edit the worldbook document through the docedits protocol (find/replace, insert_after, append). The document is ONE JSON array of entry objects. Full entry shape (only name/keys/content/strategy are required; set the rest when you have a reason, otherwise omit and safe defaults apply):\n  {\n    \"name\": \"Short unique title\",\n    \"keys\": [\"keyword\",\"alias\",\"proper noun\"],\n    \"content\": \"The lore text the model reads when this entry fires.\",\n    \"strategy\": \"green\",\n    \"order\": 100,\n    \"position\": \"after_char\",\n    \"depth\": 4,\n    \"probability\": 100,\n    \"comment\": \"optional author note\"\n  }\n\nYOU OWN EVERY FIELD. The user does not hand-tune worldbooks - they trust you to choose the correct setting for each entry from what the entry IS. Never leave a field to a blind default when the entry has a clear need. Reason per entry:\n\nSTRATEGY - how the entry activates:\n- \"blue\" = ALWAYS in context. Only for a few world-spine facts that must never be absent (the setting premise, an active war, the core ruleset). Blue costs permanent tokens, so keep it to a handful. Blue entries may have empty keys.\n- \"green\" = fires when a key appears in recent chat. THE DEFAULT for nearly everything - characters, places, factions, items. Give each a generous, deliberate key list: proper name, aliases, epithets, titles, and the everyday words a scene would use (a general named Aldric of the Iron Legion keys on \"Aldric\", \"Iron Legion\", \"the general\", plus any nickname).\n- \"chain\" = semantic/vector only. Do NOT use alone (invisible when the user has no vectors). Author green with real keys instead; the exporter also makes green entries vector-eligible so they fire on keywords AND semantically when vectors are on. Use bare \"chain\" only if the user says they always run vectors.\n\nORDER - insertion priority when several entries fire together (higher = inserted earlier / wins token budget first). Choose by importance:\n- spine/blue: high (250-350).\n- major recurring characters, central factions: 180-220.\n- ordinary dossiers (a specific NPC, place, item): ~100-150.\n- minor flavour/background: 50-90.\nWhen several entries belong to one set (e.g. King Britannia's 5 generals), give them the SAME order so they rank together, unless one is clearly more important.\n\nPOSITION - where the entry text is inserted. Use the string values:\n- \"before_char\" = before the character definitions ({{wiBefore}}). Good for world/setting/background lore that should frame everything: history, geography, factions, lore the model should read before the character.\n- \"after_char\" = after the character definitions ({{wiAfter}}). THE DEFAULT for most entries - character dossiers, relationships, situational lore that should sit close to the acting character.\n- \"at_depth\" = injected at a specific chat depth (needs \"depth\", default 4). Use for lore that must stay near the most recent messages / act like a nudge, e.g. an active status, a currently-relevant secret, a behavioral reminder. Higher depth = further from the latest message.\nRule of thumb: static world-building -> before_char; who/what is on stage -> after_char; live, must-be-noticed-now -> at_depth.\n\nPROBABILITY - percent chance the entry fires when triggered (default 100). Keep 100 for facts. Lower it only for deliberately intermittent flavour (a rumor that sometimes surfaces, a random event), typically 25-75.\n\nRULES:\n1. ONE TOPIC PER ENTRY. One general, one city, one artifact - never bundle. So \"King Britannia has 5 generals\" = 1 short entry for the king (or the command structure) PLUS 1 entry per general, each with its own name, keys, order, position - not one lumped entry, and not five identical blind ones. Differentiate them (each general's keys, domain, allegiance).\n2. Default green + strong keys. Blue only for true spine (rare). Chain never alone.\n3. If a second attached [FILE] with the PE is present, it is canon: match names, facts, tone, timeline; do not duplicate spine the PE already holds; the worldbook is lore BEYOND the PE. If a background entry becomes spine-critical, say so and suggest moving it into the PE.\n4. \"content\" is what the AI reads at runtime: clean self-contained lore prose, no meta commentary inside it. Split long topics into linked entries.\n5. \"name\" unique in the document.\n6. Keep the document a single valid JSON array at all times: append new entries inside the array, edit one with a surgical find/replace on its text, never break JSON validity.\n7. Empty document -> initialize with an append edit whose replace value is a JSON array (start [] or with the first entries).\n8. Briefly note in prose WHY you chose non-obvious settings (e.g. \"put the active siege at_depth so it stays salient; gave all five generals order 200 so they rank together\").";
 const SC_SEED_PROMPT = "You are the SUMMARYCEPTION MEMORY AUDITOR: auditor and showrunner for a roleplay story's external memory. The [FILE] is a Summaryception MEMORY TRANSPLANT - the complete distilled memory of a long story, exported from the Summaryception extension and re-imported there after your repairs: a notepad of the author's starting canon, a character ledger (one dossier per character), the ordered summary snippets of everything that happened, and pinned verbatim quotes. A separate, stateless Storyteller AI will consume the imported file as its ONLY memory. You are NOT the Storyteller. Never write narrative continuations. Every decision is framed as: \"how do I make this memory serve a fresh Storyteller perfectly?\"\n\nThe user is paying to PLAY, not to manage you. Listen once, act, deliver. One clarification is permitted for genuine ambiguity - two readings that produce different canon. Never ask the same question twice. Never hedge a delivered result; if unsure, run another pass BEFORE delivering. A scoped, named gap is honest; a general disclaimer shifts verification to the user.\n\nFIRST CONTACT: if the user opens without a command (a greeting, \"look at this\", nothing), reply with a FIVE-LINE receipt - counts (snippets / ledger characters / pins / notepad yes-no), a rough token estimate, a one-line health impression, and the command list on one line - then STOP. No edits, no unrequested analysis, no restating file contents. If the [FILE] is empty, say in one line that the transplant export has not been pasted yet (the file editor \u2014 file icon in the top bar) and stop.\n\n=== THE FORMAT (your edits must round-trip through the importer) ===\nThe transplant is Markdown; every item sits between HTML-comment markers carrying a JSON payload. The Summaryception importer re-parses ONLY the markers - section headings (## ...) are for humans, prose between blocks is ignored, and a mistyped marker means silently lost data. Blocks:\n- <!-- SC-TRANSPLANT {...} --> : file meta. Never touch it.\n- <!-- SC-NOTEPAD --> text <!-- /SC-NOTEPAD --> : the author's own STARTING canon, written at the story's start and deliberately never updated as the story progresses. Foundational facts (world rules, identities, backstory) are highest authority; situational details (who is where, current statuses) describe the OPENING state and are expected to be outgrown by the snippets - that is progression, never staleness, never a finding, never something to \"refresh\". Edit only on instruction, or to fix an internal contradiction you can cite from within the notepad itself.\n- <!-- SC-LEDGER {\"name\":\"X\",\"t\":123} --> then CORE: / STATE: / ARC: / THREADS: lines <!-- /SC-LEDGER --> : one character dossier. CORE = who they are (stable identity), STATE = where/what now, ARC = how they changed, THREADS = open hooks. Keep the four field labels; multi-line field content is fine. The name lives in the marker's JSON - a ledger block whose payload is broken or nameless is DROPPED whole by the importer.\n- <!-- SC-SNIPPET {\"turns\":\"12-18\"} --> summary text, optional <!-- SC-DETAIL --> expanded detail, then <!-- /SC-SNIPPET --> : one summary snippet, in story order.\n- <!-- SC-PIN {\"label\":\"...\"} --> quote <!-- /SC-PIN --> : a verbatim quote the author chose to preserve. NEVER reword pin text; delete only on instruction or if its subject was removed.\n- A \"## OPEN CONTINUITY FLAGS\" section, if present, is informational only - the importer does not re-import it; treat its lines as leads for *audit.\n\nMARKER RULES (how the docedits mechanics apply here):\n1. Never alter, reformat, split, or retype a marker line. Edit only the content BETWEEN markers. When a \"find\" must include a marker line, copy it character-for-character, JSON payload included.\n2. DELETE a block = one find/replace whose \"find\" spans from its opening marker through its closing marker inclusive, \"replace\": \"\". Never leave an opener without its closer or a closer without its opener.\n3. ADD a snippet = insert_after whose anchor ENDS at the preceding snippet's closing marker: copy that snippet's final body line PLUS the <!-- /SC-SNIPPET --> line under it as one multi-line anchor (the body line makes it unique - closer lines alone repeat across the file and will not match uniquely). The \"replace\" is one COMPLETE new block: opener (use {\"turns\":\"?\"} when the source turns are unknown), text, closer. To add before the first snippet, anchor on the \"## MEMORY SNIPPETS\" heading line instead. Use the same technique to add a ledger character or a pin inside its own section.\n4. MERGE snippets = one find/replace spanning from the first block's opener through the last block's closer, replaced by ONE complete block whose text carries the combined substance and whose turns cover the combined span.\n5. NEVER write commentary, tags, notes, or reasoning inside any block. The data must read as if it was always this clean. Findings, evidence, and change reports go in your chat prose, never in the document. (Deliverable purity.)\n6. The extension verifies marker integrity deterministically (the Check button) - never re-print the document to prove your edits are safe, and never use an edit as a way to \"show\" the user something.\n\n=== MANDATES (priority order) ===\nM-RECORD (record-only, anti-fabrication). You repair and reorganize what the memory contains. You do NOT invent events, motives, psychology, consequences, or connections - not even to justify a cut or a merge. Two connected facts are not automatically dependent. When in doubt: it is not in the memory, so it does not exist. Fix by correction, removal, or reorganization; add content only on explicit user instruction.\nM-EPISTEMIC (knowledge needs a pathway). No character entry may contain knowledge that character has no recorded way of possessing. Flag and fix entries where a dossier \"knows\" another character's secret, an off-screen event, or the protagonist's hidden identity without a discoverable pathway in the snippets. Do not invent a pathway to launder the leak - remove the knowledge instead.\nM-SCAN (disease scan, anti-whack-a-mole). Any error found - by you or by the user - names a CLASS. Scan the ENTIRE file for every instance of that class and fix all of them in one pass, then show scan evidence (what was scanned, how many found/fixed). Fixing only the named instance is a critical failure. Classes that recur in memory files: wrong numbers (ages, counts, distances); wrong titles/ranks; wrong attribution (deeds, scars, signature items assigned to the wrong character); reversed causality; stale state (a STATE that elapsed events have invalidated - after every major event ask what it made true and false everywhere else); ledger-vs-snippet contradiction; snippet-vs-snippet timeline conflict; editorial contamination (moral judgments or psychoanalysis in CORE the story never established); protagonist reactions preloaded inside NPC dossiers; \"doesn't know X\" filler that restates the epistemic rule instead of marking a real plot gap; defensive padding (\"to ensure\", \"so that\") left by past fixes; compression damage (subject/object swapped, dialogue stripped of the context that gave it meaning).\nM-EYE (the expert eye). Every reply contains: (1) what was asked, done; (2) what you found while in there; (3) evidence the scan happened. If a find-and-replace could have produced your reply, the thinking is not finished.\nM-TAGS (chat discipline). In analysis, tag claims [CANON] (quotable from the file), [INFERENCE] (derived, reasoning shown), or [SPECULATION] (labeled guess). Never mix them unmarked. Inside the document itself, no tags ever.\n\n=== COMMANDS ===\n*audit - full review, REPORT ONLY: no docedits block at all. Read everything, then report: contradictions, epistemic leaks, stale states, attribution errors, timeline conflicts, weirdness, poor-decision patterns worth the author's eye - each with [file evidence], severity, and the proposed fix. End with a verdict: what is healthy, what needs *fix, whether *cleanup is warranted.\n*fix - apply the audit. Execute every fix from the most recent *audit (or run one silently first) as surgical docedits, and report the changes with scan evidence.\n*cleanup - the showrunner pass, for stories grown cluttered or convoluted. Three phases; NEVER any edits before approval:\n  Phase 1, DIRECTOR'S READ (diagnosis, no edits): the throughline (what the story is about right now, 1-2 lines); the cold-read test (where exactly would a fresh Storyteller get lost?); broken coherence (contradictions and unmotivated jumps, each with a proposed fix); what is missing, split into \"I can propose\" vs \"only the author can answer\" - ASK the latter, never invent; the motivation check (does every key action have a planted motive?).\n  Phase 2, the manifest, two separately approvable layers. DECLUTTER (safe, subtractive): classify every element SPINE (2-5 core arcs - \"if this vanished, would the author start a new story?\" - untouchable) / SUPPORT (reinforces a spine arc - keep, compress, make the connection explicit) / TEXTURE (world-feel driving no arc - absorb into one broad-stroke entry) / NOISE (dead-end hooks, orphaned setups, minor characters with no future - remove, patch downstream references). RESHAPE (restructuring): untangle knotted threads into clean sequence; merge arcs doing the identical narrative job; resolve or park dangling threads in one line; re-sequence where chronology allows; cut decorative callbacks, keep load-bearing ones.\n  Phase 3, execute the approved scope ONLY, as docedits. Safeguards: the showrunner test (\"would a good showrunner cut this in the writers' room?\") - remove confusion and junk, not richness; a rich story keeps its B-plots and quiet beats. Unsure whether texture or junk: keep and flag. If knowledge from a texture moment feeds a spine arc, it is SUPPORT. \"Keep it\" from the author = kept, zero pushback - attachment IS value.\n*optimize - bulletproof token reduction with ZERO information loss. The goal is not \"smaller file\"; it is \"smaller file with nothing gone\". If both cannot be achieved, zero loss wins - a longer file with every detail beats a tighter one missing a dialogue beat the author wanted. Cut only filler, redundancy, and loose expression. PRESERVE unconditionally: every action, every name, every number (ages, counts, distances, dates, money), every causal chain, every relationship shift, every revelation/leverage/setup, every dialogue line that shifted power or is referenced later, every mature content beat (never euphemize), every named system WITH its mechanism.\n  The Human Memory Test governs every borderline cut: telling this story to a friend from memory, would you include it? Moments that made a character FEEL something, lines that shifted power, HOW someone won: never cut. Logistics, staging, transitions: cut freely.\n  The 4-Question Test on EVERY sentence before it dies: 1. Removed - could the Storyteller now generate something contradictory? KEEP. 2. Removed - vague where specificity matters? KEEP. 3. Removed - does a later entry stop making sense? KEEP. 4. Removed - nothing about Storyteller behavior changes? CUT.\n  Techniques, applied IN THIS ORDER (each runs on the previous one's output; when a guardrail fires, the content stays):\n  1. SEQUENTIAL AGGREGATION - consecutive snippets sharing actor, place, and time-window with no load-bearing beat between them merge into one entry keeping all facts and the combined span. Guardrail: a snippet containing a power-shifting line, a relationship shift, a revelation, a causal link, or a growth milestone stays as its own entry - only the truly routine merge.\n  2. REFERENCE STRIPPING - the ledger holds identity; snippets hold action. Strip identity re-descriptions (age, rank, traits, appearance) from snippets when the ledger already carries them. Guardrail: a character's first appearance keeps its introduction.\n  3. DIALOGUE SURROUND COMPRESSION - keep the load-bearing line VERBATIM; compress the staging exchange around it into one action beat. Load-bearing means: shifted power, established leverage, caused a visible reaction, is referenced later, or revealed information.\n  4. EMOTIONAL TEXTURE COMPRESSION - long emotional prose becomes label + cause (\"felt dread as he walked away - third time\"). Guardrail: a FIRST-time emotion, or one contradicting the character's CORE plot-relevantly, keeps its full texture.\n  5. SPATIAL/STAGING COMPRESSION - travel becomes origin to destination + anything significant en route. Guardrail: an encounter, observation, or realization during the travel stays as its own beat.\n  6. CAUSAL CHAIN NOTATION - multi-step strategies compress to arrow notation keeping every concrete lever: \"scouts -> blocked pass -> burning depot (urgency) -> archer bait -> cavalry flank\". Guardrail: the mechanism of each step must remain inferable; \"plan -> executed -> won\" is loss, not compression.\n  7. REDUNDANT RESTATEMENT STRIPPING - if a ledger field restates what a snippet already records (or vice versa), the source of truth keeps it and the restatement keeps only what the other could not convey.\n  8. NOTATION COMPRESSION - last, pure notation tightening with zero information content (filler transitions, double-framing, restated headers). Guardrail: never introduce parsing ambiguity; marker lines are untouchable.\n  ZERO-LOSS VERIFICATION (mandatory, after all techniques - \"same entry count\" is the WRONG test, aggregation reduces count by design). Verify instead: every load-bearing dialogue line present verbatim; every relationship shift still captured; every causal chain's mechanism inferable; every named character still appears; every scale-defining number present; every revelation/leverage/setup described; every mature beat present un-euphemized; the causal web still lets a reader reconstruct what happened, why, and what it changed. ANY check fails: the compression was not smart enough - restore the missing content and re-compress without losing it. Report estimated tokens before/after and the verification result as scan evidence.\n*brief - write a short handoff paragraph IN CHAT (no docedits, never in the document) telling a fresh Storyteller where the story stands and what is in motion, for use as the first message of a new session.\nFree-form (\"change X\", \"retcon Y\", \"Alaric should never have learned Z\") - the minimal correct edit, then the M-SCAN class pass across the whole file, then the edits.\n\n=== HOW YOU DELIVER ===\nYou never output the file and never produce downloads - the extension applies your docedits as reviewable diff cards with undo, and the user exports/imports the document themselves. Prefer several surgical edits (the author reviews each one) over rewrites. \"replace_all\" is permitted ONLY for *optimize and an approved full-scope *cleanup - those commands ARE the user explicitly requesting a full rewrite - and its \"replace\" must then be the COMPLETE document with every kept block present: never a diff, never \"unchanged sections omitted\", never \"rest as before\" - an omitted block is a silently deleted block.\nIn chat alongside the edits: the change report - what changed and why, scan evidence, estimated token delta when size changed. Reference content by character name or snippet turns plus a SHORT quote; never paste whole snippets or dossiers into the report; never echo the document back; never re-explain these instructions; never ask whether to proceed on a command already given. Every token you print is the user's budget: spend it on findings and fixes, not narration.";
 
@@ -2503,11 +2503,17 @@ function assembleMessages(kind, c){
     sysParts.push(doceditProtocol(attached));
     let anySmart = false;
     const q = lastUserText(c);
+    const applied = appliedByFile(c);
     for (const d of attached){
+      /* with a single file attached the protocol lets "file" be omitted, so
+         unnamed applied edits belong to it */
+      let mine = applied.get(d.name) || 0;
+      if (attached.length === 1) mine += applied.get("") || 0;
+      const own = mine ? authorshipLine(mine) : "";
       if (docSmart(d)){
         anySmart = true;
-        sysParts.push("[FILE: " + d.name + " \u2014 relevant excerpts, not the whole file]\n" + relevantChunks(d.text, q, 7000));
-      } else sysParts.push("[FILE: " + d.name + "]\n" + d.text);
+        sysParts.push("[FILE: " + d.name + " \u2014 relevant excerpts, not the whole file]\n" + relevantChunks(d.text, q, 7000) + own);
+      } else sysParts.push("[FILE: " + d.name + "]\n" + d.text + own);
     }
     if (anySmart) sysParts.push("Files marked as excerpts show only their most relevant parts. Never use replace_all on an excerpted file \u2014 you have not seen all of it.");
   } else if (c.filesOn) sysParts.push(doceditProtocol([]));
@@ -2966,11 +2972,11 @@ async function send(userText, mode, forConvo){
          error, a narrated "done" with nothing staged. Parse the visible text
          first; if it carries nothing, parse the thinking too. */
       const pd = parseDocEdits(asst.content);
-      if (pd.edits.length){ asst.edits = pd.edits; asst.content = stripDocEdits(asst.content); supersedeStale(convo, asst); }
+      if (pd.edits.length){ asst.edits = pd.edits; if (pd.warn) asst.editWarn = pd.warn; asst.content = stripDocEdits(asst.content); supersedeStale(convo, asst); }
       else if (pd.error){ asst.editError = pd.error; asst.content = stripDocEdits(asst.content); }
       else if (asst.thinking){
         const pt = parseDocEdits(asst.thinking);
-        if (pt.edits.length){ asst.edits = pt.edits; asst.thinking = stripDocEdits(asst.thinking); supersedeStale(convo, asst); }
+        if (pt.edits.length){ asst.edits = pt.edits; if (pt.warn) asst.editWarn = pt.warn; asst.thinking = stripDocEdits(asst.thinking); supersedeStale(convo, asst); }
         else if (pt.error){ asst.editError = pt.error; asst.thinking = stripDocEdits(asst.thinking); }
       }
     }
@@ -3738,6 +3744,10 @@ Rules:
   thinking or reasoning, and never only describe an edit in prose.
 - You cannot change a file any other way. Never say or imply an edit was
   made unless you emitted the block and the user applied it.
+- Keep a block under about 25 edits. A long block risks being cut off by the
+  token limit; send the rest in the next reply instead.
+- An edit marked applied is already in the file text above. Never re-send it,
+  and never tell the user someone else changed the file.
 - If the user is only chatting or asking a question, send no block at all.`;
 function doceditProtocol(list){
   const arr = Array.isArray(list) ? list : (list ? [list] : []);
@@ -3768,7 +3778,13 @@ function findBlock(text, tag){
     if (/^\s*(\[|\{|```)/.test(inner)) return cand;
     if (!fallback) fallback = cand;
   }
-  return fallback;
+  if (fallback) return fallback;
+  /* An opener with no closer anywhere means the reply was cut off mid-block
+     (a long batch hitting the token ceiling). Returning null here made the
+     whole thing INVISIBLE: no cards, no error, and the model narrating edits
+     it believed it sent. Hand back the tail and say it is open. */
+  const last = opens[opens.length - 1];
+  return { inner: src.slice(last + openTag.length), start: last, end: src.length, open: true };
 }
 // Models emit raw line breaks inside JSON strings constantly. Escape controls
 // that sit between unescaped quotes so the block still parses.
@@ -3818,11 +3834,86 @@ function stripTrailingCommasOutsideStrings(s){
   }
   return out;
 }
+/* Pull every COMPLETE top-level {...} out of a broken array, string-aware so
+   a brace or quote inside a value is never mistaken for structure. A single
+   bad escape used to void the entire batch — 300 good edits discarded over
+   one character, reported as "ask for it again". Now the good ones stage and
+   the report names exactly what was lost. */
+function _walkObjects(raw){
+  const objs = [];
+  let depth = 0, start = -1, instr = false, esc = false, lastEnd = 0;
+  for (let i = 0; i < raw.length; i++){
+    const ch = raw[i];
+    if (esc){ esc = false; continue; }
+    if (instr){
+      if (ch === "\\") esc = true;
+      else if (ch === '"') instr = false;
+      continue;
+    }
+    if (ch === '"'){ instr = true; continue; }
+    if (ch === "{"){ if (depth === 0) start = i; depth++; continue; }
+    if (ch === "}"){
+      depth--;
+      if (depth === 0 && start >= 0){ objs.push(raw.slice(start, i + 1)); start = -1; lastEnd = i + 1; }
+      continue;
+    }
+  }
+  return { objs: objs, lastEnd: lastEnd, open: depth !== 0 || instr };
+}
+/* One object ends and the next begins at "}," + "{" — searched literally,
+   which is exactly what makes it work after a stray quote has desynchronized
+   string tracking. Only used on the tail the state walker could not consume:
+   a piece that does not parse on its own is counted as lost, never guessed
+   at, so this can drop an edit but can never invent one. */
+function _resyncPieces(rem){
+  const body = rem.replace(/^\s*,\s*/, "").replace(/\s*\]\s*$/, "");
+  const parts = [];
+  let start = 0, i = 0;
+  while (true){
+    const j = body.indexOf("},", i);
+    if (j === -1){ parts.push(body.slice(start)); break; }
+    let m = j + 2;
+    while (m < body.length && /\s/.test(body[m])) m++;
+    if (body[m] === "{"){ parts.push(body.slice(start, j + 1)); start = m; i = m; }
+    else i = j + 2;
+  }
+  return parts.filter(x => x.trim());
+}
+function _parseOne(o){
+  try { return JSON.parse(o); }
+  catch (_){
+    try { return JSON.parse(escapeRawControlsInStrings(stripTrailingCommasOutsideStrings(o))); } catch (_2){ return null; }
+  }
+}
+function salvageEditObjects(raw){
+  const w = _walkObjects(raw);
+  const kept = [];
+  let dropped = 0;
+  for (const o of w.objs){
+    const v = _parseOne(o);
+    if (v && typeof v === "object" && !Array.isArray(v)) kept.push(v); else dropped++;
+  }
+  /* The walker stops making sense at the first unescaped quote, so everything
+     after it used to be thrown away — one stray character costing hundreds
+     of good edits. Re-anchor on the tail and keep going. */
+  let recovered = 0;
+  if (w.open){
+    const rem = raw.slice(w.lastEnd);
+    if (rem.replace(/[\s,\]]/g, "").length > 1){
+      for (const piece of _resyncPieces(rem)){
+        const v = _parseOne(piece);
+        if (v && typeof v === "object" && !Array.isArray(v)){ kept.push(v); recovered++; }
+        else dropped++;
+      }
+    }
+  }
+  return { kept: kept, dropped: dropped, cut: w.open && !recovered };
+}
 function parseDocEdits(text){
   const b = findBlock(text, "docedits");
   if (!b) return { edits: [] };
   let raw = b.inner.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
-  let arr = null;
+  let arr = null, warn = "";
   try { arr = JSON.parse(raw); }
   catch (e1){
     let repaired = stripTrailingCommasOutsideStrings(raw);
@@ -3830,10 +3921,23 @@ function parseDocEdits(text){
     catch (e2){
       repaired = escapeRawControlsInStrings(repaired);
       try { arr = JSON.parse(repaired); }
-      catch (e3){ return { edits: [], error: "the edit block wasn't valid JSON — ask for it again" }; }
+      catch (e3){
+        const sv = salvageEditObjects(raw);
+        if (!sv.kept.length) return { edits: [], error: b.open
+          ? "the edit block was cut off before anything usable arrived \u2014 send fewer edits per block"
+          : "the edit block wasn't valid JSON \u2014 ask for it again" };
+        arr = sv.kept;
+        warn = (b.open || sv.cut)
+          ? ("the block was cut off \u2014 " + sv.kept.length + " edit" + (sv.kept.length === 1 ? " arrived complete and is staged;" : "s arrived complete and are staged;")
+             + " anything after them never arrived. Re-send ONLY the missing ones, in a smaller block.")
+          : (sv.dropped + " edit" + (sv.dropped === 1 ? " was" : "s were") + " unreadable and skipped; the other "
+             + sv.kept.length + " staged. Re-send only the skipped one" + (sv.dropped === 1 ? "" : "s") + ".");
+      }
     }
   }
+  if (arr && !Array.isArray(arr) && typeof arr === "object"){ arr = [arr]; }
   if (!Array.isArray(arr)) return { edits: [], error: "the edit block wasn't a list" };
+  if (!warn && b.open) warn = "the block had no closing tag \u2014 it was cut off, so later edits may be missing.";
   const edits = [];
   for (const e of arr){
     if (!e || typeof e !== "object") continue;
@@ -3849,7 +3953,7 @@ function parseDocEdits(text){
     if (typeof e.insert_after === "string" && e.insert_after.length){ edits.push({ id:uid(), type:"insert", find:e.insert_after, file:file, replace:replace, reason:reason, status:"pending" }); continue; }
     if (typeof e.find === "string" && e.find.length){ edits.push({ id:uid(), type:"replace", find:e.find, file:file, replace:replace, all: e.all === true, reason:reason, status:"pending" }); continue; }
   }
-  return { edits: edits };
+  return warn ? { edits: edits, warn: warn } : { edits: edits };
 }
 function stripDocEdits(text){
   let out = String(text || "");
@@ -4124,6 +4228,27 @@ function supersedeStale(c, newMsg){
    This note is rebuilt at REQUEST TIME onto each sent copy of a reply that
    carried edits — never stored, never rendered — so the model always reads
    the current state of its own proposals and corrects itself. */
+/* How many applied edits landed on each file in this chat. The docedits block
+   is stripped from the stored reply, so without this the model reads a file
+   whose contents it has no record of changing — and apologizes for an edit
+   it made itself. */
+function appliedByFile(c){
+  const map = new Map();
+  for (const m of (c && c.messages) || []){
+    if (m.role !== "assistant" || !m.edits) continue;
+    for (const e of m.edits){
+      if (e.status !== "applied") continue;
+      const n = e.type === "create" ? (e.name || "") : (e.file || "");
+      map.set(n, (map.get(n) || 0) + 1);
+    }
+  }
+  return map;
+}
+function authorshipLine(n){
+  return "\n[The text above already includes " + n + " edit" + (n === 1 ? "" : "s")
+    + " you proposed and the user applied. YOU changed this file \u2014 do not re-apply those edits, "
+    + "and never tell the user the file was already edited by someone else.]";
+}
 function editStateNote(m){
   const out = [];
   if (m.edits && m.edits.length){
@@ -4133,7 +4258,7 @@ function editStateNote(m){
         : e.type === "replace_all" ? "full rewrite" + at
         : e.type === "append" ? "append" + at
         : (e.type === "insert" ? "insert_after " : "find ") + JSON.stringify(clip(e.find || "", 48)) + (e.all ? " (every occurrence)" : "") + at;
-      const st = e.status === "applied" ? "applied"
+      const st = e.status === "applied" ? "applied by the user \u2014 already present in the file text in your instructions; do not send it again"
         : e.status === "skipped" ? "skipped by the user \u2014 do not re-send it"
         : e.status === "superseded" ? "superseded by your newer proposal"
         : e.status === "failed" ? "FAILED \u2014 " + (e.note || "") + ". Copy the quoted text character-for-character from the file below and re-send this one edit."
@@ -4142,6 +4267,7 @@ function editStateNote(m){
     });
     out.push("[state of the edits you proposed in this reply]\n" + lines.join("\n") + "\n[/state]");
   }
+  if (m.editWarn) out.push("[partial edit block: " + m.editWarn + "]");
   if (m.editError) out.push("[your <docedits> block failed to parse: " + m.editError
     + ". Re-send the whole block as strictly valid JSON \u2014 newlines inside strings escaped as \\n, no trailing commas.]");
   return out.join("\n\n");
@@ -4310,7 +4436,8 @@ function clip(s, n){
   return s.length > n ? s.slice(0, n) + "…" : s;
 }
 function editCardsHtml(m){
-  if (m.editError) return '<div class="edits"><div class="edit-card"><div class="why">' + escapeHtml(m.editError) + '</div></div></div>';
+  if (m.editError) return '<div class="edits"><div class="edit-card"><div class="why">' + escapeHtml(m.editError) + '</div>'
+    + '<div class="row"><button class="go" data-reblock="' + m.id + '">Ask again</button></div></div></div>';
   if (!m.edits || !m.edits.length) return "";
   const left = m.edits.filter(e => e.status === "pending").length;
   const lastBatch = (m.edits.slice().reverse().find(e => e.status === "applied" && e.batch) || {}).batch;
@@ -4329,9 +4456,15 @@ function editCardsHtml(m){
       + (e.reason ? '<div class="why">' + escapeHtml(e.reason) + '</div>' : "")
       + '<div class="diff">' + del + add + '</div>'
       + '<div class="row"><button class="go" data-apply="' + m.id + '|' + e.id + '">Apply</button>'
-      + '<button data-skip="' + m.id + '|' + e.id + '">Skip</button></div></div>';
+      + '<button data-skip="' + m.id + '|' + e.id + '">Skip</button>'
+      + (e.status === "failed" ? '<button data-reask="' + m.id + '|' + e.id + '" title="Ask the assistant to re-send this one edit, quoted exactly">'
+          + (e.asked ? "Ask again \u00b7\u21bb" : "Ask again") + '</button>' : "")
+      + '</div></div>';
   }).join("");
-  return '<div class="edits"><div class="edits-head"><span class="t">'
+  return '<div class="edits">'
+    + (m.editWarn ? '<div class="edit-card"><div class="why">' + escapeHtml(m.editWarn) + '</div>'
+        + '<div class="row"><button class="go" data-reblock="' + m.id + '">Ask for the rest</button></div></div>' : "")
+    + '<div class="edits-head"><span class="t">'
     + m.edits.length + ' proposed change' + (m.edits.length === 1 ? "" : "s") + '</span>'
     + (left ? '<button data-applyall="' + m.id + '">Apply all</button>' : "")
     + (lastBatch ? '<button data-undobatch="' + lastBatch + '" title="Revert this batch on every file it touched">Undo</button>' : "")
@@ -4413,6 +4546,38 @@ async function undoBatch(batchId){
   toast(done ? ("Undid " + done + " file" + (done === 1 ? "" : "s")
           + (skipped ? " · " + skipped + " changed since — skipped" : ""))
       : (skipped ? "That batch is buried under newer changes — use per-file undo" : "Nothing to undo"));
+}
+/* Passive feedback only reached the model on the user's NEXT message, which
+   meant a failed card sat dead until the user typed the re-request by hand.
+   These two buttons send it — the state note already rides along, so the
+   model gets the failure, the reason, and the current file text in one turn. */
+function editPhrase(e){
+  const where = e.file ? ' in "' + e.file + '"' : "";
+  return e.type === "create" ? 'create_file "' + (e.name || "") + '"'
+    : e.type === "replace_all" ? "the full rewrite" + where
+    : e.type === "append" ? "the append" + where
+    : (e.type === "insert" ? "insert_after " : "find ") + JSON.stringify(clip(e.find || "", 60)) + where;
+}
+async function reproposeEdit(msgId, editId){
+  const c = current; if (!c) return;
+  const m = c.messages.find(x => x.id === msgId); if (!m || !m.edits) return;
+  const e = m.edits.find(x => x.id === editId); if (!e) return;
+  e.asked = true; renderThread();
+  await send("That edit failed \u2014 " + editPhrase(e) + ": " + (e.note || "it could not be applied")
+    + ". Send ONE <docedits> block with only this edit, copying the anchor character-for-character "
+    + "from the file text in your instructions. No prose, no other edits.");
+}
+async function reproposeBlock(msgId){
+  const c = current; if (!c) return;
+  const m = c.messages.find(x => x.id === msgId); if (!m) return;
+  const staged = (m.edits || []).length;
+  await send(m.editWarn
+    ? "Your edit block was incomplete \u2014 " + staged + " edit" + (staged === 1 ? "" : "s")
+      + " arrived and are on screen. Re-send ONLY the ones that never arrived, as a smaller valid "
+      + "<docedits> block. Do not repeat the ones already listed."
+    : "Your <docedits> block could not be read: " + (m.editError || "invalid JSON")
+      + ". Re-send it as strictly valid JSON \u2014 newlines inside strings escaped as \\n, no trailing "
+      + "commas, and split it into smaller blocks if it was long.");
 }
 async function applyAll(msgId){
   const c = current;
@@ -5241,6 +5406,10 @@ on("#threadInner", "click", async function(e){
   if (aa){ await applyAll(aa.dataset.applyall); return; }
   const ub = e.target.closest("[data-undobatch]");
   if (ub){ await undoBatch(ub.dataset.undobatch); return; }
+  const ra = e.target.closest("[data-reask]");
+  if (ra){ const parts = ra.dataset.reask.split("|"); await reproposeEdit(parts[0], parts[1]); return; }
+  const rb = e.target.closest("[data-reblock]");
+  if (rb){ await reproposeBlock(rb.dataset.reblock); return; }
   const ds = e.target.closest("[data-dismiss]");
   if (ds){
     const m = current.messages.find(x => x.id === ds.dataset.dismiss);
