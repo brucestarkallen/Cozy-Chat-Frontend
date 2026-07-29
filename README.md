@@ -101,6 +101,13 @@ Tap **Test** before saving.
   version's proposals with their own applied/pending states — one version's
   prose never sits over another version's cards, and regenerating no longer
   drops the cards the old version proposed.
+- **Edits can't hide in thinking.** Reasoning models sometimes emit the
+  docedits block inside their thinking or on a separate reasoning channel;
+  those blocks are now parsed, staged as normal confirmation cards, and
+  scrubbed from the stored thinking — a block in the visible reply still
+  wins. And a reply that proposed no edits in a files chat says exactly that
+  to the model on the next message, so "is it done?" gets answered from
+  machine truth, not a guess.
 - **Undo a whole batch.** After Apply all, one Undo on the reply's edit
   header reverts that batch on every file it touched. A file you've changed
   since is skipped with a note — never silently unwound — and per-file undo
@@ -432,11 +439,11 @@ network-first, so a refresh always gets the newest version.
 | `send()` | Sends and reads the streaming reply |
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
-**Tests.** Everything in `tests/` — `v513test.js` down to `v2test.js`, plus
+**Tests.** Everything in `tests/` — `v5131test.js` down to `v2test.js`, plus
 `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`, `swtest.js`,
 `scrolltest.js`, `styletest.js`, `hiddentest.js`, `coherencetest.js` and
 `installtest.sh` — runs under Node with jsdom (`npm i jsdom fake-indexeddb`).
-986 checks across the matching engine, JSON tolerance, prompt assembly,
+1003 checks across the matching engine, JSON tolerance, prompt assembly,
 proposal supersede,
 projects, retrieval, streaming, SSE framing and Hermes tool activity,
 stream/chat binding, touch reorder, reader-owned scrolling, backup

@@ -101,8 +101,12 @@ console.log('=== 3. WIRE-ONLY: NEVER STORED, NEVER SHOWN, FREE WHEN CLEAN ===');
   })()`);
   const p=assembled(w);
   const body=JSON.parse(p).messages;
-  const clean=body.find(m=>String(m.content)==='clean reply, no edits');
-  ck('a reply without edits is sent byte-identical', !!clean);
+  // v5.13.1: in a FILES chat a zero-edit reply now carries the no-edits
+  // truth on the wire (prose first, note appended); byte-identity without
+  // files is guarded in v5131test. The stored message stays clean below.
+  const clean=body.find(m=>String(m.content).indexOf('clean reply, no edits')===0);
+  ck('a reply without edits keeps its prose first on the wire', !!clean);
+  ck('and now carries the no-edits truth', !!clean && /no file edits were proposed/.test(String(clean.content)));
   ck('stored message content untouched', w.eval(`current.messages.find(m=>m.id==='A1').content`)==='sure');
   ck('the user never sees the note in the thread', !/\[state of the edits/.test(d.querySelector('#thread').textContent));
   const notes=(p.match(/\[state of the edits/g)||[]).length;
