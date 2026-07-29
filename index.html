@@ -1495,10 +1495,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v5.9.0
+   COZY CHAT v5.10.0
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "5.9.0";
+const VERSION = "5.10.0";
 
 const PRESETS = {
   anthropic:  { name:"Claude",     kind:"anthropic", url:"https://api.anthropic.com/v1", model:"claude-sonnet-4-6", ctx:200000, hint:"e.g. claude-sonnet-4-6, claude-opus-4-5" },
@@ -2394,6 +2394,10 @@ function assembleMessages(kind, c){
         c += "\n\n<image_results note=\"these images are already shown to the user above your reply\">\n"
           + m.images.map((im,i) => "[" + (i+1) + "] " + (im.title || "image") + " \u2014 " + (im.full || im.url)).join("\n")
           + "\n</image_results>";
+      }
+      if (m.role === "assistant" && ((m.edits && m.edits.length) || m.editError)){
+        const st = editStateNote(m);
+        if (st) c += "\n\n" + st;
       }
       const atts = m.attachments || [];
       for (const a of atts) if (a.kind === "text"){
@@ -3865,6 +3869,38 @@ function supersedeStale(c, newMsg){
     }
   }
   return n;
+}
+
+/* ---------- edit-state feedback ---------- */
+/* The model is blind to its own cards: the docedits block is stripped from
+   every stored reply, and outcomes — applied, failed, skipped, superseded,
+   still pending — only ever lived on the cards the USER sees. So a failed
+   locate sat dead until the user typed "quote it exactly" by hand, and the
+   model happily re-proposed work that was already applied or still waiting.
+   This note is rebuilt at REQUEST TIME onto each sent copy of a reply that
+   carried edits — never stored, never rendered — so the model always reads
+   the current state of its own proposals and corrects itself. */
+function editStateNote(m){
+  const out = [];
+  if (m.edits && m.edits.length){
+    const lines = m.edits.map((e, i) => {
+      const at = e.file ? ' in "' + e.file + '"' : "";
+      const what = e.type === "create" ? 'create_file "' + (e.name || "") + '"'
+        : e.type === "replace_all" ? "full rewrite" + at
+        : e.type === "append" ? "append" + at
+        : (e.type === "insert" ? "insert_after " : "find ") + JSON.stringify(clip(e.find || "", 48)) + at;
+      const st = e.status === "applied" ? "applied"
+        : e.status === "skipped" ? "skipped by the user \u2014 do not re-send it"
+        : e.status === "superseded" ? "superseded by your newer proposal"
+        : e.status === "failed" ? "FAILED \u2014 " + (e.note || "") + ". Copy the quoted text character-for-character from the file below and re-send this one edit."
+        : "pending \u2014 the user has not acted on it yet; do not re-propose it";
+      return (i + 1) + ". " + what + ": " + st;
+    });
+    out.push("[state of the edits you proposed in this reply]\n" + lines.join("\n") + "\n[/state]");
+  }
+  if (m.editError) out.push("[your <docedits> block failed to parse: " + m.editError
+    + ". Re-send the whole block as strictly valid JSON \u2014 newlines inside strings escaped as \\n, no trailing commas.]");
+  return out.join("\n\n");
 }
 
 /* ---------- matching ---------- */

@@ -101,6 +101,12 @@ Tap **Test** before saving.
   version's proposals with their own applied/pending states — one version's
   prose never sits over another version's cards, and regenerating no longer
   drops the cards the old version proposed.
+- **Failed edits fix themselves.** The assistant is shown the fate of every
+  card it proposed — applied, pending, skipped, superseded, or failed and
+  why — folded into each request, never stored, never shown to you. A
+  misquoted find comes back re-quoted character-for-character on the next
+  message by itself; applied and still-pending work stops being re-proposed;
+  an unparseable edit block is re-sent as valid JSON without you asking.
 
 **Projects** (sidebar → **+ Project**)
 - A project groups chats and gives them shared ground: its own **instructions**,
@@ -401,11 +407,11 @@ network-first, so a refresh always gets the newest version.
 | `send()` | Sends and reads the streaming reply |
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
-**Tests.** Everything in `tests/` — `v59test.js` down to `v2test.js`, plus
+**Tests.** Everything in `tests/` — `v510test.js` down to `v2test.js`, plus
 `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`, `swtest.js`,
 `scrolltest.js`, `styletest.js`, `hiddentest.js`, `coherencetest.js` and
 `installtest.sh` — runs under Node with jsdom (`npm i jsdom fake-indexeddb`).
-902 checks across the matching engine, JSON tolerance, prompt assembly,
+920 checks across the matching engine, JSON tolerance, prompt assembly,
 proposal supersede,
 projects, retrieval, streaming, SSE framing and Hermes tool activity,
 stream/chat binding, touch reorder, reader-owned scrolling, backup
