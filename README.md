@@ -90,6 +90,17 @@ Tap **Test** before saving.
   (trailing commas, raw newlines inside strings) and reported plainly when it isn't.
 - The file icon shows a count when more than one is attached; tap it to open,
   undo, or remove any of them individually.
+- **Stale cards retire themselves.** Ask again without applying, and when the
+  new reply proposes the same change — same append, same quoted find, a full
+  rewrite covering it, a duplicate create — the older card is marked
+  **Superseded** and drops out of Apply all. Newest wins, visibly; a stale
+  card can never land an append twice or nest a replacement inside the fresh
+  one. Anything not provably the same change (a rephrased quote, an insert
+  next to a replace) is left alone.
+- **Each version of a reply keeps its own cards.** Swiping ‹ › shows that
+  version's proposals with their own applied/pending states — one version's
+  prose never sits over another version's cards, and regenerating no longer
+  drops the cards the old version proposed.
 
 **Projects** (sidebar → **+ Project**)
 - A project groups chats and gives them shared ground: its own **instructions**,
@@ -390,11 +401,12 @@ network-first, so a refresh always gets the newest version.
 | `send()` | Sends and reads the streaming reply |
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
-**Tests.** Everything in `tests/` — `v521test.js` down to `v2test.js`, plus
+**Tests.** Everything in `tests/` — `v59test.js` down to `v2test.js`, plus
 `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`, `swtest.js`,
 `scrolltest.js`, `styletest.js`, `hiddentest.js`, `coherencetest.js` and
 `installtest.sh` — runs under Node with jsdom (`npm i jsdom fake-indexeddb`).
-883 checks across the matching engine, JSON tolerance, prompt assembly,
+902 checks across the matching engine, JSON tolerance, prompt assembly,
+proposal supersede,
 projects, retrieval, streaming, SSE framing and Hermes tool activity,
 stream/chat binding, touch reorder, reader-owned scrolling, backup
 round-trips, migration, and negative tests that deliberately reintroduce

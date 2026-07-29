@@ -1495,10 +1495,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v5.8.1
+   COZY CHAT v5.9.0
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "5.8.1";
+const VERSION = "5.9.0";
 
 const PRESETS = {
   anthropic:  { name:"Claude",     kind:"anthropic", url:"https://api.anthropic.com/v1", model:"claude-sonnet-4-6", ctx:200000, hint:"e.g. claude-sonnet-4-6, claude-opus-4-5" },
@@ -1932,6 +1932,17 @@ function variantsOf(m){
 function syncVariant(m){
   const v = variantsOf(m)[m.vi];
   m.content = v.content; m.thinking = v.thinking; m.model = v.model; m.sources = v.sources; m.tools = v.tools; m.approvals = v.approvals;
+  m.edits = v.edits; m.editError = v.editError;
+}
+/* Inverse of syncVariant: write the live fields back into the version being
+   left, so every version of a reply keeps its OWN edit cards and their
+   applied/pending states. Before this, cards belonged to the message, not
+   the version: swiping showed one version's prose over another version's
+   cards, and a regenerate silently dropped the old version's pending cards. */
+function saveVariant(m){
+  const v = variantsOf(m)[m.vi];
+  v.content = m.content; v.thinking = m.thinking; v.model = m.model; v.sources = m.sources; v.tools = m.tools; v.approvals = m.approvals;
+  v.edits = m.edits; v.editError = m.editError;
 }
 function lastAssistantIdx(){
   if (!current) return -1;
@@ -2926,7 +2937,7 @@ async function send(userText, mode, forConvo){
     if (asst.tools) for (const t of asst.tools) if (t.status === "running") t.status = "done";
     if (chatDocIds(convo).length || convo.filesOn){
       const pd = parseDocEdits(asst.content);
-      if (pd.edits.length){ asst.edits = pd.edits; asst.content = stripDocEdits(asst.content); }
+      if (pd.edits.length){ asst.edits = pd.edits; asst.content = stripDocEdits(asst.content); supersedeStale(convo, asst); }
       else if (pd.error){ asst.editError = pd.error; asst.content = stripDocEdits(asst.content); }
     }
     if (!asst.content && !asst.thinking) asst.content = "_(empty reply)_";
@@ -2950,7 +2961,7 @@ async function send(userText, mode, forConvo){
     if (asst && asst.approvals) for (const a of asst.approvals) if (a.status === "pending") a.status = "expired";
     if (asst && asst.role === "assistant"){
       asst.variants = asst.variants || [];
-      const snap = { content:asst.content, thinking:asst.thinking, model:asst.model, sources:asst.sources, tools:asst.tools, approvals:asst.approvals };
+      const snap = { content:asst.content, thinking:asst.thinking, model:asst.model, sources:asst.sources, tools:asst.tools, approvals:asst.approvals, edits:asst.edits, editError:asst.editError };
       if (continuing && asst.variants.length) asst.variants[asst.vi] = snap;
       else { asst.variants.push(snap); asst.vi = asst.variants.length - 1; }
     }
@@ -3463,7 +3474,7 @@ on("#threadInner", "click", async function(e){
   if (sw){
     const m = current.messages.find(x=>x.id===sw.dataset.swipe);
     const next = m.vi + Number(sw.dataset.dir);
-    if (next >= 0 && next < m.variants.length){ m.vi = next; syncVariant(m); renderThread(); await persist(); }
+    if (next >= 0 && next < m.variants.length){ saveVariant(m); m.vi = next; syncVariant(m); renderThread(); await persist(); }
     return;
   }
   const cp = e.target.closest("[data-copy]");
@@ -3488,7 +3499,7 @@ on("#threadInner", "click", async function(e){
     const i = convo.messages.findIndex(x=>x.id===rg.dataset.regen);
     const m = convo.messages[i];
     if (i === lastAssistantIdx()){
-      const kept = variantsOf(m).slice();
+      saveVariant(m); const kept = variantsOf(m).slice();
       convo.messages = convo.messages.slice(0, i);
       renderThread(); await persistConvo(convo); pinned = true;
       await send(null, null, convo);
@@ -3806,6 +3817,56 @@ function stripDocEdits(text){
   return out.trim();
 }
 
+/* ---------- proposal supersede ---------- */
+/* The reported class this retires mechanically: the assistant proposes an
+   edit, the user asks again WITHOUT applying it, the next reply proposes
+   nearly the same edit — and now two live cards target the same spot. Apply
+   both and an append lands twice, or the stale find matches INSIDE the fresh
+   replacement and nests garbage into the file with no error. So when a fresh
+   reply stages proposals, older still-pending cards that PROVABLY collide
+   with them are marked superseded — newest wins, visibly, on the card.
+   Only provable collisions are touched:
+     - two find/replace edits anchored on the SAME find text (both can only
+       ever hit the first occurrence, so they cannot both be right),
+     - an identical insert (same anchor, same text) or identical append,
+     - anything pending on a file a fresh full rewrite is about to replace,
+     - a duplicate create of the same file name (two applies would make two
+       files with one name, and every later edit by name hits the first).
+   Deliberately left alone, because retiring possibly-wanted work silently is
+   worse than a clean failed card: a REPHRASED find aiming at the same passage
+   (unprovable without locating both), an insert vs a replace sharing an
+   anchor (the insert does not consume it — both may be wanted), and an OLDER
+   full rewrite facing a newer targeted edit. */
+function editsCollide(oldE, newE, c){
+  if (oldE.type === "create" || newE.type === "create"){
+    const nb = x => String(x || "").trim().toLowerCase().replace(/^.*[\\/]/, "");
+    return oldE.type === "create" && newE.type === "create" && nb(oldE.name) === nb(newE.name);
+  }
+  const oldDoc = resolveTarget(oldE, c), newDoc = resolveTarget(newE, c);
+  if (!oldDoc || !newDoc || oldDoc.id !== newDoc.id) return false;
+  if (newE.type === "replace_all") return true;
+  if (oldE.type !== newE.type) return false;
+  if (oldE.type === "replace") return oldE.find === newE.find;
+  if (oldE.type === "insert")  return oldE.find === newE.find && oldE.replace === newE.replace;
+  if (oldE.type === "append")  return oldE.replace === newE.replace;
+  return false;
+}
+function supersedeStale(c, newMsg){
+  const fresh = (newMsg.edits || []).filter(e => e.status === "pending");
+  if (!fresh.length) return 0;
+  let n = 0;
+  for (const m of c.messages){
+    if (m.id === newMsg.id || m.role !== "assistant" || !m.edits) continue;
+    for (const e of m.edits){
+      if (e.status !== "pending") continue;
+      if (fresh.some(f => editsCollide(e, f, c))){
+        e.status = "superseded"; e.note = "a newer reply covers this"; n++;
+      }
+    }
+  }
+  return n;
+}
+
 /* ---------- matching ---------- */
 // length-preserving, so indices stay valid against the original string
 function normChars(s){
@@ -3969,7 +4030,8 @@ function editCardsHtml(m){
     const stCls = e.status === "applied" ? "ok" : (e.status === "failed" ? "bad" : "");
     const stTxt = e.status === "applied" ? ("Applied" + (e.note ? " · " + e.note : ""))
                 : e.status === "failed"  ? ("Failed · " + (e.note || ""))
-                : e.status === "skipped" ? "Skipped" : "";
+                : e.status === "skipped" ? "Skipped"
+                : e.status === "superseded" ? ("Superseded · " + (e.note || "a newer reply covers this")) : "";
     return '<div class="edit-card' + (e.status !== "pending" ? " done" : "") + '" data-eid="' + e.id + '">'
       + '<div class="kind">' + escapeHtml(editKindLabel(e))
       + '<span class="st ' + stCls + '">' + escapeHtml(stTxt) + '</span></div>'
