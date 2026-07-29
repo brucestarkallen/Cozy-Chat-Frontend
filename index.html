@@ -1495,10 +1495,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v5.10.0
+   COZY CHAT v5.11.0
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "5.10.0";
+const VERSION = "5.11.0";
 
 const PRESETS = {
   anthropic:  { name:"Claude",     kind:"anthropic", url:"https://api.anthropic.com/v1", model:"claude-sonnet-4-6", ctx:200000, hint:"e.g. claude-sonnet-4-6, claude-opus-4-5" },
@@ -3686,6 +3686,7 @@ const DOCEDIT_BODY =
 [
   {"create_file": "name.md", "replace": "the complete contents", "reason": "why"},
   {"file": "which.md", "find": "verbatim excerpt", "replace": "new text", "reason": "why"},
+  {"file": "which.md", "find": "verbatim excerpt", "replace": "new text", "all": true, "reason": "replace EVERY exact occurrence"},
   {"file": "which.md", "insert_after": "verbatim anchor line", "replace": "text under the anchor", "reason": "why"},
   {"file": "which.md", "append": true, "replace": "text added at the end", "reason": "why"},
   {"file": "which.md", "replace_all": true, "replace": "entire new file", "reason": "only on an explicit full-rewrite request"}
@@ -3700,6 +3701,8 @@ Rules:
 - "find" and "insert_after" MUST be copied character-for-character from the file.
   Do not paraphrase them. Quote the smallest unique span that does the job.
 - Valid JSON only: escape newlines inside strings as \\n, no trailing commas.
+- Add "all": true to a find/replace to change every exact occurrence in one
+  edit (a rename, a recurring fix). Exact literal match only.
 - Use replace_all only when explicitly asked to rewrite the whole file.
 - If the user is only chatting or asking a question, send no block at all.`;
 function doceditProtocol(list){
@@ -3810,7 +3813,7 @@ function parseDocEdits(text){
     if (e.replace_all === true){ edits.push({ id:uid(), type:"replace_all", find:null, file:file, replace:replace, reason:reason, status:"pending" }); continue; }
     if (e.append === true){ edits.push({ id:uid(), type:"append", find:null, file:file, replace:replace, reason:reason, status:"pending" }); continue; }
     if (typeof e.insert_after === "string" && e.insert_after.length){ edits.push({ id:uid(), type:"insert", find:e.insert_after, file:file, replace:replace, reason:reason, status:"pending" }); continue; }
-    if (typeof e.find === "string" && e.find.length){ edits.push({ id:uid(), type:"replace", find:e.find, file:file, replace:replace, reason:reason, status:"pending" }); continue; }
+    if (typeof e.find === "string" && e.find.length){ edits.push({ id:uid(), type:"replace", find:e.find, file:file, replace:replace, all: e.all === true, reason:reason, status:"pending" }); continue; }
   }
   return { edits: edits };
 }
@@ -3888,7 +3891,7 @@ function editStateNote(m){
       const what = e.type === "create" ? 'create_file "' + (e.name || "") + '"'
         : e.type === "replace_all" ? "full rewrite" + at
         : e.type === "append" ? "append" + at
-        : (e.type === "insert" ? "insert_after " : "find ") + JSON.stringify(clip(e.find || "", 48)) + at;
+        : (e.type === "insert" ? "insert_after " : "find ") + JSON.stringify(clip(e.find || "", 48)) + (e.all ? " (every occurrence)" : "") + at;
       const st = e.status === "applied" ? "applied"
         : e.status === "skipped" ? "skipped by the user \u2014 do not re-send it"
         : e.status === "superseded" ? "superseded by your newer proposal"
@@ -4026,6 +4029,15 @@ function applyEditToText(text, edit){
   const t = String(text == null ? "" : text);
   if (edit.type === "replace_all") return { text: edit.replace, note: "whole file replaced" };
   if (edit.type === "append")      return { text: t + (t.endsWith("\n") ? "" : "\n") + edit.replace, note: "added at the end" };
+  if (edit.type === "replace" && edit.all){
+    // every EXACT occurrence, split/join so nothing is a regex; foolproof by
+    // construction: it touches only real occurrences of exactly that string,
+    // or fails cleanly and changes nothing
+    const parts = t.split(edit.find);
+    const n = parts.length - 1;
+    if (!n) return { text: null, note: "couldn't find that text in the file" };
+    return { text: parts.join(edit.replace), note: "replaced " + n + " occurrence" + (n === 1 ? "" : "s") };
+  }
   const hit = locate(t, edit.find);
   if (!hit) return { text: null, note: "couldn't find that text in the file" };
   if (hit.fuzzy && !hit.safe)
@@ -4049,7 +4061,8 @@ function editKindLabel(e){
   const where = e.file ? " — " + e.file : "";
   return (e.type === "replace_all" ? "Rewrite whole file"
        : e.type === "append" ? "Add at the end"
-       : e.type === "insert" ? "Insert after" : "Replace") + where;
+       : e.type === "insert" ? "Insert after"
+       : e.all ? "Replace everywhere" : "Replace") + where;
 }
 function clip(s, n){
   s = String(s == null ? "" : s);

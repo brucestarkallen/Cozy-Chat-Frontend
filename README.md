@@ -101,6 +101,12 @@ Tap **Test** before saving.
   version's proposals with their own applied/pending states — one version's
   prose never sits over another version's cards, and regenerating no longer
   drops the cards the old version proposed.
+- **Rename in one card.** The assistant can mark a find/replace with
+  `"all": true` and every exact occurrence in the file changes in a single
+  undoable edit — the card reads **Replace everywhere** and reports how many
+  it changed. Exact literal match only, on purpose: it touches real
+  occurrences of exactly that text or fails cleanly touching nothing, so a
+  misquote can never be written into your file N times.
 - **Failed edits fix themselves.** The assistant is shown the fate of every
   card it proposed — applied, pending, skipped, superseded, or failed and
   why — folded into each request, never stored, never shown to you. A
@@ -407,11 +413,11 @@ network-first, so a refresh always gets the newest version.
 | `send()` | Sends and reads the streaming reply |
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
-**Tests.** Everything in `tests/` — `v510test.js` down to `v2test.js`, plus
+**Tests.** Everything in `tests/` — `v511test.js` down to `v2test.js`, plus
 `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`, `swtest.js`,
 `scrolltest.js`, `styletest.js`, `hiddentest.js`, `coherencetest.js` and
 `installtest.sh` — runs under Node with jsdom (`npm i jsdom fake-indexeddb`).
-920 checks across the matching engine, JSON tolerance, prompt assembly,
+935 checks across the matching engine, JSON tolerance, prompt assembly,
 proposal supersede,
 projects, retrieval, streaming, SSE framing and Hermes tool activity,
 stream/chat binding, touch reorder, reader-owned scrolling, backup
