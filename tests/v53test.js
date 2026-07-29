@@ -73,6 +73,14 @@ console.log('=== 1. HERMES TOOL ACTIVITY, SEEN LIVE AND KEPT ===');
   const live=d.querySelector('.tool-log .tool-row');
   ck('running tool appears while streaming', !!live && live.className.indexOf('running')>=0,
      live?live.className:'no row');
+  const det=d.querySelector('details.tool-log');
+  ck('the log arrives folded, not sprawled', !!det && !det.open);
+  ck('the summary line itself carries the live call', (function(){
+    const sm=det.querySelector('.tl-sum');
+    return sm && sm.className.indexOf('running')>=0 && sm.textContent.indexOf('web_search: bali tides')>=0;
+  })());
+  // the reader opens it; the next tool event must not slam it shut
+  det.open=true;
   await drain(w,4);
   const m=w.eval('current.messages[1]');
   ck('reply text assembled, split frame included', m.content==='Looking that up. Low tide at nine.',
@@ -80,8 +88,13 @@ console.log('=== 1. HERMES TOOL ACTIVITY, SEEN LIVE AND KEPT ===');
   ck('tool kept on the message', m.tools&&m.tools.length===1&&m.tools[0].id==='c1', JSON.stringify(m.tools));
   ck('completed event settled it', m.tools[0].status==='done', m.tools[0].status);
   ck('label carried through', m.tools[0].label==='web_search: bali tides', m.tools[0].label);
-  const row=d.querySelector('.tool-log .tool-row');
+  const row=d.querySelector('.tool-log .tl-body .tool-row');
   ck('settled row rendered as done', !!row && row.className.indexOf('done')>=0, row?row.className:'no row');
+  ck('the drawer the reader opened stayed open through repaints', d.querySelector('details.tool-log').open===true);
+  ck('a settled summary counts instead of listing', (function(){
+    const html2=w.eval('msgHtml({id:"mx",role:"assistant",content:"x",tools:[{id:"1",tool:"a",label:"a",status:"done"},{id:"2",tool:"b",label:"b",status:"done"}]},true)');
+    return html2.indexOf('2 tool calls')>=0 && html2.indexOf('<details class="tool-log">')>=0;
+  })());
   ck('the version snapshot carries it too', (function(){const v=m.variants[m.vi];return v&&v.tools&&v.tools[0]&&v.tools[0].status==='done';})(),
      JSON.stringify(m.variants[m.vi]&&m.variants[m.vi].tools));
 }

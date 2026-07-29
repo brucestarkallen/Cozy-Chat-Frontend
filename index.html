@@ -231,11 +231,16 @@ button{background:none;border:0;cursor:pointer;padding:0}
   white-space:pre-wrap;line-height:1.6;max-height:340px;overflow-y:auto;
 }
 
-/* agent tool activity (Hermes) */
+/* agent tool activity (Hermes) — folded like thinking */
 .tool-log{
   margin-bottom:10px;border:1px dashed var(--border);border-radius:var(--r);
-  background:var(--bg-2);padding:7px 12px;display:flex;flex-direction:column;gap:4px;
+  background:var(--bg-2);
 }
+.tool-log .tl-sum{padding:8px 12px;cursor:pointer;list-style:none;user-select:none;-webkit-user-select:none}
+.tool-log .tl-sum::-webkit-details-marker{display:none}
+.tl-arrow{flex:none;display:inline-block;transition:transform .15s ease;color:var(--muted);font-size:10px}
+.tool-log[open] .tl-arrow{transform:rotate(90deg)}
+.tl-body{padding:0 12px 9px;display:flex;flex-direction:column;gap:4px}
 .tool-row{
   font-family:var(--mono);font-size:11px;color:var(--muted);
   display:flex;align-items:baseline;gap:7px;min-width:0;
@@ -1490,10 +1495,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v5.8.0
+   COZY CHAT v5.8.1
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "5.8.0";
+const VERSION = "5.8.1";
 
 const PRESETS = {
   anthropic:  { name:"Claude",     kind:"anthropic", url:"https://api.anthropic.com/v1", model:"claude-sonnet-4-6", ctx:200000, hint:"e.g. claude-sonnet-4-6, claude-opus-4-5" },
@@ -2060,15 +2065,23 @@ function renderThread(){
   const lastA = lastAssistantIdx();
   /* A rebuild recreates every code block; any the user has swiped sideways
      keeps its place, matched per message so edits elsewhere cannot shift it. */
-  const keepX = {};
+  const keepX = {}, keepTL = {};
   Array.prototype.forEach.call(el.querySelectorAll(".msg[data-mid]"), function(mEl){
     const a = Array.prototype.map.call(mEl.querySelectorAll("pre"), function(p){ return p.scrollLeft; });
     if (a.some(function(v){ return v; })) keepX[mEl.getAttribute("data-mid")] = a;
+    /* same courtesy for the tool drawer: the reader opened it, so a rebuild
+       must not slam it shut */
+    const tl = mEl.querySelector("details.tool-log");
+    if (tl && tl.open) keepTL[mEl.getAttribute("data-mid")] = true;
   });
   el.innerHTML = current.messages.map((m,i) => msgHtml(m, i === lastA)).join("");
   Array.prototype.forEach.call(el.querySelectorAll(".msg[data-mid]"), function(mEl){
     const a = keepX[mEl.getAttribute("data-mid")];
     if (a) Array.prototype.forEach.call(mEl.querySelectorAll("pre"), function(p, i){ if (a[i]) p.scrollLeft = a[i]; });
+    if (keepTL[mEl.getAttribute("data-mid")]){
+      const tl = mEl.querySelector("details.tool-log");
+      if (tl) tl.open = true;
+    }
   });
   $("#regenBtn").hidden = false; $("#clearBtn").hidden = false;
   updateEmber(); scrollDown();
@@ -2239,15 +2252,28 @@ function sourcesHtml(list){
       + (s.snippet ? '<div class="snip">' + escapeHtml(s.snippet) + '</div>' : "") + '</div>').join("")
     + '</div></details>';
 }
-function toolLogHtml(list){
+function toolLogHtml(list, open){
   if (!list || !list.length) return "";
-  return '<div class="tool-log">' + list.map(function(t){
-    const st = t.status === "running" ? "running" : (t.status === "stopped" ? "stopped" : "done");
-    return '<div class="tool-row ' + st + '">'
-      + '<span class="tl-dot">' + escapeHtml(t.emoji || "\u2699") + '</span>'
-      + '<span class="tl-label">' + escapeHtml(t.label || t.tool || "tool") + '</span>'
-      + '<span class="tl-st">' + (st === "running" ? "\u2026" : st) + '</span></div>';
-  }).join("") + '</div>';
+  const running = list.filter(function(t){ return t.status === "running"; }).pop();
+  const settled = list.some(function(t){ return t.status === "stopped"; }) ? "stopped" : "done";
+  const sum = '<summary class="tl-sum tool-row' + (running ? " running" : "") + '">'
+    + '<span class="tl-arrow">\u25B8</span>'
+    + (running
+      ? '<span class="tl-dot">' + escapeHtml(running.emoji || "\u2699") + '</span>'
+        + '<span class="tl-label">' + escapeHtml(running.label || running.tool || "tool") + '</span>'
+        + '<span class="tl-st">' + (list.length > 1 ? (list.length - 1) + " \u00b7 \u2026" : "\u2026") + '</span>'
+      : '<span class="tl-dot">\u2699</span>'
+        + '<span class="tl-label">' + list.length + (list.length === 1 ? " tool call" : " tool calls") + '</span>'
+        + '<span class="tl-st">' + settled + '</span>')
+    + '</summary>';
+  return '<details class="tool-log"' + (open ? " open" : "") + '>' + sum + '<div class="tl-body">'
+    + list.map(function(t){
+      const st = t.status === "running" ? "running" : (t.status === "stopped" ? "stopped" : "done");
+      return '<div class="tool-row ' + st + '">'
+        + '<span class="tl-dot">' + escapeHtml(t.emoji || "\u2699") + '</span>'
+        + '<span class="tl-label">' + escapeHtml(t.label || t.tool || "tool") + '</span>'
+        + '<span class="tl-st">' + (st === "running" ? "\u2026" : st) + '</span></div>';
+    }).join("") + '</div></details>';
 }
 const APPROVE_LABELS = { once:"Allow once", session:"This chat", always:"Always allow", deny:"Deny" };
 function approvalHtml(m){
@@ -2683,7 +2709,7 @@ async function send(userText, mode, forConvo){
       if (S.showTools !== false && asst.tools && asst.tools.length && paintedRev !== toolsRev){
         paintedRev = toolsRev;
         let tl = document.querySelector('[data-mid="' + asst.id + '"] .tool-log');
-        if (tl) tl.outerHTML = toolLogHtml(asst.tools);
+        if (tl) tl.outerHTML = toolLogHtml(asst.tools, tl.open);
         else {
           const holder = document.createElement("div");
           holder.innerHTML = toolLogHtml(asst.tools);

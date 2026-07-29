@@ -228,11 +228,13 @@ it before Hermes ever sees the request.
 
 What you get in the chat:
 
-- **Live tool activity.** While the agent works, each tool call appears as a
-  row above the reply — running with a pulse, then settled — and stays on the
-  message afterwards, so you can see what a reply cost in actions, not just
-  read its text. Stopping mid-tool marks the unfinished call *stopped* rather
-  than leaving it spinning.
+- **Live tool activity, folded like thinking.** The log arrives as one
+  collapsed line: while the agent works it shows the current call with a
+  pulse, and when it settles it reads "8 tool calls · done". Tap to unfold
+  the full list — and a drawer you opened stays open through repaints and
+  rebuilds. Everything is kept on the message afterwards, so a reply's cost
+  in actions is one tap away without eight rows of scroll. Stopping mid-tool
+  marks the unfinished call *stopped* rather than leaving it spinning.
 - **Reasoning control.** The same Off / Low / Medium / High switch every other
   service uses, sent in the shape the Hermes agent understands. Off sends
   nothing, so the agent's own configuration decides.
@@ -392,7 +394,7 @@ network-first, so a refresh always gets the newest version.
 `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`, `swtest.js`,
 `scrolltest.js`, `styletest.js`, `hiddentest.js`, `coherencetest.js` and
 `installtest.sh` — runs under Node with jsdom (`npm i jsdom fake-indexeddb`).
-879 checks across the matching engine, JSON tolerance, prompt assembly,
+883 checks across the matching engine, JSON tolerance, prompt assembly,
 projects, retrieval, streaming, SSE framing and Hermes tool activity,
 stream/chat binding, touch reorder, reader-owned scrolling, backup
 round-trips, migration, and negative tests that deliberately reintroduce
