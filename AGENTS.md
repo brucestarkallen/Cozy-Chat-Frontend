@@ -14,6 +14,15 @@ worker, `install.sh` the Termux installer, `tests/` the gate.
 
 1327 checks as of v5.17.1, measured from real output.
 
+`tests/inerttest.js` is in the loop but prints SKIP without a second checkout
+to compare against. It answers the question a passing gate does not: whether a
+new feature changed the request Cozy was already sending. Run it against the
+previous release after anything that touches prompt assembly, `buildPayload()`
+or `applyReasoning()`:
+
+    git worktree add /tmp/cozy-prev <previous tag or sha>
+    OLD=/tmp/cozy-prev node tests/inerttest.js
+
 `tests/prefillnegtest.js` is held out of that loop because it is a *meta*
 gate: it runs a prefill gate once per mutation against a mutated `index.html`,
 plus a control run of each, and
@@ -109,3 +118,7 @@ lost, and re-saving the connection clears the mark — the same bargain
 
 Bump `const VERSION` and the header comment in `index.html` together. Commit
 message is plain language: `vX.Y.Z — what changed, from the user's side`.
+
+A commit that adds or fixes only tests is not a release and does not bump
+`VERSION` — the app checks that string for updates, and a bump with nothing
+behind it tells every install there is something new to fetch.
