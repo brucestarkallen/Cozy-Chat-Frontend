@@ -60,7 +60,8 @@ function run(w,msgs,cfg,wire,mode){
   return w.eval(`(()=>{
     const msgs=${JSON.stringify(msgs)};
     const before=JSON.stringify(msgs);
-    const r=applyPrefill(msgs,Object.assign({},PF_DEFAULT,{on:true},${JSON.stringify(cfg||{})}),
+    const r=applyPrefill(msgs,Object.assign({},PF_DEFAULT,
+      {on:true,flagField:'partial',reasoningField:'reasoning_content'},${JSON.stringify(cfg||{})}),
       Object.assign({fields:true,thinking:false,refused:false,tools:false},${JSON.stringify(wire||{})}),
       ${JSON.stringify(mode||null)});
     return JSON.stringify({r:r,msgs:msgs,untouched:before===JSON.stringify(msgs)});
@@ -249,7 +250,7 @@ console.log(NL+'=== I. IT REACHES THE WIRE, AND ONLY THIS WIRE ===');
   w.eval(`(()=>{
     newConvo();
     current.messages.push({id:'u1',role:'user',content:'hello',ts:Date.now()});
-    pfSet({on:true,text:'<think>plan</think>Once upon'});
+    pfSet({on:true,text:'<think>plan</think>Once upon',flagField:'partial',reasoningField:'reasoning_content'});
   })()`);
   const req=JSON.parse(w.eval('JSON.stringify(buildPayload({},current))'));
   const tail=req.body.messages[req.body.messages.length-1];
@@ -286,7 +287,7 @@ console.log(NL+'=== J. A SEEDED THINKING CHANNEL IS AN OPEN ONE ===');
     newConvo();
     S.activeProvider='pZ'; cfgSet('providerId','pZ'); cfgSet('effort','off');
     current.messages.push({id:'u1',role:'user',content:'hello',ts:Date.now()});
-    pfSet({on:true,text:'<think>plan</think>Once upon'});
+    pfSet({on:true,text:'<think>plan</think>Once upon',flagField:'partial',reasoningField:'reasoning_content'});
   })()`);
   let b=JSON.parse(w.eval('JSON.stringify(buildPayload({},current).body)'));
   ck('a seed cancels an explicit "thinking off"',b.thinking&&b.thinking.type==='enabled',JSON.stringify(b.thinking));
@@ -358,7 +359,7 @@ console.log(NL+'=== L. A REFUSAL COSTS THE MESSAGE NOTHING ===');
   ck('so the prompt still ends with the user',tail.role==='user',tail.role);
   // More is a different thing: the assistant tail is the reply being carried
   // on, not a turn the prefill added, so the mark has no say over it
-  const more=JSON.parse(w.eval("(()=>{current.messages.pop();pfSet({applyToContinue:true});return JSON.stringify(buildPayload({mode:'continue'},current));})()"));
+  const more=JSON.parse(w.eval("(()=>{current.messages.pop();pfSet({applyToContinue:true,flagField:'partial'});return JSON.stringify(buildPayload({mode:'continue'},current));})()"));
   ck('but More is not disabled by the mark',more.prefill.applied===true,more.prefill.reason);
   ck('re-saving the connection clears the mark',
     w.eval("(()=>{const p=S.providers.find(x=>x.id==='p1');const d={id:p.id,preset:p.preset,kind:p.kind,name:p.name,url:p.url,apiKey:p.apiKey,model:p.model,ctx:p.ctx};S.providers[0]=d;return !d.prefillDownAt;})()")===true);
@@ -417,6 +418,30 @@ console.log(NL+'=== O. THE FIELD-NAME SHORTCUT TELLS THE TRUTH ===');
   ck('and the shortcut stops claiming credit',d.getElementById('pfProfile').value===''
     &&w.eval('pfCfg().profile')==='','profile='+w.eval('pfCfg().profile'));
   await sleep(60);  dom.window.close();
+}
+
+console.log(NL+'=== O2. WHAT IT DOES BEFORE ANYTHING IS CONFIGURED ===');
+{
+  const dom=await boot(base());const w=dom.window;
+  const d=JSON.parse(w.eval('JSON.stringify(PF_DEFAULT)'));
+  ck('no continuation flag out of the box',d.flagField==='',JSON.stringify(d.flagField));
+  ck('no thinking field either',d.reasoningField==='',JSON.stringify(d.reasoningField));
+  ck('and the shortcut says so',d.profile==='plain',d.profile);
+  ck('every ready-made set the shortcut offers is a real one',!!w.eval('PF_PROFILES[PF_DEFAULT.profile]'));
+  // turning it on and sending must not put an unknown key on the wire
+  w.eval(`(()=>{
+    newConvo();
+    current.messages.push({id:'u1',role:'user',content:'hello',ts:Date.now()});
+    pfSet({on:true});
+  })()`);
+  const req=JSON.parse(w.eval('JSON.stringify(buildPayload({},current))'));
+  const tail=req.body.messages[req.body.messages.length-1];
+  ck('the turn still goes out',tail.role==='assistant'&&req.prefill.applied===true,req.prefill.reason);
+  ck('carrying nothing a service could reject',
+    JSON.stringify(Object.keys(tail).sort())==='["content","role"]',Object.keys(tail).join(','));
+  ck('the prefill text is kept whole',tail.content==='<think>I should continue the story.',tail.content);
+  await sleep(60);
+  dom.window.close();
 }
 
 console.log(NL+'=== P. THE SETTING BELONGS TO THE CHAT ===');

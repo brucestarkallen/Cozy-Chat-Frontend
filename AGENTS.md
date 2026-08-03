@@ -12,14 +12,15 @@ worker, `install.sh` the Termux installer, `tests/` the gate.
     done
     bash tests/installtest.sh
 
-1316 checks as of v5.17.0, measured from real output.
+1327 checks as of v5.17.1, measured from real output.
 
 `tests/prefillnegtest.js` is held out of that loop because it is a *meta*
-gate: it runs the prefill gates 39 times against a mutated `index.html` and
+gate: it runs a prefill gate once per mutation against a mutated `index.html`,
+plus a control run of each, and
 takes over ten minutes. Run it on its own after touching a prefill guard, in
 slices if a session cannot hold a long call:
 
-    node tests/prefillnegtest.js          # all 38
+    node tests/prefillnegtest.js          # all 39
     node tests/prefillnegtest.js 0 9      # a slice
 
 It edits `index.html` in place. A `.negbak` is written before the first
@@ -90,6 +91,13 @@ field and a rejected turn are different repairs.
 **A verdict describes the settings it was produced under.** `pfFingerprint()`
 lists them; when it moves, the line is cleared. Every control in that list has
 to re-render, or a green light outlives what it was about.
+
+**The shipped default is the one that cannot fail.** `PF_DEFAULT` carries no
+`flagField` and no `reasoningField`. `partial` is a Moonshot field, and on
+most other endpoints an unknown key on a message is a 400 — so defaulting to
+it meant switching the prefill on broke the user's next real *message*, not a
+test, on every connection but one. A field set is an opt-in with a button next
+to it. The mutation reverting this is in `prefillnegtest.js`; keep it.
 
 Capability that cannot be read off a model name is learned from the wire.
 Claude 4.6+ refuses a prefilled turn with a 400; `markPrefillDown()` records

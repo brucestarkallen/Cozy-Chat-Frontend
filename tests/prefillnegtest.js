@@ -202,6 +202,10 @@ const MUTATIONS=[
    '    const runsWillSkip = reasonStyle(p) === "hermes" && p.hermesRuns && !runsIsDown(p);',
    '    const runsWillSkip = false;', 'test'],
 
+  ['the shipped default puts a Moonshot field on every other service',
+   '  flagField:"", reasoningField:"",',
+   '  flagField:"partial", reasoningField:"reasoning_content",'],
+
   ['a green light survives the settings it was given for',
    `  return [p ? p.id : "", p ? p.model : "", c.flagField, c.reasoningField, c.openTag, c.closeTag,
           c.thinkOn ? 1 : 0, chatEffort()].join("\\u0000");`,

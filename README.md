@@ -264,6 +264,16 @@ the SillyTavern **Prefill Control** extension, built into Cozy.
   They are *field* names, not model names: nothing is guessed from the model
   string, so a relay or a renamed model can't quietly break it.
 
+  **It ships with none of them set**, on purpose. Every service understands a
+  trailing assistant turn; only some understand a field riding on it, and an
+  unknown key on a message is usually a refusal rather than something quietly
+  ignored. So switching the prefill on works everywhere out of the box, and
+  picking your service's field set is a deliberate second step — one tap, then
+  **Test prefill** to confirm it took. On Moonshot or Kimi that step is worth
+  taking: `partial` is what makes the model carry the turn on rather than
+  answer it, and `reasoning_content` is what makes the opening seed its
+  thinking rather than its prose.
+
 | Field | What it does |
 |---|---|
 | Continuation flag | `partial` on Moonshot, `prefix` on DeepSeek — tells the service to carry the turn on rather than answer it |
@@ -532,7 +542,7 @@ network-first, so a refresh always gets the newest version.
 `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`, `swtest.js`,
 `scrolltest.js`, `styletest.js`, `hiddentest.js`, `coherencetest.js` and
 `installtest.sh` — runs under Node with jsdom (`npm i jsdom fake-indexeddb`).
-1316 checks across the matching engine, JSON tolerance, prompt assembly,
+1327 checks across the matching engine, JSON tolerance, prompt assembly,
 multi-block replies, proposal supersede, undo truth, button visibility,
 projects, retrieval, streaming, SSE framing and Hermes tool activity,
 stream/chat binding, touch reorder, reader-owned scrolling, backup
@@ -540,7 +550,7 @@ round-trips, migration, prefill on every wire shape, and negative tests that
 deliberately reintroduce fixed bugs to prove the guards fire.
 
 `tests/prefillnegtest.js` is a mutation harness rather than part of the gate:
-it puts each of the 38 prefill bugs back, one at a time, and requires the gate
+it puts each of the 39 prefill bugs back, one at a time, and requires the gate
 to catch it. It edits `index.html` in place, so it keeps a `.negbak` on disk
 and puts the file back at startup if a run was interrupted. Run it after
 changing a prefill guard — `node tests/prefillnegtest.js`, or in slices,

@@ -73,7 +73,7 @@ async function rig(w,provId,patch){
     newConvo();
     current.messages.push({id:'u1',role:'user',content:'hello',ts:Date.now()});
     ${provId?`cfgSet('providerId','${provId}');`:''}
-    pfSet(Object.assign({on:true},${JSON.stringify(patch||{})}));
+    pfSet(Object.assign({on:true,flagField:'partial',reasoningField:'reasoning_content'},${JSON.stringify(patch||{})}));
     openSettings();
   })()`);
   await sleep(60);
@@ -321,6 +321,22 @@ console.log(NL+'=== X. A GREEN LIGHT THAT WOULD BE A LIE ===');
   d.getElementById('tgPfEcho').dispatchEvent(new w.Event('click',{bubbles:true}));
   await sleep(80);
   ck('a setting the test does not depend on leaves it alone',statTxt(d)===before,statTxt(d).slice(0,40));
+  await sleep(60);
+  dom.window.close();
+}
+
+console.log(NL+'=== X2. THE TEST ON A CONNECTION NOBODY HAS CONFIGURED ===');
+{
+  const rec=script([{body:oaReply('D E F')}]);
+  const dom=await boot(base(),rec.attach);const w=dom.window,d=w.document;
+  await w.eval("(()=>{newConvo();current.messages.push({id:'u1',role:'user',content:'hi',ts:Date.now()});pfSet({on:true});openSettings();})()");
+  await sleep(60);
+  await press(w,d,600);
+  ck('the out-of-the-box setup passes',/pf-ok/.test(statCls(d)),statCls(d));
+  ck('on one request, because there are no fields to ask about',rec.n===1,String(rec.n));
+  ck('and nothing a service could reject went out',
+    JSON.stringify(Object.keys(rec.tail(0)).sort())==='["content","role"]',Object.keys(rec.tail(0)).join(','));
+  ck('so no field is claimed accepted',!/accepted/.test(statTxt(d)),statTxt(d).slice(0,80));
   await sleep(60);
   dom.window.close();
 }
