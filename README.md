@@ -246,6 +246,53 @@ assistant turn is never merged.
   NeuralWatt and Wafer get the GLM shape automatically. There's an override on
   each connection if a service needs something else.
 
+**Prefill** (Settings → Chat → *Prefill the reply*, off by default)
+
+Start the assistant's turn for it. Instead of asking and hoping, you write the
+first words of the reply and the model carries on from them — the same idea as
+the SillyTavern **Prefill Control** extension, built into Cozy.
+
+- **Prefill text** — what the assistant has already "said" when the model takes
+  over. It is added only when the prompt doesn't already end with a reply, so
+  it never rewrites something that is already there.
+- **Send the opening as thinking** — text between the tags (default
+  `<think>` … `</think>`) is moved out of the reply and into the thinking
+  field, so it seeds the model's reasoning instead of turning up as its first
+  words. Without a thinking field configured, the tag simply stays in the text.
+- **Field names** — a shortcut fills these for Moonshot/Kimi, DeepSeek,
+  OpenRouter and generic OpenAI-compatible services, and you can type your own.
+  They are *field* names, not model names: nothing is guessed from the model
+  string, so a relay or a renamed model can't quietly break it.
+
+| Field | What it does |
+|---|---|
+| Continuation flag | `partial` on Moonshot, `prefix` on DeepSeek — tells the service to carry the turn on rather than answer it |
+| Thinking field | `reasoning_content` on most, `reasoning` on OpenRouter — where the seed is sent |
+
+- **Turn thinking on when a seed is sent** — a seeded thinking field means
+  nothing if the same request also tells the service to switch thinking off.
+  This cancels that one contradiction and nothing else; an effort level you
+  chose is never overwritten.
+- **Keep the prefill in the reply** — the model continues from your words, so
+  without this the saved reply starts mid-sentence. Only what was sent as the
+  reply is kept; anything moved into the thinking field is not.
+- **Also on More** — **More** already ends the prompt with the reply so far,
+  which is a prefill of its own, so with this on the flag rides along with it.
+  The prefill *text* is never added there — that would rewrite your reply.
+- **Last message sent** — the panel says what actually went out, and why, when
+  something was skipped. There is no console on a phone, so the diagnostic
+  lives where you can read it.
+
+**Claude is a special case, and it handles itself.** Anthropic's API takes the
+prefilled turn itself but rejects unknown fields on a message, so the flag and
+the thinking field are simply not sent there. Claude 4.6 and newer refuse a
+prefilled turn outright — and since a model name can't tell you what is really
+behind an address, the connection *learns* it: the first refusal is remembered,
+the message is sent again without the prefill instead of being lost, and the
+connection stops being offered one. Saving that connection tries again. The
+same refusal on **More** can't be worked around — there the assistant turn *is*
+your reply — so it says so in plain words instead of showing a raw 400.
+
 **Picking a model**
 - **Load list** next to the Model field pulls the service's `/models` and turns
   it into a dropdown. The list is saved with the connection.
@@ -448,6 +495,8 @@ network-first, so a refresh always gets the newest version.
 | `locate()` | Three-tier text matching for file edits |
 | `applyEditToText()` | Applies one approved edit |
 | `reasonStyle()` / `applyReasoning()` | Which thinking parameter each service wants |
+| `applyPrefill()` | Puts the prefilled turn on the finished message list |
+| `pfWire()` / `markPrefillDown()` | What a connection will accept on that turn, and how a refusal is learned |
 | `loadModels()` | Fetches the model dropdown from `/models` |
 | `connLabel()` | Shows the model once instead of connection name + model |
 | `runSearch()` | Web search calls per service |
@@ -456,16 +505,23 @@ network-first, so a refresh always gets the newest version.
 | `send()` | Sends and reads the streaming reply |
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
-**Tests.** Everything in `tests/` — `v515test.js` down to `v2test.js`, plus
+**Tests.** Everything in `tests/` — `v516test.js` down to `v2test.js`, plus
 `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`, `swtest.js`,
 `scrolltest.js`, `styletest.js`, `hiddentest.js`, `coherencetest.js` and
 `installtest.sh` — runs under Node with jsdom (`npm i jsdom fake-indexeddb`).
-1088 checks across the matching engine, JSON tolerance, prompt assembly,
+1239 checks across the matching engine, JSON tolerance, prompt assembly,
 multi-block replies, proposal supersede, undo truth, button visibility,
 projects, retrieval, streaming, SSE framing and Hermes tool activity,
 stream/chat binding, touch reorder, reader-owned scrolling, backup
-round-trips, migration, and negative tests that deliberately reintroduce
-fixed bugs to prove the guards fire.
+round-trips, migration, prefill on every wire shape, and negative tests that
+deliberately reintroduce fixed bugs to prove the guards fire.
+
+`tests/v516negtest.js` is a mutation harness rather than part of the gate: it
+puts each prefill bug back, one at a time, and requires `v516test.js` to catch
+it. It edits `index.html` in place, so it keeps a `.negbak` on disk and puts
+the file back at startup if a run was interrupted. Run it after changing a
+prefill guard — `node tests/v516negtest.js`, or in slices,
+`node tests/v516negtest.js 0 9`.
 
 ---
 

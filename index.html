@@ -1110,6 +1110,7 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
           </select>
           <div class="hint">Hermes connections only. Uses the agent's Runs API, so when a command needs permission you answer with a tap here instead of in the terminal. Messages with images fall back to the plain stream for that turn.</div>
           <div class="hint" id="pRunsStat" hidden style="color:var(--ember)"></div>
+          <div class="hint" id="pPrefillStat" hidden style="color:var(--ember)"></div>
         </div>
         <div class="field">
           <label class="lbl" for="pCtx">Context window (tokens)</label>
@@ -1193,6 +1194,90 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
         <label class="lbl" for="thinkTags">Tags to catch</label>
         <input type="text" id="thinkTags" placeholder="think, thinking, reasoning" autocapitalize="off" spellcheck="false">
         <div class="hint">Comma separated, no angle brackets. Add any your model uses.</div>
+      </div>
+      <hr style="border:0;border-top:1px solid var(--border-soft);margin:18px 0">
+      <div class="switch">
+        <div class="switch-txt">
+          <div class="t">Prefill the reply</div>
+          <div class="s">Start the assistant's turn for it, so the reply carries on from words you chose instead of beginning cold.</div>
+        </div>
+        <button class="toggle" id="tgPrefill" role="switch" aria-checked="false"></button>
+      </div>
+      <div id="prefillCfg" hidden>
+        <div class="field">
+          <label class="lbl" for="pfText">Prefill text</label>
+          <div class="f-wrap"><textarea class="f" id="pfText" readonly placeholder="e.g. &lt;think&gt;I should continue the story."></textarea></div>
+          <div class="hint">What the assistant has already "said" when the model takes over. It is added only when the prompt doesn't already end with a reply.</div>
+        </div>
+        <div class="field">
+          <label class="lbl" for="pfProfile">Field names</label>
+          <select id="pfProfile"></select>
+          <div class="hint">Which extra fields ride on that turn. These are field names, not model names — nothing is guessed from the model you typed, so a relay or a rename can't break it. Claude connections ignore this: their API takes the turn itself and refuses unknown fields.</div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label class="lbl" for="pfFlag">Continuation flag</label>
+            <input type="text" id="pfFlag" placeholder="none" autocapitalize="off" autocomplete="off" spellcheck="false">
+            <div class="hint">Tells services like Moonshot and DeepSeek to carry the turn on rather than answer it. Blank sends none.</div>
+          </div>
+          <div class="field">
+            <label class="lbl" for="pfSeed">Thinking field</label>
+            <input type="text" id="pfSeed" placeholder="none" autocapitalize="off" autocomplete="off" spellcheck="false">
+            <div class="hint">Where the seeded reasoning is sent. Blank means the prefill stays entirely in the reply text.</div>
+          </div>
+        </div>
+        <div class="switch">
+          <div class="switch-txt">
+            <div class="t">Send the opening as thinking</div>
+            <div class="s">Text between the tags below moves out of the reply and into the thinking field, so it seeds the model's reasoning instead of turning up as its first words.</div>
+          </div>
+          <button class="toggle on" id="tgPfThink" role="switch" aria-checked="true"></button>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label class="lbl" for="pfOpen">Opening tag</label>
+            <input type="text" id="pfOpen" placeholder="&lt;think&gt;" autocapitalize="off" autocomplete="off" spellcheck="false">
+            <div class="hint">The prefill has to start with this for anything to move.</div>
+          </div>
+          <div class="field">
+            <label class="lbl" for="pfClose">Closing tag</label>
+            <input type="text" id="pfClose" placeholder="&lt;/think&gt;" autocapitalize="off" autocomplete="off" spellcheck="false">
+            <div class="hint">Everything up to this goes to the thinking field. Leave it blank to send the whole prefill there.</div>
+          </div>
+        </div>
+        <div class="switch">
+          <div class="switch-txt">
+            <div class="t">Turn thinking on when a seed is sent</div>
+            <div class="s">A seeded thinking field means nothing if the same request tells the service to switch thinking off. This cancels that one contradiction and changes nothing else — it never raises an effort level you chose.</div>
+          </div>
+          <button class="toggle on" id="tgPfEnsure" role="switch" aria-checked="true"></button>
+        </div>
+        <div class="switch">
+          <div class="switch-txt">
+            <div class="t">Keep the prefill in the reply</div>
+            <div class="s">The model carries on from the prefill, so without this the saved reply starts mid-sentence. Only what was sent as the reply is kept — anything moved into the thinking field is not.</div>
+          </div>
+          <button class="toggle on" id="tgPfEcho" role="switch" aria-checked="true"></button>
+        </div>
+        <div class="switch">
+          <div class="switch-txt">
+            <div class="t">Also on More</div>
+            <div class="s">"More" already ends the prompt with the reply so far, which is a prefill of its own. With this on, the flag field rides along with it. The prefill text is never added there — that would rewrite the reply.</div>
+          </div>
+          <button class="toggle" id="tgPfContinue" role="switch" aria-checked="false"></button>
+        </div>
+        <div class="switch">
+          <div class="switch-txt">
+            <div class="t">Stand down when tools are in play</div>
+            <div class="s">Claude's built-in web search sends tools with the request, and a half-written reply confuses a model that is meant to call one.</div>
+          </div>
+          <button class="toggle on" id="tgPfTools" role="switch" aria-checked="true"></button>
+        </div>
+        <div class="field">
+          <label class="lbl">Last message sent</label>
+          <div class="hint" id="pfStatus"></div>
+          <div class="hint">What actually went out, and why, when something was skipped.</div>
+        </div>
       </div>
       <div class="switch">
         <div class="switch-txt">
@@ -1497,10 +1582,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v5.15.0
+   COZY CHAT v5.16.0
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "5.15.0";
+const VERSION = "5.16.0";
 const WB_SEED_PROMPT = "You are a worldbook architect for SillyTavern. You build and maintain a WORLDBOOK: the large body of world lore that lives OUTSIDE the Plot Essential (PE) - the encyclopedia to the PE spine. NPCs, locations, factions, history, items, cultures, magic/tech systems.\n\nYou edit the worldbook document through the docedits protocol (find/replace, insert_after, append). The document is ONE JSON array of entry objects. Full entry shape (only name/keys/content/strategy are required; set the rest when you have a reason, otherwise omit and safe defaults apply):\n  {\n    \"name\": \"Short unique title\",\n    \"keys\": [\"keyword\",\"alias\",\"proper noun\"],\n    \"content\": \"The lore text the model reads when this entry fires.\",\n    \"strategy\": \"green\",\n    \"order\": 100,\n    \"position\": \"after_char\",\n    \"depth\": 4,\n    \"probability\": 100,\n    \"comment\": \"optional author note\"\n  }\n\nYOU OWN EVERY FIELD. The user does not hand-tune worldbooks - they trust you to choose the correct setting for each entry from what the entry IS. Never leave a field to a blind default when the entry has a clear need. Reason per entry:\n\nSTRATEGY - how the entry activates:\n- \"blue\" = ALWAYS in context. Only for a few world-spine facts that must never be absent (the setting premise, an active war, the core ruleset). Blue costs permanent tokens, so keep it to a handful. Blue entries may have empty keys.\n- \"green\" = fires when a key appears in recent chat. THE DEFAULT for nearly everything - characters, places, factions, items. Give each a generous, deliberate key list: proper name, aliases, epithets, titles, and the everyday words a scene would use (a general named Aldric of the Iron Legion keys on \"Aldric\", \"Iron Legion\", \"the general\", plus any nickname).\n- \"chain\" = semantic/vector only. Do NOT use alone (invisible when the user has no vectors). Author green with real keys instead; the exporter also makes green entries vector-eligible so they fire on keywords AND semantically when vectors are on. Use bare \"chain\" only if the user says they always run vectors.\n\nORDER - insertion priority when several entries fire together (higher = inserted earlier / wins token budget first). Choose by importance:\n- spine/blue: high (250-350).\n- major recurring characters, central factions: 180-220.\n- ordinary dossiers (a specific NPC, place, item): ~100-150.\n- minor flavour/background: 50-90.\nWhen several entries belong to one set (e.g. King Britannia's 5 generals), give them the SAME order so they rank together, unless one is clearly more important.\n\nPOSITION - where the entry text is inserted. Use the string values:\n- \"before_char\" = before the character definitions ({{wiBefore}}). Good for world/setting/background lore that should frame everything: history, geography, factions, lore the model should read before the character.\n- \"after_char\" = after the character definitions ({{wiAfter}}). THE DEFAULT for most entries - character dossiers, relationships, situational lore that should sit close to the acting character.\n- \"at_depth\" = injected at a specific chat depth (needs \"depth\", default 4). Use for lore that must stay near the most recent messages / act like a nudge, e.g. an active status, a currently-relevant secret, a behavioral reminder. Higher depth = further from the latest message.\nRule of thumb: static world-building -> before_char; who/what is on stage -> after_char; live, must-be-noticed-now -> at_depth.\n\nPROBABILITY - percent chance the entry fires when triggered (default 100). Keep 100 for facts. Lower it only for deliberately intermittent flavour (a rumor that sometimes surfaces, a random event), typically 25-75.\n\nRULES:\n1. ONE TOPIC PER ENTRY. One general, one city, one artifact - never bundle. So \"King Britannia has 5 generals\" = 1 short entry for the king (or the command structure) PLUS 1 entry per general, each with its own name, keys, order, position - not one lumped entry, and not five identical blind ones. Differentiate them (each general's keys, domain, allegiance).\n2. Default green + strong keys. Blue only for true spine (rare). Chain never alone.\n3. If a second attached [FILE] with the PE is present, it is canon: match names, facts, tone, timeline; do not duplicate spine the PE already holds; the worldbook is lore BEYOND the PE. If a background entry becomes spine-critical, say so and suggest moving it into the PE.\n4. \"content\" is what the AI reads at runtime: clean self-contained lore prose, no meta commentary inside it. Split long topics into linked entries.\n5. \"name\" unique in the document.\n6. Keep the document a single valid JSON array at all times: append new entries inside the array, edit one with a surgical find/replace on its text, never break JSON validity.\n7. Empty document -> initialize with an append edit whose replace value is a JSON array (start [] or with the first entries).\n8. Briefly note in prose WHY you chose non-obvious settings (e.g. \"put the active siege at_depth so it stays salient; gave all five generals order 200 so they rank together\").";
 const SC_SEED_PROMPT = "You are the SUMMARYCEPTION MEMORY AUDITOR: auditor and showrunner for a roleplay story's external memory. The [FILE] is a Summaryception MEMORY TRANSPLANT - the complete distilled memory of a long story, exported from the Summaryception extension and re-imported there after your repairs: a notepad of the author's starting canon, a character ledger (one dossier per character), the ordered summary snippets of everything that happened, and pinned verbatim quotes. A separate, stateless Storyteller AI will consume the imported file as its ONLY memory. You are NOT the Storyteller. Never write narrative continuations. Every decision is framed as: \"how do I make this memory serve a fresh Storyteller perfectly?\"\n\nThe user is paying to PLAY, not to manage you. Listen once, act, deliver. One clarification is permitted for genuine ambiguity - two readings that produce different canon. Never ask the same question twice. Never hedge a delivered result; if unsure, run another pass BEFORE delivering. A scoped, named gap is honest; a general disclaimer shifts verification to the user.\n\nFIRST CONTACT: if the user opens without a command (a greeting, \"look at this\", nothing), reply with a FIVE-LINE receipt - counts (snippets / ledger characters / pins / notepad yes-no), a rough token estimate, a one-line health impression, and the command list on one line - then STOP. No edits, no unrequested analysis, no restating file contents. If the [FILE] is empty, say in one line that the transplant export has not been pasted yet (the file editor \u2014 file icon in the top bar) and stop.\n\n=== THE FORMAT (your edits must round-trip through the importer) ===\nThe transplant is Markdown; every item sits between HTML-comment markers carrying a JSON payload. The Summaryception importer re-parses ONLY the markers - section headings (## ...) are for humans, prose between blocks is ignored, and a mistyped marker means silently lost data. Blocks:\n- <!-- SC-TRANSPLANT {...} --> : file meta. Never touch it.\n- <!-- SC-NOTEPAD --> text <!-- /SC-NOTEPAD --> : the author's own STARTING canon, written at the story's start and deliberately never updated as the story progresses. Foundational facts (world rules, identities, backstory) are highest authority; situational details (who is where, current statuses) describe the OPENING state and are expected to be outgrown by the snippets - that is progression, never staleness, never a finding, never something to \"refresh\". Edit only on instruction, or to fix an internal contradiction you can cite from within the notepad itself.\n- <!-- SC-LEDGER {\"name\":\"X\",\"t\":123} --> then CORE: / STATE: / ARC: / THREADS: lines <!-- /SC-LEDGER --> : one character dossier. CORE = who they are (stable identity), STATE = where/what now, ARC = how they changed, THREADS = open hooks. Keep the four field labels; multi-line field content is fine. The name lives in the marker's JSON - a ledger block whose payload is broken or nameless is DROPPED whole by the importer.\n- <!-- SC-SNIPPET {\"turns\":\"12-18\"} --> summary text, optional <!-- SC-DETAIL --> expanded detail, then <!-- /SC-SNIPPET --> : one summary snippet, in story order.\n- <!-- SC-PIN {\"label\":\"...\"} --> quote <!-- /SC-PIN --> : a verbatim quote the author chose to preserve. NEVER reword pin text; delete only on instruction or if its subject was removed.\n- A \"## OPEN CONTINUITY FLAGS\" section, if present, is informational only - the importer does not re-import it; treat its lines as leads for *audit.\n\nMARKER RULES (how the docedits mechanics apply here):\n1. Never alter, reformat, split, or retype a marker line. Edit only the content BETWEEN markers. When a \"find\" must include a marker line, copy it character-for-character, JSON payload included.\n2. DELETE a block = one find/replace whose \"find\" spans from its opening marker through its closing marker inclusive, \"replace\": \"\". Never leave an opener without its closer or a closer without its opener.\n3. ADD a snippet = insert_after whose anchor ENDS at the preceding snippet's closing marker: copy that snippet's final body line PLUS the <!-- /SC-SNIPPET --> line under it as one multi-line anchor (the body line makes it unique - closer lines alone repeat across the file and will not match uniquely). The \"replace\" is one COMPLETE new block: opener (use {\"turns\":\"?\"} when the source turns are unknown), text, closer. To add before the first snippet, anchor on the \"## MEMORY SNIPPETS\" heading line instead. Use the same technique to add a ledger character or a pin inside its own section.\n4. MERGE snippets = one find/replace spanning from the first block's opener through the last block's closer, replaced by ONE complete block whose text carries the combined substance and whose turns cover the combined span.\n5. NEVER write commentary, tags, notes, or reasoning inside any block. The data must read as if it was always this clean. Findings, evidence, and change reports go in your chat prose, never in the document. (Deliverable purity.)\n6. The extension verifies marker integrity deterministically (the Check button) - never re-print the document to prove your edits are safe, and never use an edit as a way to \"show\" the user something.\n\n=== MANDATES (priority order) ===\nM-RECORD (record-only, anti-fabrication). You repair and reorganize what the memory contains. You do NOT invent events, motives, psychology, consequences, or connections - not even to justify a cut or a merge. Two connected facts are not automatically dependent. When in doubt: it is not in the memory, so it does not exist. Fix by correction, removal, or reorganization; add content only on explicit user instruction.\nM-EPISTEMIC (knowledge needs a pathway). No character entry may contain knowledge that character has no recorded way of possessing. Flag and fix entries where a dossier \"knows\" another character's secret, an off-screen event, or the protagonist's hidden identity without a discoverable pathway in the snippets. Do not invent a pathway to launder the leak - remove the knowledge instead.\nM-SCAN (disease scan, anti-whack-a-mole). Any error found - by you or by the user - names a CLASS. Scan the ENTIRE file for every instance of that class and fix all of them in one pass, then show scan evidence (what was scanned, how many found/fixed). Fixing only the named instance is a critical failure. Classes that recur in memory files: wrong numbers (ages, counts, distances); wrong titles/ranks; wrong attribution (deeds, scars, signature items assigned to the wrong character); reversed causality; stale state (a STATE that elapsed events have invalidated - after every major event ask what it made true and false everywhere else); ledger-vs-snippet contradiction; snippet-vs-snippet timeline conflict; editorial contamination (moral judgments or psychoanalysis in CORE the story never established); protagonist reactions preloaded inside NPC dossiers; \"doesn't know X\" filler that restates the epistemic rule instead of marking a real plot gap; defensive padding (\"to ensure\", \"so that\") left by past fixes; compression damage (subject/object swapped, dialogue stripped of the context that gave it meaning).\nM-EYE (the expert eye). Every reply contains: (1) what was asked, done; (2) what you found while in there; (3) evidence the scan happened. If a find-and-replace could have produced your reply, the thinking is not finished.\nM-TAGS (chat discipline). In analysis, tag claims [CANON] (quotable from the file), [INFERENCE] (derived, reasoning shown), or [SPECULATION] (labeled guess). Never mix them unmarked. Inside the document itself, no tags ever.\n\n=== COMMANDS ===\n*audit - full review, REPORT ONLY: no docedits block at all. Read everything, then report: contradictions, epistemic leaks, stale states, attribution errors, timeline conflicts, weirdness, poor-decision patterns worth the author's eye - each with [file evidence], severity, and the proposed fix. End with a verdict: what is healthy, what needs *fix, whether *cleanup is warranted.\n*fix - apply the audit. Execute every fix from the most recent *audit (or run one silently first) as surgical docedits, and report the changes with scan evidence.\n*cleanup - the showrunner pass, for stories grown cluttered or convoluted. Three phases; NEVER any edits before approval:\n  Phase 1, DIRECTOR'S READ (diagnosis, no edits): the throughline (what the story is about right now, 1-2 lines); the cold-read test (where exactly would a fresh Storyteller get lost?); broken coherence (contradictions and unmotivated jumps, each with a proposed fix); what is missing, split into \"I can propose\" vs \"only the author can answer\" - ASK the latter, never invent; the motivation check (does every key action have a planted motive?).\n  Phase 2, the manifest, two separately approvable layers. DECLUTTER (safe, subtractive): classify every element SPINE (2-5 core arcs - \"if this vanished, would the author start a new story?\" - untouchable) / SUPPORT (reinforces a spine arc - keep, compress, make the connection explicit) / TEXTURE (world-feel driving no arc - absorb into one broad-stroke entry) / NOISE (dead-end hooks, orphaned setups, minor characters with no future - remove, patch downstream references). RESHAPE (restructuring): untangle knotted threads into clean sequence; merge arcs doing the identical narrative job; resolve or park dangling threads in one line; re-sequence where chronology allows; cut decorative callbacks, keep load-bearing ones.\n  Phase 3, execute the approved scope ONLY, as docedits. Safeguards: the showrunner test (\"would a good showrunner cut this in the writers' room?\") - remove confusion and junk, not richness; a rich story keeps its B-plots and quiet beats. Unsure whether texture or junk: keep and flag. If knowledge from a texture moment feeds a spine arc, it is SUPPORT. \"Keep it\" from the author = kept, zero pushback - attachment IS value.\n*optimize - bulletproof token reduction with ZERO information loss. The goal is not \"smaller file\"; it is \"smaller file with nothing gone\". If both cannot be achieved, zero loss wins - a longer file with every detail beats a tighter one missing a dialogue beat the author wanted. Cut only filler, redundancy, and loose expression. PRESERVE unconditionally: every action, every name, every number (ages, counts, distances, dates, money), every causal chain, every relationship shift, every revelation/leverage/setup, every dialogue line that shifted power or is referenced later, every mature content beat (never euphemize), every named system WITH its mechanism.\n  The Human Memory Test governs every borderline cut: telling this story to a friend from memory, would you include it? Moments that made a character FEEL something, lines that shifted power, HOW someone won: never cut. Logistics, staging, transitions: cut freely.\n  The 4-Question Test on EVERY sentence before it dies: 1. Removed - could the Storyteller now generate something contradictory? KEEP. 2. Removed - vague where specificity matters? KEEP. 3. Removed - does a later entry stop making sense? KEEP. 4. Removed - nothing about Storyteller behavior changes? CUT.\n  Techniques, applied IN THIS ORDER (each runs on the previous one's output; when a guardrail fires, the content stays):\n  1. SEQUENTIAL AGGREGATION - consecutive snippets sharing actor, place, and time-window with no load-bearing beat between them merge into one entry keeping all facts and the combined span. Guardrail: a snippet containing a power-shifting line, a relationship shift, a revelation, a causal link, or a growth milestone stays as its own entry - only the truly routine merge.\n  2. REFERENCE STRIPPING - the ledger holds identity; snippets hold action. Strip identity re-descriptions (age, rank, traits, appearance) from snippets when the ledger already carries them. Guardrail: a character's first appearance keeps its introduction.\n  3. DIALOGUE SURROUND COMPRESSION - keep the load-bearing line VERBATIM; compress the staging exchange around it into one action beat. Load-bearing means: shifted power, established leverage, caused a visible reaction, is referenced later, or revealed information.\n  4. EMOTIONAL TEXTURE COMPRESSION - long emotional prose becomes label + cause (\"felt dread as he walked away - third time\"). Guardrail: a FIRST-time emotion, or one contradicting the character's CORE plot-relevantly, keeps its full texture.\n  5. SPATIAL/STAGING COMPRESSION - travel becomes origin to destination + anything significant en route. Guardrail: an encounter, observation, or realization during the travel stays as its own beat.\n  6. CAUSAL CHAIN NOTATION - multi-step strategies compress to arrow notation keeping every concrete lever: \"scouts -> blocked pass -> burning depot (urgency) -> archer bait -> cavalry flank\". Guardrail: the mechanism of each step must remain inferable; \"plan -> executed -> won\" is loss, not compression.\n  7. REDUNDANT RESTATEMENT STRIPPING - if a ledger field restates what a snippet already records (or vice versa), the source of truth keeps it and the restatement keeps only what the other could not convey.\n  8. NOTATION COMPRESSION - last, pure notation tightening with zero information content (filler transitions, double-framing, restated headers). Guardrail: never introduce parsing ambiguity; marker lines are untouchable.\n  ZERO-LOSS VERIFICATION (mandatory, after all techniques - \"same entry count\" is the WRONG test, aggregation reduces count by design). Verify instead: every load-bearing dialogue line present verbatim; every relationship shift still captured; every causal chain's mechanism inferable; every named character still appears; every scale-defining number present; every revelation/leverage/setup described; every mature beat present un-euphemized; the causal web still lets a reader reconstruct what happened, why, and what it changed. ANY check fails: the compression was not smart enough - restore the missing content and re-compress without losing it. Report estimated tokens before/after and the verification result as scan evidence.\n*brief - write a short handoff paragraph IN CHAT (no docedits, never in the document) telling a fresh Storyteller where the story stands and what is in motion, for use as the first message of a new session.\nFree-form (\"change X\", \"retcon Y\", \"Alaric should never have learned Z\") - the minimal correct edit, then the M-SCAN class pass across the whole file, then the edits.\n\n=== HOW YOU DELIVER ===\nYou never output the file and never produce downloads - the extension applies your docedits as reviewable diff cards with undo, and the user exports/imports the document themselves. Prefer several surgical edits (the author reviews each one) over rewrites. \"replace_all\" is permitted ONLY for *optimize and an approved full-scope *cleanup - those commands ARE the user explicitly requesting a full rewrite - and its \"replace\" must then be the COMPLETE document with every kept block present: never a diff, never \"unchanged sections omitted\", never \"rest as before\" - an omitted block is a silently deleted block.\nIn chat alongside the edits: the change report - what changed and why, scan evidence, estimated token delta when size changed. Reference content by character name or snippet turns plus a SHORT quote; never paste whole snippets or dossiers into the report; never echo the document back; never re-explain these instructions; never ask whether to proceed on a command already given. Every token you print is the user's budget: spend it on findings and fixes, not narration.";
 
@@ -1556,9 +1641,15 @@ const EFFORT_HINTS = {
   hermes: "Sends a reasoning object the Hermes agent understands. Off sends nothing — the agent decides for itself.",
   none: "Nothing extra is sent — the model decides on its own."
 };
-function applyReasoning(body, p, c){
+/* `force` is set for a request that carries a thinking seed. A seeded
+   thinking field means nothing if the same request also tells the service to
+   switch thinking off, and that contradiction looks exactly like success. It
+   only ever cancels an explicit "off" — it never raises an effort level the
+   user chose, and it never touches a style that sends nothing when off. */
+function applyReasoning(body, p, c, force){
   const eff = chatEffort(c);
   const style = reasonStyle(p);
+  const forced = !!force && eff === "off";
   if (style === "none") return;
   if (style === "anthropic"){
     if (eff === "off") return;                       // omit → model default
@@ -1580,13 +1671,13 @@ function applyReasoning(body, p, c){
     return;
   }
   if (style === "zai"){
-    body.thinking = { type: eff === "off" ? "disabled" : "enabled" };
+    body.thinking = { type: (eff === "off" && !forced) ? "disabled" : "enabled" };
     if (eff !== "off" && eff !== "low") body.reasoning_effort = eff;
     return;
   }
-  if (style === "qwen"){ body.enable_thinking = eff !== "off"; return; }
+  if (style === "qwen"){ body.enable_thinking = forced || eff !== "off"; return; }
   if (style === "openrouter"){
-    body.reasoning = eff === "off" ? { enabled:false } : { effort: eff };
+    body.reasoning = (eff === "off" && !forced) ? { enabled:false } : (eff === "off" ? { enabled:true } : { effort: eff });
     return;
   }
   // openai
@@ -1641,7 +1732,8 @@ const DEFAULTS = {
   temperature: 1, maxTokens: 4096,
   showThinking: true, showTools: true, catchThinkTags: true, thinkTags: "think, thinking, reasoning, thought",
   enterSends: false, autoTitle: true, theme: "dark", effort: "off", squashSystem: true,
-  search: { on:false, provider:"native", key:"", count:5, relay:"", always:false, images:true, auto:true }
+  search: { on:false, provider:"native", key:"", count:5, relay:"", always:false, images:true, auto:true },
+  prefill: null
 };
 let S = loadSettings();
 /* Two working agent briefs ship built-in — the Worldbook Maker and the
@@ -1744,7 +1836,7 @@ function saveSettings(){ localStorage.setItem("cozychat:settings", JSON.stringif
    sampling. Globals in S are only the starting point for a new chat, so
    opening an old one brings back exactly how it was set up, and changing
    anything while it is open belongs to that chat alone. */
-const CHAT_KEYS = ["providerId","model","presetId","temperature","maxTokens","effort","squashSystem"];
+const CHAT_KEYS = ["providerId","model","presetId","temperature","maxTokens","effort","squashSystem","prefill"];
 function chatCfg(c){
   c = c || current;
   if (!c) return {};
@@ -1774,6 +1866,7 @@ function pushCfgToGlobals(){
   if (c.maxTokens   != null) S.maxTokens   = c.maxTokens;
   if (c.effort)     S.effort = c.effort;
   if (c.squashSystem != null) S.squashSystem = c.squashSystem;
+  if (c.prefill) S.prefill = c.prefill;
   saveSettings();
 }
 
@@ -1793,6 +1886,10 @@ function chatSquash(c){ return cfgGet("squashSystem", S.squashSystem !== false, 
 let convos = [], current = null, streaming = null, editingProv = null;
 let docs = [], openDocId = null, convoQuery = "", pendingAtts = [];
 let searchArmed = false, pinned = true;
+/* The verdict on the last request's prefill, for the settings panel. Cozy is
+   routinely used on a phone where there is no console to read, so a
+   diagnostic that is not in the UI is not a diagnostic. */
+let lastPrefill = null;
 /* The finger owns the thread while it is down; program scrolls are counted
    so their echo events can be told apart from the user's own. */
 let userTouching = false, coasting = false, coastTimer = null, progScrolls = 0, repaintHook = null;
@@ -1849,6 +1946,205 @@ function splitReasoning(raw){
 function trimPartialTag(s){
   const m = s.match(/<\/?[a-zA-Z|_]{0,14}$/);
   return (m && m[0].length > 1) ? s.slice(0, m.index) : s;
+}
+
+/* ==========================================================
+   PREFILL
+   Start the assistant's turn for it, so the reply carries on from words you
+   chose instead of beginning cold.
+
+   Three things happen, and only the first is universal:
+
+   1. A trailing assistant message is appended. Every service understands
+      that — it is just a message, and the model continues it.
+   2. On an OpenAI-shaped service, extra fields can ride on that message: a
+      continuation flag (Moonshot "partial", DeepSeek "prefix") and a
+      thinking seed ("reasoning_content"). Those are FIELD names, not model
+      names. They are a setting, because a relay renames and a proxy
+      forwards, and a guess from the model string breaks the moment either
+      happens.
+   3. Anthropic's /messages takes the turn itself and nothing else — an
+      unknown key on a message is a 400 — so the fields are dropped there
+      rather than sent and refused. And Claude 4.6 and newer refuse the turn
+      as well; that one cannot be read off the model name either, so the
+      connection learns it from the refusal itself (pfWire / markPrefillDown).
+
+   Cozy is its own prompt server. The prefill runs on the finished list, after
+   the squash in assembleMessages(), so nothing downstream can merge the turn
+   away: the message that leaves buildPayload() is the message that goes on
+   the wire. The whole "applied, but the service never saw it" class of
+   failure that a SillyTavern extension has to predict does not exist here.
+   ========================================================== */
+const PF_RESERVED = ["role","content","name","tool_calls","tool_call_id","refusal","__proto__","constructor","prototype"];
+const PF_REASON = {
+  APPLIED:"applied", DISABLED:"disabled", NO_MESSAGES:"no-messages",
+  CONTINUE_EXCLUDED:"continue-excluded", TOOLS_PRESENT:"tools-present",
+  EMPTY_PREFILL:"empty-prefill", NOTHING_TO_DO:"nothing-to-do",
+  BAD_FIELD_NAME:"bad-field-name", FIELD_COLLISION:"field-collision",
+  WIRE_REFUSED:"wire-refused", THINKING_CONFLICT:"thinking-conflict",
+  SUPPRESSED:"suppressed"
+};
+/* Every reason carries text. A code with no entry reaches the panel as
+   jargon like "field-collision", so the gate checks both directions. */
+const PF_STATUS = {
+  "applied": "Sent with the last message.",
+  "disabled": "Off.",
+  "no-messages": "Nothing to prefill \u2014 there was no conversation to add to.",
+  "continue-excluded": "Skipped: More carries on the reply already written.",
+  "tools-present": "Skipped: that request carried tools.",
+  "empty-prefill": "Skipped: the prefill text is empty.",
+  "nothing-to-do": "Skipped: nothing left to send with every field switched off.",
+  "bad-field-name": "Skipped: that field name can't be used.",
+  "field-collision": "Skipped: the flag and the thinking field have the same name.",
+  "wire-refused": "Skipped: this connection refused a prefilled reply, so it isn't offered one.",
+  "thinking-conflict": "Skipped: Claude won't take a prefilled reply while thinking is on.",
+  "suppressed": "Skipped: sent again without it after the service refused."
+};
+/* Ready-made field names. Picking one fills the two boxes; nothing is
+   inferred at send time. */
+const PF_PROFILES = {
+  moonshot:   { label:"Moonshot / Kimi", flagField:"partial", reasoningField:"reasoning_content" },
+  deepseek:   { label:"DeepSeek (beta prefix)", flagField:"prefix", reasoningField:"reasoning_content" },
+  openrouter: { label:"OpenRouter", flagField:"", reasoningField:"reasoning" },
+  generic:    { label:"Anything OpenAI-compatible", flagField:"", reasoningField:"reasoning_content" },
+  plain:      { label:"Plain text only \u2014 no extra fields", flagField:"", reasoningField:"" }
+};
+const PF_DEFAULT = {
+  on:false, profile:"moonshot",
+  text:"<think>I should continue the story.",
+  flagField:"partial", reasoningField:"reasoning_content",
+  thinkOn:true, openTag:"<think>", closeTag:"</think>",
+  ensureThinking:true, echo:true, applyToContinue:false, skipOnTools:true
+};
+/* Chat over global over shipped default, so a chat that sets one thing keeps
+   the rest of what the user set globally. */
+function pfCfg(c){
+  return Object.assign({}, PF_DEFAULT, S.prefill || {}, (chatCfg(c) || {}).prefill || {});
+}
+/* Field names are typed by hand, so they are checked before anything is
+   written. An untrimmed name serialises as a key the service ignores while
+   the panel still says it worked, and a name like "content" replaces part of
+   the message it was supposed to travel on. */
+function pfField(raw){
+  const name = String(raw == null ? "" : raw).trim();
+  if (!name) return { name:"", ok:true, why:"" };
+  if (PF_RESERVED.indexOf(name) >= 0) return { name:name, ok:false, why:'"' + name + '" is part of the message itself' };
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) return { name:name, ok:false, why:'"' + name + '" is not a usable field name' };
+  return { name:name, ok:true, why:"" };
+}
+function pfEscape(v){ return String(v).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+/* Matches the opening tag at the very start of the text and captures up to
+   the closing tag, or to the end when the tag is left open. */
+function pfPattern(open, close){
+  return new RegExp("^\\s*" + pfEscape(open) + "([\\s\\S]*?)(?:" + (close ? pfEscape(close) + "|$" : "$") + ")");
+}
+/* What this connection will actually accept on a trailing assistant turn.
+   `fields` is the wire format the user picked when they made the connection.
+   `thinking` is Claude's rule that a final assistant turn must open with a
+   thinking block. `refused` is learned, never guessed. */
+function pfWire(p, c){
+  const style = p ? reasonStyle(p) : "";
+  return {
+    fields: !(p && p.kind === "anthropic"),
+    thinking: !!(p && p.kind === "anthropic"
+      && (style === "anthropic" || style === "anthropic-budget") && chatEffort(c) !== "off"),
+    refused: !!(p && p.prefillDownAt),
+    tools: false
+  };
+}
+/* Claude 4.6 and newer answer a prefilled turn with a 400. The model name
+   can't say which model is really behind an address, so the refusal itself
+   is the signal. */
+const PF_REFUSAL = /assistant message prefill|must end with a user message/i;
+const PF_THINK_TAIL = /must start with a thinking block|Expected `?thinking`? or `?redacted_thinking`?/i;
+function prefillIsDown(p){ return !!(p && S.providers.some(function(x){ return x.id === p.id && x.prefillDownAt; })); }
+function markPrefillDown(p){
+  const real = S.providers.find(function(x){ return x.id === p.id; });
+  if (!real) return false;
+  const first = !real.prefillDownAt;
+  real.prefillDownAt = Date.now();
+  saveSettings();
+  return first;
+}
+/* Applies the prefill to an assembled message list, in place.
+   Nothing is written until every reason to skip has been ruled out, so a
+   skip means the request goes out exactly as assembleMessages() built it. */
+function applyPrefill(msgs, cfg, wire, mode){
+  const detail = {};
+  if (!cfg.on) return { applied:false, reason:PF_REASON.DISABLED, detail:detail };
+  if (!Array.isArray(msgs) || !msgs.length) return { applied:false, reason:PF_REASON.NO_MESSAGES, detail:detail };
+  if (mode === "continue" && !cfg.applyToContinue) return { applied:false, reason:PF_REASON.CONTINUE_EXCLUDED, detail:detail };
+  if (cfg.skipOnTools && wire.tools) return { applied:false, reason:PF_REASON.TOOLS_PRESENT, detail:detail };
+
+  /* On a wire that takes no extra fields there is nothing to validate: the
+     names are unused, which is not a mistake worth reporting. */
+  const flag = pfField(wire.fields ? cfg.flagField : "");
+  const seed = pfField(wire.fields ? cfg.reasoningField : "");
+  if (!flag.ok || !seed.ok)
+    return { applied:false, reason:PF_REASON.BAD_FIELD_NAME, detail:{ why: flag.ok ? seed.why : flag.why } };
+  /* Two names, one key: the flag is written after the split, so a collision
+     replaces the seeded thinking with `true` and reports success. */
+  if (flag.name && flag.name === seed.name)
+    return { applied:false, reason:PF_REASON.FIELD_COLLISION, detail:{ why:'both are named "' + flag.name + '"' } };
+
+  const tail = msgs[msgs.length - 1];
+
+  /* A tail that came from the conversation is a real reply somebody wrote or
+     the model produced. Fields may be added to it — that is exactly what a
+     continuation flag is for — but its text is never rewritten, or More on
+     a reply that happens to open with <think> would silently lose its first
+     paragraph to the thinking field. */
+  if (tail && tail.role === "assistant"){
+    if (!flag.name) return { applied:false, reason:PF_REASON.NOTHING_TO_DO, detail:detail };
+    tail[flag.name] = true;
+    detail.flagField = flag.name;
+    return { applied:true, reason:PF_REASON.APPLIED, detail:detail };
+  }
+
+  if (wire.refused) return { applied:false, reason:PF_REASON.WIRE_REFUSED, detail:detail };
+  if (wire.thinking) return { applied:false, reason:PF_REASON.THINKING_CONFLICT, detail:detail };
+  const text = String(cfg.text == null ? "" : cfg.text);
+  if (!text.trim()) return { applied:false, reason:PF_REASON.EMPTY_PREFILL, detail:detail };
+
+  const msg = { role:"assistant", content:text };
+
+  /* The opening tag moves into the thinking field when one is configured, so
+     the seed arrives as reasoning instead of as the reply's first words.
+     With no field there is nothing to move it into and the tag stays in the
+     text — the right shape for a service that answers with inline tags. */
+  if (cfg.thinkOn && seed.name && cfg.openTag){
+    const pat = pfPattern(cfg.openTag, cfg.closeTag);
+    const m = msg.content.match(pat);
+    if (m){
+      const got = m[1].trim();
+      msg.content = msg.content.replace(pat, "").replace(/^\s+/, "");
+      if (got){
+        msg[seed.name] = got;
+        detail.reasoningField = seed.name;
+        detail.reasoningLength = got.length;
+      }
+    }
+  }
+  /* Anthropic rejects trailing whitespace on the final assistant turn, and no
+     service is helped by it. The message was built here, so it is trimmed
+     here — which also makes the echo below exactly what was sent. */
+  msg.content = msg.content.replace(/\s+$/, "");
+  if (flag.name){ msg[flag.name] = true; detail.flagField = flag.name; }
+
+  /* A turn with no text, no seed and no flag is an empty message for the
+     service to interpret. Nothing has been pushed yet, so the skip costs
+     nothing to make. */
+  if (!msg.content && !detail.reasoningField && !detail.flagField)
+    return { applied:false, reason:PF_REASON.NOTHING_TO_DO, detail:detail };
+
+  msgs.push(msg);
+  detail.appended = true;
+  detail.text = msg.content;
+  /* The reply carries on from this text, so unless it is echoed back the
+     saved message starts mid-sentence. Only what was sent as the reply is
+     echoed — anything moved into the thinking field is not. */
+  if (cfg.echo && msg.content) detail.echo = msg.content;
+  return { applied:true, reason:PF_REASON.APPLIED, detail:detail };
 }
 
 /* ==========================================================
@@ -2534,6 +2830,21 @@ function buildPayload(opts, c){
   const asm = assembleMessages(p.kind, c);
   const useNative = S.search.on && S.search.provider === "native" && p.kind === "anthropic" && opts.search;
 
+  /* The prefill runs here, on the finished list, and nowhere else. The squash
+     is already behind it, so nothing downstream can merge the turn away; and
+     the Hermes Runs transport assembles its own messages without coming
+     through this function, which is right — a run has no notion of a reply
+     that has already started, and an assistant tail would leave its `input`
+     empty. */
+  const pfc = pfCfg(c);
+  const wire = pfWire(p, c);
+  wire.tools = !!useNative;
+  const pf = opts.noPrefill
+    ? { applied:false, reason:PF_REASON.SUPPRESSED, detail:{} }
+    : applyPrefill(asm.messages, pfc, wire, opts.mode);
+  lastPrefill = pf;
+  const openThinking = !!(pf.applied && pf.detail.reasoningField && pfc.ensureThinking);
+
   if (p.kind === "anthropic"){
     const body = {
       model:p.model, max_tokens:chatMaxTok(c),
@@ -2541,12 +2852,13 @@ function buildPayload(opts, c){
     };
     if (asm.system) body.system = asm.system;
     if (useNative) body.tools = [{ type:"web_search_20250305", name:"web_search", max_uses:Number(S.search.count)||5 }];
-    applyReasoning(body, p, c);
+    applyReasoning(body, p, c, openThinking);
     return {
       url: (p.proxy || p.url).replace(/\/+$/,"") + "/messages",
       headers: { "content-type":"application/json", "x-api-key":p.apiKey,
                  "anthropic-version":"2023-06-01", "anthropic-dangerous-direct-browser-access":"true" },
-      body: body
+      body: body,
+      prefill: pf
     };
   }
   const body = {
@@ -2554,7 +2866,7 @@ function buildPayload(opts, c){
     temperature:chatTemp(c), stream:true,
     messages: asm.system ? [{ role:"system", content:asm.system }].concat(asm.messages) : asm.messages
   };
-  applyReasoning(body, p, c);
+  applyReasoning(body, p, c, openThinking);
   const headers = { "content-type":"application/json", "authorization":"Bearer " + p.apiKey };
   /* Hermes already keeps one agent session per conversation by hashing the
      system prompt and first user message, so continuity needs no headers.
@@ -2570,7 +2882,8 @@ function buildPayload(opts, c){
   return {
     url: (p.proxy || p.url).replace(/\/+$/,"") + "/chat/completions",
     headers: headers,
-    body: body
+    body: body,
+    prefill: pf
   };
 }
 
@@ -2650,8 +2963,23 @@ async function runSearch(query){
 /* ==========================================================
    SENDING
    ========================================================== */
+/* One read of a failed response, from whichever shape it came back in. */
+async function errDetail(res){
+  try {
+    const j = await res.json();
+    return (j.error && (j.error.message || j.error.type)) || JSON.stringify(j).slice(0,300);
+  } catch(_) {
+    return (await res.text().catch(function(){ return ""; })).slice(0,300);
+  }
+}
 function friendlyError(err, p){
   const msg = String(err && err.message || err);
+  if (PF_REFUSAL.test(msg)){
+    return "This model won't carry on a reply that has already started.\n\nClaude 4.6 and newer only accept a conversation that ends with your message, so \"More\" and prefill can't work on them. Older Claude models and every OpenAI-compatible service still can.";
+  }
+  if (PF_THINK_TAIL.test(msg)){
+    return "Claude won't carry on a reply while thinking is switched on.\n\nSet Thinking effort to Off in Settings \u2192 Chat and try again, or start a fresh message instead of continuing this one.";
+  }
   if (/Failed to fetch|NetworkError|Load failed/i.test(msg)){
     return "Couldn't reach " + p.name + ".\n\nUsually one of three things:\n• No internet right now\n• The address is wrong — check it in Settings\n• The service won't accept calls straight from a browser. If the address is right and you're online, that's the cause, and you'll need a relay address filled in.";
   }
@@ -2892,13 +3220,33 @@ async function send(userText, mode, forConvo){
       }
     }
     if (!ranViaRuns){
-    const req = buildPayload({ search: wantSearch }, convo);
-    const res = await fetch(req.url, { method:"POST", headers:req.headers, body:JSON.stringify(req.body), signal:ctrl.signal });
+    let req = buildPayload({ search: wantSearch, mode: mode }, convo);
+    let res = await fetch(req.url, { method:"POST", headers:req.headers, body:JSON.stringify(req.body), signal:ctrl.signal });
     if (!res.ok){
-      let detail = "";
-      try { const j = await res.json(); detail = (j.error && (j.error.message || j.error.type)) || JSON.stringify(j).slice(0,300); }
-      catch(_) { detail = (await res.text().catch(()=>"")).slice(0,300); }
-      throw new Error(p.name + " said no (" + res.status + ").\n\n" + (detail || "No details given."));
+      let detail = await errDetail(res);
+      /* A service that refuses a prefilled reply says so once, and the
+         connection remembers it — the same bargain the Runs API gets. The
+         message is not spent on finding out: when the prefill was ours to
+         remove, the turn is sent again without it. When it was the reply
+         being continued, it is not ours to remove and the error explains
+         itself instead. */
+      if (res.status === 400 && PF_REFUSAL.test(detail)){
+        markPrefillDown(p);
+        if (req.prefill && req.prefill.detail && req.prefill.detail.appended){
+          req = buildPayload({ search: wantSearch, mode: mode, noPrefill:true }, convo);
+          res = await fetch(req.url, { method:"POST", headers:req.headers, body:JSON.stringify(req.body), signal:ctrl.signal });
+          if (res.ok) toast("This model won't take a prefill \u2014 sent without it");
+          else detail = await errDetail(res);
+        }
+      }
+      if (!res.ok) throw new Error(p.name + " said no (" + res.status + ").\n\n" + (detail || "No details given."));
+    }
+    /* The model continues from the prefill, so the prefill is the first part
+       of the reply. Seeded exactly the way a continuation seeds it, because
+       it is the same thing. */
+    if (!continuing && req.prefill && req.prefill.detail && req.prefill.detail.echo){
+      raw = req.prefill.detail.echo;
+      paint();
     }
 
     const reader = res.body.getReader(), dec = new TextDecoder();
@@ -3075,9 +3423,14 @@ function editProv(id){
       prs.hidden = !p.runsDownAt;
       if (p.runsDownAt) prs.textContent = "Last time, the Runs API didn't answer — the plain stream is in use. Saving this connection tries it again.";
     }
+    const pps = $("#pPrefillStat");
+    if (pps){
+      pps.hidden = !p.prefillDownAt;
+      if (p.prefillDownAt) pps.textContent = "This connection refused a prefilled reply, so prefill is off for it. Saving the connection tries it again.";
+    }
     $("#modelHint").textContent = PRESETS[preset].hint;
     fillModelList(p.models || []);
-  } else { applyPreset("anthropic"); $("#pReason").value = "auto"; $("#pHdrs").value = ""; $("#pRuns").value = ""; const prs2 = $("#pRunsStat"); if (prs2) prs2.hidden = true; fillModelList([]); }
+  } else { applyPreset("anthropic"); $("#pReason").value = "auto"; $("#pHdrs").value = ""; $("#pRuns").value = ""; const prs2 = $("#pRunsStat"); if (prs2) prs2.hidden = true; const pps2 = $("#pPrefillStat"); if (pps2) pps2.hidden = true; fillModelList([]); }
   $("#delProvBtn").hidden = !p;
   $("#provEditor").hidden = false;
   if ($("#provEditor").scrollIntoView) $("#provEditor").scrollIntoView({ behavior:"smooth", block:"nearest" });
@@ -3106,8 +3459,8 @@ function saveProv(){
     if (prevChatProv !== data.id) cfgSet("model", null);
     cfgSet("providerId", data.id);
   }
-  // a saved edit is a reason to try the Runs API again — data was rebuilt
-  // from the fields above, so any runsDownAt mark is gone with it
+  // a saved edit is a reason to try the Runs API and the prefill again — data
+  // was rebuilt from the fields above, so both marks are gone with it
   saveSettings(); renderProvList(); renderThread();
   $("#provEditor").hidden = true; editingProv = null; toast("Connection saved");
 }
@@ -3297,6 +3650,54 @@ function exportMd(){
 }
 
 function setToggle(el, on){ el.classList.toggle("on", !!on); el.setAttribute("aria-checked", on?"true":"false"); }
+/* The verdict on the last request, in the panel. Every reason code has text;
+   a code with no entry would reach the user as jargon, so the gate checks
+   PF_STATUS against PF_REASON in both directions. */
+function pfStatusText(){
+  if (!lastPrefill) return "Nothing has been sent yet in this session.";
+  const d = lastPrefill.detail || {};
+  const bits = [];
+  if (d.appended) bits.push("added as the last turn");
+  if (d.flagField) bits.push(d.flagField + ": true");
+  if (d.reasoningField) bits.push(d.reasoningField + " (" + d.reasoningLength + " characters)");
+  if (d.why) bits.push(d.why);
+  const text = PF_STATUS[lastPrefill.reason] || lastPrefill.reason;
+  return bits.length ? text + " \u2014 " + bits.join(", ") : text;
+}
+function renderPrefill(){
+  const cfg = pfCfg();
+  const box = $("#prefillCfg");
+  if (!box) return;
+  setToggle($("#tgPrefill"), cfg.on);
+  box.hidden = !cfg.on;
+  const sel = $("#pfProfile");
+  if (sel){
+    if (!sel.options.length){
+      sel.innerHTML = '<option value="">Set by hand below</option>' + Object.keys(PF_PROFILES).map(function(k){
+        return '<option value="' + k + '">' + escapeHtml(PF_PROFILES[k].label) + '</option>';
+      }).join("");
+    }
+    sel.value = PF_PROFILES[cfg.profile] ? cfg.profile : "";
+  }
+  $("#pfText").value = cfg.text;
+  $("#pfFlag").value = cfg.flagField;
+  $("#pfSeed").value = cfg.reasoningField;
+  $("#pfOpen").value = cfg.openTag;
+  $("#pfClose").value = cfg.closeTag;
+  setToggle($("#tgPfThink"), cfg.thinkOn);
+  setToggle($("#tgPfEnsure"), cfg.ensureThinking);
+  setToggle($("#tgPfEcho"), cfg.echo);
+  setToggle($("#tgPfContinue"), cfg.applyToContinue);
+  setToggle($("#tgPfTools"), cfg.skipOnTools);
+  const st = $("#pfStatus");
+  if (st) st.textContent = pfStatusText();
+}
+/* One write path: the merged view is snapshotted onto whatever scope cfgSet
+   is pointed at, so a chat that has been touched keeps the settings it had
+   even after the shipped defaults move. */
+function pfSet(patch){
+  cfgSet("prefill", Object.assign({}, pfCfg(), patch));
+}
 function syncSettingsUI(){
   $("#sysPrompt").value = PS().system;
   $("#chatSys").value = (current && current.sysExtra) || "";
@@ -3317,6 +3718,7 @@ function syncSettingsUI(){
   $("#thinkTags").value = S.thinkTags;
   setToggle($("#tgSquash"), chatSquash());
   renderEffort();
+  renderPrefill();
   setToggle($("#tgThink"), S.showThinking);
   setToggle($("#tgTools"), S.showTools !== false);
   setToggle($("#tgThinkTags"), S.catchThinkTags);
@@ -4920,6 +5322,28 @@ on("#effortSeg", "click", function(e){
   if (!b) return;
   cfgSet("effort", b.dataset.effort); renderEffort();
 });
+
+/* ---------- prefill ---------- */
+on("#tgPrefill", "click", function(){ pfSet({ on: !pfCfg().on }); renderPrefill(); });
+on("#pfProfile", "change", function(e){
+  const pr = PF_PROFILES[e.target.value];
+  if (!pr){ pfSet({ profile:"" }); renderPrefill(); return; }
+  pfSet({ profile:e.target.value, flagField:pr.flagField, reasoningField:pr.reasoningField });
+  renderPrefill();
+});
+on("#pfText", "click", function(e){ openBigText(e.target, "Prefill text"); });
+on("#pfText",  "change", function(e){ pfSet({ text:e.target.value }); });
+/* Typing a field name by hand is a choice, so the preset above stops
+   claiming credit for it rather than showing a name it no longer holds. */
+on("#pfFlag",  "change", function(e){ pfSet({ flagField:e.target.value.trim(), profile:"" }); renderPrefill(); });
+on("#pfSeed",  "change", function(e){ pfSet({ reasoningField:e.target.value.trim(), profile:"" }); renderPrefill(); });
+on("#pfOpen",  "change", function(e){ pfSet({ openTag:e.target.value }); });
+on("#pfClose", "change", function(e){ pfSet({ closeTag:e.target.value }); });
+on("#tgPfThink",    "click", function(e){ const v = !pfCfg().thinkOn;         pfSet({ thinkOn:v });        setToggle(e.currentTarget, v); });
+on("#tgPfEnsure",   "click", function(e){ const v = !pfCfg().ensureThinking;  pfSet({ ensureThinking:v }); setToggle(e.currentTarget, v); });
+on("#tgPfEcho",     "click", function(e){ const v = !pfCfg().echo;            pfSet({ echo:v });           setToggle(e.currentTarget, v); });
+on("#tgPfContinue", "click", function(e){ const v = !pfCfg().applyToContinue; pfSet({ applyToContinue:v }); setToggle(e.currentTarget, v); });
+on("#tgPfTools",    "click", function(e){ const v = !pfCfg().skipOnTools;     pfSet({ skipOnTools:v });    setToggle(e.currentTarget, v); });
 
 /* the attached file is one icon in the top bar; tapping opens a small card */
 function closeFilePop(){

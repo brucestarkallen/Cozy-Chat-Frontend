@@ -1,3 +1,5 @@
 node_modules/
 package.json
 package-lock.json
+# left behind only when the mutation harness is interrupted
+index.html.negbak
