@@ -1,4 +1,4 @@
-// NEGATIVE TEST — run with: node tests/v516negtest.js
+// NEGATIVE TEST — run with: node tests/prefillnegtest.js
 //
 // A guard that has never failed is an unproven guard. This puts each v5.16.0
 // bug back, one at a time, and requires tests/v516test.js to catch it. A
@@ -10,7 +10,11 @@
 // reports every mutation as caught while proving nothing.
 const fs=require('fs');const cp=require('child_process');
 const FILE=__dirname+'/../index.html';
-const GATE=__dirname+'/v516test.js';
+/* Each mutation names the gate that is supposed to catch it. Running every
+   gate against every mutation would double the time and prove nothing extra:
+   what is being asked is whether *a* check exists for this bug, and a
+   mutation caught by the wrong gate is a mutation nobody aimed. */
+const GATES={prefill:__dirname+'/v516test.js', test:__dirname+'/v517test.js'};
 const BAK=FILE+'.negbak';
 /* A `finally` does not run when the process is killed, and a harness that is
    killed mid-mutation leaves the bug in the working tree looking like code
@@ -28,8 +32,8 @@ for (const sig of ['SIGINT','SIGTERM','SIGHUP']) process.on(sig,()=>{ restore();
 let pass=0,fail=0;
 const ck=(n,ok,x)=>{console.log((ok?'  ok  ':'  FAIL'),n,x===undefined?'':'→ '+x);ok?pass++:fail++;};
 
-function gate(){
-  const r=cp.spawnSync('node',[GATE],{encoding:'utf8',timeout:300000});
+function gate(which){
+  const r=cp.spawnSync('node',[GATES[which||'prefill']],{encoding:'utf8',timeout:300000});
   const line=(r.stdout||'').split('\n').filter(l=>l.indexOf('RESULT:')===0).pop()||'(no result line)';
   return {ok:r.status===0,line:line};
 }
@@ -89,8 +93,9 @@ const MUTATIONS=[
    '      if (false && res.status === 400 && PF_REFUSAL.test(detail)){'],
 
   ['the refusal is not remembered, so every message pays for it again',
-   '        markPrefillDown(p);',
-   '        '],
+   `        markPrefillDown(p);
+        if (req.prefill && req.prefill.detail && req.prefill.detail.appended){`,
+   `        if (req.prefill && req.prefill.detail && req.prefill.detail.appended){`],
 
   ['a reason code reaches the user as jargon',
    '  "wire-refused": "Skipped: this connection refused a prefilled reply, so it isn\'t offered one.",',
@@ -125,16 +130,94 @@ const MUTATIONS=[
    '  applyPrefill(merged, pfCfg(c), Object.assign(pfWire(activeProv(c), c), { tools:false }), null);\n  return { messages: merged, system: system };\n}'],
 
   ['the panel stops reporting what happened to the last message',
-   '  lastPrefill = pf;',
+   '  if (!opts.probe) lastPrefill = pf;',
    '  '],
+
+  // ---- the Test button. Each of these makes it lie in a different way. ----
+
+  ['the test sends the real chat, so what comes after C is a matter of opinion',
+   `  const asm = opts.probe
+    ? { messages: [{ role:"user", content: PF_PROBE_ASK }], system: "" }
+    : assembleMessages(p.kind, c);`,
+   '  const asm = assembleMessages(p.kind, c);', 'test'],
+
+  ['a test overwrites the panel report on the last message the user sent',
+   '  if (!opts.probe) lastPrefill = pf;',
+   '  lastPrefill = pf;', 'test'],
+
+  ['an old refusal gags the test that would have cleared it',
+   '  if (opts.probe) wire.refused = false;',
+   '', 'test'],
+
+  ['the flag rides on the probe that exists to rule the flag out',
+   `    if (kind === "bare") return { text: PF_PROBE_TEXT, thinkOn:false, echo:false, flagField:"" };`,
+   '    if (kind === "bare") return { text: PF_PROBE_TEXT, thinkOn:false, echo:false };', 'test'],
+
+  ['a service that drops the prefill and starts over is called a pass',
+   '    if (/^A\\b/.test(norm)) return "restarted";',
+   '', 'test'],
+
+  ['a reply with nothing in it is called a pass',
+   '    if (!norm) return "empty";',
+   '', 'test'],
+
+  ['"Done" is read as the model continuing from C',
+   '    if (/^D\\b/.test(norm)) return "continued";',
+   '    if (/^D/.test(norm)) return "continued";', 'test'],
+
+  ['a refusal found by the test is not remembered',
+   `            if (PF_REFUSAL.test(first.detail)){
+                markPrefillDown(p);`,
+   `            if (PF_REFUSAL.test(first.detail)){`, 'test'],
+
+  ['a rejected field and a rejected turn are reported as the same failure',
+   `            const flag = String(cfg.flagField || "").trim();
+            if (flag){`,
+   `            const flag = String(cfg.flagField || "").trim();
+            if (false && flag){`, 'test'],
+
+  ['the thinking field is never checked, so it fails later in real use',
+   '        if (verdict === "continued" && seedField && cfg.thinkOn && wire.fields && String(cfg.openTag || "").trim()){',
+   '        if (false){', 'test'],
+
+  ['a passing test leaves an old refusal in place, so messages skip the prefill',
+   `        if (p.prefillDownAt){
+            const real = S.providers.find(function(x){ return x.id === p.id; });
+            if (real){ delete real.prefillDownAt; saveSettings(); }
+        }`,
+   '', 'test'],
+
+  ['Claude with thinking on is sent a request that can only 400',
+   `    if (wire.thinking){
+        pfSay("bad", "Claude won\'t take a prefilled reply while thinking is on. Set Thinking effort to Off in this panel to use the prefill on this connection.");
+        return;
+    }`,
+   '', 'test'],
+
+  ['a prefill that is switched off is blamed on the service',
+   '        if (!first.prefill || !first.prefill.applied){',
+   '        if (false){', 'test'],
+
+  ['Runs mode gets a green light while carrying no prefill at all',
+   '    const runsWillSkip = reasonStyle(p) === "hermes" && p.hermesRuns && !runsIsDown(p);',
+   '    const runsWillSkip = false;', 'test'],
+
+  ['a green light survives the settings it was given for',
+   `  return [p ? p.id : "", p ? p.model : "", c.flagField, c.reasoningField, c.openTag, c.closeTag,
+          c.thinkOn ? 1 : 0, chatEffort()].join("\\u0000");`,
+   '  return "always the same";', 'test'],
 ];
 
 (function main(){
   try {
-    console.log('=== CONTROL: the gate passes on an unmutated file ===');
-    const c=gate();
-    ck('control run is green',c.ok,c.line);
-    if(!c.ok){
+    console.log('=== CONTROL: both gates pass on an unmutated file ===');
+    let green=true;
+    for (const k of Object.keys(GATES)){
+      const c=gate(k);
+      ck('control run is green: '+k,c.ok,c.line);
+      green=green&&c.ok;
+    }
+    if(!green){
       console.log('\nCONTROL FAILED — every mutation below would read as caught while proving nothing.');
       process.exitCode=1;
       return;
@@ -146,11 +229,11 @@ const MUTATIONS=[
     const from=Number(process.argv[2]||0), to=Number(process.argv[3]||MUTATIONS.length);
     console.log('\n=== MUTATIONS '+from+'..'+Math.min(to,MUTATIONS.length)+' of '+MUTATIONS.length+': each bug must be caught ===');
     fs.writeFileSync(BAK,original,'utf8');
-    for (const [label,find,replace] of MUTATIONS.slice(from,to)){
+    for (const [label,find,replace,which] of MUTATIONS.slice(from,to)){
       const n=original.split(find).length-1;
       if(n!==1){ ck('MUTATION TARGET "'+label+'" appears exactly once',false,n+' occurrences'); continue; }
       fs.writeFileSync(FILE,original.replace(find,replace),'utf8');
-      const r=gate();
+      const r=gate(which);
       ck(label,!r.ok,r.ok?'SURVIVED — '+r.line:r.line.replace('RESULT: ',''));
       fs.writeFileSync(FILE,original,'utf8');
     }

@@ -6,13 +6,21 @@ worker, `install.sh` the Termux installer, `tests/` the gate.
 ## Gate — run before every push
 
     npm i jsdom fake-indexeddb        # once per workspace
-    for t in tests/*.js; do node "$t" || exit 1; done
+    for t in tests/*.js; do
+      [ "$t" = tests/prefillnegtest.js ] && continue
+      node "$t" || exit 1
+    done
     bash tests/installtest.sh
 
-1239 checks as of v5.16.0, measured from real output. `tests/v516negtest.js` is
-in that loop but is a *meta* gate: it runs `v516test.js` 24 times against a
-mutated `index.html` and takes several minutes. Run it on its own, or in
-slices (`node tests/v516negtest.js 0 9`), after touching a prefill guard.
+1316 checks as of v5.17.0, measured from real output.
+
+`tests/prefillnegtest.js` is held out of that loop because it is a *meta*
+gate: it runs the prefill gates 39 times against a mutated `index.html` and
+takes over ten minutes. Run it on its own after touching a prefill guard, in
+slices if a session cannot hold a long call:
+
+    node tests/prefillnegtest.js          # all 38
+    node tests/prefillnegtest.js 0 9      # a slice
 
 It edits `index.html` in place. A `.negbak` is written before the first
 mutation and restored at startup if a previous run was killed — without that,
@@ -50,7 +58,7 @@ in `buildPayload()`, after the squash in `assembleMessages()`, and the message
 that leaves `buildPayload()` is the message on the wire. None of the merge
 prediction was carried over, because none of it can happen here.
 
-Four invariants, each with a mutation in `v516negtest.js`:
+Four invariants, each with a mutation in `prefillnegtest.js`:
 
 - **Nothing is written until every skip has been ruled out.** A report of
   "skipped" means the request went out exactly as `assembleMessages()` built
@@ -66,6 +74,22 @@ Four invariants, each with a mutation in `v516negtest.js`:
 - **The prefill lives in `buildPayload()`, never in `assembleMessages()`.**
   The Hermes Runs transport assembles its own list and maps it to
   `{role, content}`; an assistant tail there empties the run's `input`.
+
+**A test that builds its own request tests itself.** `pfTest()` goes through
+`buildPayload()` with `opts.probe`, which swaps the conversation and nothing
+else — provider, field names, tags, thinking style and every guard are the
+live ones. A probe is not a message, so it does not touch `lastPrefill`, and
+it ignores an existing refusal because clearing one is half its job.
+
+**A status code is not a verdict.** A service can accept the trailing turn and
+drop it, which is a 200 either way. The probe sequence exists so continuation
+has a deterministic answer, and the flag and the thinking field get their own
+probes — sent only when they can distinguish something — because a rejected
+field and a rejected turn are different repairs.
+
+**A verdict describes the settings it was produced under.** `pfFingerprint()`
+lists them; when it moves, the line is cleared. Every control in that list has
+to re-render, or a green light outlives what it was about.
 
 Capability that cannot be read off a model name is learned from the wire.
 Claude 4.6+ refuses a prefilled turn with a 400; `markPrefillDown()` records

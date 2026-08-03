@@ -279,6 +279,28 @@ the SillyTavern **Prefill Control** extension, built into Cozy.
 - **Also on More** — **More** already ends the prompt with the reply so far,
   which is a prefill of its own, so with this on the flag rides along with it.
   The prefill *text* is never added there — that would rewrite your reply.
+- **Test prefill** — the button answers the only question that matters: does
+  this work on *this* connection with *this* model. It sends one short
+  message, built by exactly the same code your real messages go through, and
+  reads what comes back:
+
+| What you see | What it means |
+|---|---|
+| Green | The model carried on from the prefilled words. It works here. |
+| Amber | The request was accepted but something is off — the service dropped the turn, a field was rejected, or a setting elsewhere means real messages won't carry it |
+| Red | Refused, with the reason and what to change |
+
+  A status code on its own would not be enough. A service can accept the turn
+  and quietly drop it, which looks identical to success until you notice the
+  model started its answer over — so the test uses a sequence with a
+  deterministic continuation and checks the reply. The continuation flag and
+  the thinking field are asked about separately, because "this model won't
+  take a prefill" and "this model won't take that field" are different
+  problems with different fixes. A test that passes also clears an earlier
+  refusal, so a connection is never stuck on a verdict that has stopped being
+  true. And the answer disappears the moment you change anything it depended
+  on — a green light describing settings you have since edited is worse than
+  no green light at all.
 - **Last message sent** — the panel says what actually went out, and why, when
   something was skipped. There is no console on a phone, so the diagnostic
   lives where you can read it.
@@ -497,6 +519,7 @@ network-first, so a refresh always gets the newest version.
 | `reasonStyle()` / `applyReasoning()` | Which thinking parameter each service wants |
 | `applyPrefill()` | Puts the prefilled turn on the finished message list |
 | `pfWire()` / `markPrefillDown()` | What a connection will accept on that turn, and how a refusal is learned |
+| `pfTest()` / `pfProbe()` | The live test — real requests through the real `buildPayload()` |
 | `loadModels()` | Fetches the model dropdown from `/models` |
 | `connLabel()` | Shows the model once instead of connection name + model |
 | `runSearch()` | Web search calls per service |
@@ -505,23 +528,23 @@ network-first, so a refresh always gets the newest version.
 | `send()` | Sends and reads the streaming reply |
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
-**Tests.** Everything in `tests/` — `v516test.js` down to `v2test.js`, plus
+**Tests.** Everything in `tests/` — `v517test.js` down to `v2test.js`, plus
 `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`, `swtest.js`,
 `scrolltest.js`, `styletest.js`, `hiddentest.js`, `coherencetest.js` and
 `installtest.sh` — runs under Node with jsdom (`npm i jsdom fake-indexeddb`).
-1239 checks across the matching engine, JSON tolerance, prompt assembly,
+1316 checks across the matching engine, JSON tolerance, prompt assembly,
 multi-block replies, proposal supersede, undo truth, button visibility,
 projects, retrieval, streaming, SSE framing and Hermes tool activity,
 stream/chat binding, touch reorder, reader-owned scrolling, backup
 round-trips, migration, prefill on every wire shape, and negative tests that
 deliberately reintroduce fixed bugs to prove the guards fire.
 
-`tests/v516negtest.js` is a mutation harness rather than part of the gate: it
-puts each prefill bug back, one at a time, and requires `v516test.js` to catch
-it. It edits `index.html` in place, so it keeps a `.negbak` on disk and puts
-the file back at startup if a run was interrupted. Run it after changing a
-prefill guard — `node tests/v516negtest.js`, or in slices,
-`node tests/v516negtest.js 0 9`.
+`tests/prefillnegtest.js` is a mutation harness rather than part of the gate:
+it puts each of the 38 prefill bugs back, one at a time, and requires the gate
+to catch it. It edits `index.html` in place, so it keeps a `.negbak` on disk
+and puts the file back at startup if a run was interrupted. Run it after
+changing a prefill guard — `node tests/prefillnegtest.js`, or in slices,
+`node tests/prefillnegtest.js 0 9`.
 
 ---
 

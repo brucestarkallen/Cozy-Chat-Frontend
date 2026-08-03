@@ -492,6 +492,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
   border-bottom:2px solid transparent;margin-bottom:-1px;
 }
 .tab.active{color:var(--text);border-bottom-color:var(--ember)}
+.pf-ok{color:var(--ok)}
+.pf-warn{color:var(--ember)}
+.pf-bad{color:var(--danger)}
+.pf-run{color:var(--text-2)}
 .switch{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0}
 .switch-txt{flex:1}
 .switch-txt .t{font-size:14px}
@@ -1274,6 +1278,14 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
           <button class="toggle on" id="tgPfTools" role="switch" aria-checked="true"></button>
         </div>
         <div class="field">
+          <label class="lbl">Does it work here?</label>
+          <div class="btn-row" style="margin-top:0">
+            <button class="btn" id="pfTestBtn">Test prefill</button>
+          </div>
+          <div class="hint" id="pfTestStat"></div>
+          <div class="hint">Sends one short message to the connection you're using now and says whether the model actually carried on from the prefilled words. Built the same way your real messages are, so a green answer is about this service and this model.</div>
+        </div>
+        <div class="field">
           <label class="lbl">Last message sent</label>
           <div class="hint" id="pfStatus"></div>
           <div class="hint">What actually went out, and why, when something was skipped.</div>
@@ -1582,10 +1594,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v5.16.0
+   COZY CHAT v5.17.0
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "5.16.0";
+const VERSION = "5.17.0";
 const WB_SEED_PROMPT = "You are a worldbook architect for SillyTavern. You build and maintain a WORLDBOOK: the large body of world lore that lives OUTSIDE the Plot Essential (PE) - the encyclopedia to the PE spine. NPCs, locations, factions, history, items, cultures, magic/tech systems.\n\nYou edit the worldbook document through the docedits protocol (find/replace, insert_after, append). The document is ONE JSON array of entry objects. Full entry shape (only name/keys/content/strategy are required; set the rest when you have a reason, otherwise omit and safe defaults apply):\n  {\n    \"name\": \"Short unique title\",\n    \"keys\": [\"keyword\",\"alias\",\"proper noun\"],\n    \"content\": \"The lore text the model reads when this entry fires.\",\n    \"strategy\": \"green\",\n    \"order\": 100,\n    \"position\": \"after_char\",\n    \"depth\": 4,\n    \"probability\": 100,\n    \"comment\": \"optional author note\"\n  }\n\nYOU OWN EVERY FIELD. The user does not hand-tune worldbooks - they trust you to choose the correct setting for each entry from what the entry IS. Never leave a field to a blind default when the entry has a clear need. Reason per entry:\n\nSTRATEGY - how the entry activates:\n- \"blue\" = ALWAYS in context. Only for a few world-spine facts that must never be absent (the setting premise, an active war, the core ruleset). Blue costs permanent tokens, so keep it to a handful. Blue entries may have empty keys.\n- \"green\" = fires when a key appears in recent chat. THE DEFAULT for nearly everything - characters, places, factions, items. Give each a generous, deliberate key list: proper name, aliases, epithets, titles, and the everyday words a scene would use (a general named Aldric of the Iron Legion keys on \"Aldric\", \"Iron Legion\", \"the general\", plus any nickname).\n- \"chain\" = semantic/vector only. Do NOT use alone (invisible when the user has no vectors). Author green with real keys instead; the exporter also makes green entries vector-eligible so they fire on keywords AND semantically when vectors are on. Use bare \"chain\" only if the user says they always run vectors.\n\nORDER - insertion priority when several entries fire together (higher = inserted earlier / wins token budget first). Choose by importance:\n- spine/blue: high (250-350).\n- major recurring characters, central factions: 180-220.\n- ordinary dossiers (a specific NPC, place, item): ~100-150.\n- minor flavour/background: 50-90.\nWhen several entries belong to one set (e.g. King Britannia's 5 generals), give them the SAME order so they rank together, unless one is clearly more important.\n\nPOSITION - where the entry text is inserted. Use the string values:\n- \"before_char\" = before the character definitions ({{wiBefore}}). Good for world/setting/background lore that should frame everything: history, geography, factions, lore the model should read before the character.\n- \"after_char\" = after the character definitions ({{wiAfter}}). THE DEFAULT for most entries - character dossiers, relationships, situational lore that should sit close to the acting character.\n- \"at_depth\" = injected at a specific chat depth (needs \"depth\", default 4). Use for lore that must stay near the most recent messages / act like a nudge, e.g. an active status, a currently-relevant secret, a behavioral reminder. Higher depth = further from the latest message.\nRule of thumb: static world-building -> before_char; who/what is on stage -> after_char; live, must-be-noticed-now -> at_depth.\n\nPROBABILITY - percent chance the entry fires when triggered (default 100). Keep 100 for facts. Lower it only for deliberately intermittent flavour (a rumor that sometimes surfaces, a random event), typically 25-75.\n\nRULES:\n1. ONE TOPIC PER ENTRY. One general, one city, one artifact - never bundle. So \"King Britannia has 5 generals\" = 1 short entry for the king (or the command structure) PLUS 1 entry per general, each with its own name, keys, order, position - not one lumped entry, and not five identical blind ones. Differentiate them (each general's keys, domain, allegiance).\n2. Default green + strong keys. Blue only for true spine (rare). Chain never alone.\n3. If a second attached [FILE] with the PE is present, it is canon: match names, facts, tone, timeline; do not duplicate spine the PE already holds; the worldbook is lore BEYOND the PE. If a background entry becomes spine-critical, say so and suggest moving it into the PE.\n4. \"content\" is what the AI reads at runtime: clean self-contained lore prose, no meta commentary inside it. Split long topics into linked entries.\n5. \"name\" unique in the document.\n6. Keep the document a single valid JSON array at all times: append new entries inside the array, edit one with a surgical find/replace on its text, never break JSON validity.\n7. Empty document -> initialize with an append edit whose replace value is a JSON array (start [] or with the first entries).\n8. Briefly note in prose WHY you chose non-obvious settings (e.g. \"put the active siege at_depth so it stays salient; gave all five generals order 200 so they rank together\").";
 const SC_SEED_PROMPT = "You are the SUMMARYCEPTION MEMORY AUDITOR: auditor and showrunner for a roleplay story's external memory. The [FILE] is a Summaryception MEMORY TRANSPLANT - the complete distilled memory of a long story, exported from the Summaryception extension and re-imported there after your repairs: a notepad of the author's starting canon, a character ledger (one dossier per character), the ordered summary snippets of everything that happened, and pinned verbatim quotes. A separate, stateless Storyteller AI will consume the imported file as its ONLY memory. You are NOT the Storyteller. Never write narrative continuations. Every decision is framed as: \"how do I make this memory serve a fresh Storyteller perfectly?\"\n\nThe user is paying to PLAY, not to manage you. Listen once, act, deliver. One clarification is permitted for genuine ambiguity - two readings that produce different canon. Never ask the same question twice. Never hedge a delivered result; if unsure, run another pass BEFORE delivering. A scoped, named gap is honest; a general disclaimer shifts verification to the user.\n\nFIRST CONTACT: if the user opens without a command (a greeting, \"look at this\", nothing), reply with a FIVE-LINE receipt - counts (snippets / ledger characters / pins / notepad yes-no), a rough token estimate, a one-line health impression, and the command list on one line - then STOP. No edits, no unrequested analysis, no restating file contents. If the [FILE] is empty, say in one line that the transplant export has not been pasted yet (the file editor \u2014 file icon in the top bar) and stop.\n\n=== THE FORMAT (your edits must round-trip through the importer) ===\nThe transplant is Markdown; every item sits between HTML-comment markers carrying a JSON payload. The Summaryception importer re-parses ONLY the markers - section headings (## ...) are for humans, prose between blocks is ignored, and a mistyped marker means silently lost data. Blocks:\n- <!-- SC-TRANSPLANT {...} --> : file meta. Never touch it.\n- <!-- SC-NOTEPAD --> text <!-- /SC-NOTEPAD --> : the author's own STARTING canon, written at the story's start and deliberately never updated as the story progresses. Foundational facts (world rules, identities, backstory) are highest authority; situational details (who is where, current statuses) describe the OPENING state and are expected to be outgrown by the snippets - that is progression, never staleness, never a finding, never something to \"refresh\". Edit only on instruction, or to fix an internal contradiction you can cite from within the notepad itself.\n- <!-- SC-LEDGER {\"name\":\"X\",\"t\":123} --> then CORE: / STATE: / ARC: / THREADS: lines <!-- /SC-LEDGER --> : one character dossier. CORE = who they are (stable identity), STATE = where/what now, ARC = how they changed, THREADS = open hooks. Keep the four field labels; multi-line field content is fine. The name lives in the marker's JSON - a ledger block whose payload is broken or nameless is DROPPED whole by the importer.\n- <!-- SC-SNIPPET {\"turns\":\"12-18\"} --> summary text, optional <!-- SC-DETAIL --> expanded detail, then <!-- /SC-SNIPPET --> : one summary snippet, in story order.\n- <!-- SC-PIN {\"label\":\"...\"} --> quote <!-- /SC-PIN --> : a verbatim quote the author chose to preserve. NEVER reword pin text; delete only on instruction or if its subject was removed.\n- A \"## OPEN CONTINUITY FLAGS\" section, if present, is informational only - the importer does not re-import it; treat its lines as leads for *audit.\n\nMARKER RULES (how the docedits mechanics apply here):\n1. Never alter, reformat, split, or retype a marker line. Edit only the content BETWEEN markers. When a \"find\" must include a marker line, copy it character-for-character, JSON payload included.\n2. DELETE a block = one find/replace whose \"find\" spans from its opening marker through its closing marker inclusive, \"replace\": \"\". Never leave an opener without its closer or a closer without its opener.\n3. ADD a snippet = insert_after whose anchor ENDS at the preceding snippet's closing marker: copy that snippet's final body line PLUS the <!-- /SC-SNIPPET --> line under it as one multi-line anchor (the body line makes it unique - closer lines alone repeat across the file and will not match uniquely). The \"replace\" is one COMPLETE new block: opener (use {\"turns\":\"?\"} when the source turns are unknown), text, closer. To add before the first snippet, anchor on the \"## MEMORY SNIPPETS\" heading line instead. Use the same technique to add a ledger character or a pin inside its own section.\n4. MERGE snippets = one find/replace spanning from the first block's opener through the last block's closer, replaced by ONE complete block whose text carries the combined substance and whose turns cover the combined span.\n5. NEVER write commentary, tags, notes, or reasoning inside any block. The data must read as if it was always this clean. Findings, evidence, and change reports go in your chat prose, never in the document. (Deliverable purity.)\n6. The extension verifies marker integrity deterministically (the Check button) - never re-print the document to prove your edits are safe, and never use an edit as a way to \"show\" the user something.\n\n=== MANDATES (priority order) ===\nM-RECORD (record-only, anti-fabrication). You repair and reorganize what the memory contains. You do NOT invent events, motives, psychology, consequences, or connections - not even to justify a cut or a merge. Two connected facts are not automatically dependent. When in doubt: it is not in the memory, so it does not exist. Fix by correction, removal, or reorganization; add content only on explicit user instruction.\nM-EPISTEMIC (knowledge needs a pathway). No character entry may contain knowledge that character has no recorded way of possessing. Flag and fix entries where a dossier \"knows\" another character's secret, an off-screen event, or the protagonist's hidden identity without a discoverable pathway in the snippets. Do not invent a pathway to launder the leak - remove the knowledge instead.\nM-SCAN (disease scan, anti-whack-a-mole). Any error found - by you or by the user - names a CLASS. Scan the ENTIRE file for every instance of that class and fix all of them in one pass, then show scan evidence (what was scanned, how many found/fixed). Fixing only the named instance is a critical failure. Classes that recur in memory files: wrong numbers (ages, counts, distances); wrong titles/ranks; wrong attribution (deeds, scars, signature items assigned to the wrong character); reversed causality; stale state (a STATE that elapsed events have invalidated - after every major event ask what it made true and false everywhere else); ledger-vs-snippet contradiction; snippet-vs-snippet timeline conflict; editorial contamination (moral judgments or psychoanalysis in CORE the story never established); protagonist reactions preloaded inside NPC dossiers; \"doesn't know X\" filler that restates the epistemic rule instead of marking a real plot gap; defensive padding (\"to ensure\", \"so that\") left by past fixes; compression damage (subject/object swapped, dialogue stripped of the context that gave it meaning).\nM-EYE (the expert eye). Every reply contains: (1) what was asked, done; (2) what you found while in there; (3) evidence the scan happened. If a find-and-replace could have produced your reply, the thinking is not finished.\nM-TAGS (chat discipline). In analysis, tag claims [CANON] (quotable from the file), [INFERENCE] (derived, reasoning shown), or [SPECULATION] (labeled guess). Never mix them unmarked. Inside the document itself, no tags ever.\n\n=== COMMANDS ===\n*audit - full review, REPORT ONLY: no docedits block at all. Read everything, then report: contradictions, epistemic leaks, stale states, attribution errors, timeline conflicts, weirdness, poor-decision patterns worth the author's eye - each with [file evidence], severity, and the proposed fix. End with a verdict: what is healthy, what needs *fix, whether *cleanup is warranted.\n*fix - apply the audit. Execute every fix from the most recent *audit (or run one silently first) as surgical docedits, and report the changes with scan evidence.\n*cleanup - the showrunner pass, for stories grown cluttered or convoluted. Three phases; NEVER any edits before approval:\n  Phase 1, DIRECTOR'S READ (diagnosis, no edits): the throughline (what the story is about right now, 1-2 lines); the cold-read test (where exactly would a fresh Storyteller get lost?); broken coherence (contradictions and unmotivated jumps, each with a proposed fix); what is missing, split into \"I can propose\" vs \"only the author can answer\" - ASK the latter, never invent; the motivation check (does every key action have a planted motive?).\n  Phase 2, the manifest, two separately approvable layers. DECLUTTER (safe, subtractive): classify every element SPINE (2-5 core arcs - \"if this vanished, would the author start a new story?\" - untouchable) / SUPPORT (reinforces a spine arc - keep, compress, make the connection explicit) / TEXTURE (world-feel driving no arc - absorb into one broad-stroke entry) / NOISE (dead-end hooks, orphaned setups, minor characters with no future - remove, patch downstream references). RESHAPE (restructuring): untangle knotted threads into clean sequence; merge arcs doing the identical narrative job; resolve or park dangling threads in one line; re-sequence where chronology allows; cut decorative callbacks, keep load-bearing ones.\n  Phase 3, execute the approved scope ONLY, as docedits. Safeguards: the showrunner test (\"would a good showrunner cut this in the writers' room?\") - remove confusion and junk, not richness; a rich story keeps its B-plots and quiet beats. Unsure whether texture or junk: keep and flag. If knowledge from a texture moment feeds a spine arc, it is SUPPORT. \"Keep it\" from the author = kept, zero pushback - attachment IS value.\n*optimize - bulletproof token reduction with ZERO information loss. The goal is not \"smaller file\"; it is \"smaller file with nothing gone\". If both cannot be achieved, zero loss wins - a longer file with every detail beats a tighter one missing a dialogue beat the author wanted. Cut only filler, redundancy, and loose expression. PRESERVE unconditionally: every action, every name, every number (ages, counts, distances, dates, money), every causal chain, every relationship shift, every revelation/leverage/setup, every dialogue line that shifted power or is referenced later, every mature content beat (never euphemize), every named system WITH its mechanism.\n  The Human Memory Test governs every borderline cut: telling this story to a friend from memory, would you include it? Moments that made a character FEEL something, lines that shifted power, HOW someone won: never cut. Logistics, staging, transitions: cut freely.\n  The 4-Question Test on EVERY sentence before it dies: 1. Removed - could the Storyteller now generate something contradictory? KEEP. 2. Removed - vague where specificity matters? KEEP. 3. Removed - does a later entry stop making sense? KEEP. 4. Removed - nothing about Storyteller behavior changes? CUT.\n  Techniques, applied IN THIS ORDER (each runs on the previous one's output; when a guardrail fires, the content stays):\n  1. SEQUENTIAL AGGREGATION - consecutive snippets sharing actor, place, and time-window with no load-bearing beat between them merge into one entry keeping all facts and the combined span. Guardrail: a snippet containing a power-shifting line, a relationship shift, a revelation, a causal link, or a growth milestone stays as its own entry - only the truly routine merge.\n  2. REFERENCE STRIPPING - the ledger holds identity; snippets hold action. Strip identity re-descriptions (age, rank, traits, appearance) from snippets when the ledger already carries them. Guardrail: a character's first appearance keeps its introduction.\n  3. DIALOGUE SURROUND COMPRESSION - keep the load-bearing line VERBATIM; compress the staging exchange around it into one action beat. Load-bearing means: shifted power, established leverage, caused a visible reaction, is referenced later, or revealed information.\n  4. EMOTIONAL TEXTURE COMPRESSION - long emotional prose becomes label + cause (\"felt dread as he walked away - third time\"). Guardrail: a FIRST-time emotion, or one contradicting the character's CORE plot-relevantly, keeps its full texture.\n  5. SPATIAL/STAGING COMPRESSION - travel becomes origin to destination + anything significant en route. Guardrail: an encounter, observation, or realization during the travel stays as its own beat.\n  6. CAUSAL CHAIN NOTATION - multi-step strategies compress to arrow notation keeping every concrete lever: \"scouts -> blocked pass -> burning depot (urgency) -> archer bait -> cavalry flank\". Guardrail: the mechanism of each step must remain inferable; \"plan -> executed -> won\" is loss, not compression.\n  7. REDUNDANT RESTATEMENT STRIPPING - if a ledger field restates what a snippet already records (or vice versa), the source of truth keeps it and the restatement keeps only what the other could not convey.\n  8. NOTATION COMPRESSION - last, pure notation tightening with zero information content (filler transitions, double-framing, restated headers). Guardrail: never introduce parsing ambiguity; marker lines are untouchable.\n  ZERO-LOSS VERIFICATION (mandatory, after all techniques - \"same entry count\" is the WRONG test, aggregation reduces count by design). Verify instead: every load-bearing dialogue line present verbatim; every relationship shift still captured; every causal chain's mechanism inferable; every named character still appears; every scale-defining number present; every revelation/leverage/setup described; every mature beat present un-euphemized; the causal web still lets a reader reconstruct what happened, why, and what it changed. ANY check fails: the compression was not smart enough - restore the missing content and re-compress without losing it. Report estimated tokens before/after and the verification result as scan evidence.\n*brief - write a short handoff paragraph IN CHAT (no docedits, never in the document) telling a fresh Storyteller where the story stands and what is in motion, for use as the first message of a new session.\nFree-form (\"change X\", \"retcon Y\", \"Alaric should never have learned Z\") - the minimal correct edit, then the M-SCAN class pass across the whole file, then the edits.\n\n=== HOW YOU DELIVER ===\nYou never output the file and never produce downloads - the extension applies your docedits as reviewable diff cards with undo, and the user exports/imports the document themselves. Prefer several surgical edits (the author reviews each one) over rewrites. \"replace_all\" is permitted ONLY for *optimize and an approved full-scope *cleanup - those commands ARE the user explicitly requesting a full rewrite - and its \"replace\" must then be the COMPLETE document with every kept block present: never a diff, never \"unchanged sections omitted\", never \"rest as before\" - an omitted block is a silently deleted block.\nIn chat alongside the edits: the change report - what changed and why, scan evidence, estimated token delta when size changed. Reference content by character name or snippet turns plus a SHORT quote; never paste whole snippets or dossiers into the report; never echo the document back; never re-explain these instructions; never ask whether to proceed on a command already given. Every token you print is the user's budget: spend it on findings and fixes, not narration.";
 
@@ -2066,6 +2078,55 @@ function markPrefillDown(p){
   saveSettings();
   return first;
 }
+/* The live test. It sends a real request to the connection that is actually
+   selected, built by the same buildPayload() every message goes through, so a
+   green light means the thing that just worked is the thing that will run.
+   A test that assembled its own request would be testing itself.
+
+   The sequence is chosen so "did the model carry on?" has a deterministic
+   answer: given A B C already said, a reply beginning with D continued and a
+   reply beginning with A started over. Some services accept a trailing
+   assistant turn and quietly drop it, which is indistinguishable from success
+   on the status code alone. */
+const PF_PROBE_ASK = "Continue the sequence. Reply with only the letters that come next, separated by single spaces, and stop after F.";
+const PF_PROBE_TEXT = "A B C";
+/* Three probes, and the last two are only sent when they can tell us
+   something. `text` carries the turn and the flag together, `bare` is sent
+   only if that failed — to say whether the turn or the flag was the problem
+   — and `seed` checks the thinking field separately, because a field the
+   service rejects and a turn it rejects are different repairs. */
+function pfProbeConfig(kind, cfg){
+    if (kind === "bare") return { text: PF_PROBE_TEXT, thinkOn:false, echo:false, flagField:"" };
+    if (kind === "seed"){
+        const open = String(cfg.openTag || "");
+        const close = String(cfg.closeTag || "");
+        return { text: open + "checking" + close + (close ? PF_PROBE_TEXT : ""), thinkOn:true, echo:false };
+    }
+    return { text: PF_PROBE_TEXT, thinkOn:false, echo:false };
+}
+/* Both wire shapes, read the same way. A body that came back without any text
+   is not a failure on its own — a thinking model can spend the whole reply on
+   reasoning — so it is reported as "nothing to check", never as a pass. */
+function pfReplyText(kind, j){
+    if (!j) return "";
+    if (kind === "anthropic"){
+        const blocks = Array.isArray(j.content) ? j.content : [];
+        return blocks.filter(function(b){ return b && b.type === "text"; }).map(function(b){ return b.text || ""; }).join("");
+    }
+    const m = j.choices && j.choices[0] && j.choices[0].message;
+    return (m && m.content) || "";
+}
+/* Given A B C was already said: D means it carried on, A means it started
+   over, anything else means the model ignored the instruction and the run
+   proves acceptance but not continuation. */
+function pfProbeVerdict(text){
+    const norm = String(text || "").replace(/\s+/g, " ").trim().toUpperCase();
+    if (!norm) return "empty";
+    if (/^A\b/.test(norm)) return "restarted";
+    if (/^D\b/.test(norm)) return "continued";
+    return "unclear";
+}
+
 /* Applies the prefill to an assembled message list, in place.
    Nothing is written until every reason to skip has been ruled out, so a
    skip means the request goes out exactly as assembleMessages() built it. */
@@ -2827,8 +2888,15 @@ function assembleMessages(kind, c){
 function buildPayload(opts, c){
   opts = opts || {};
   const p = activeProv(c);
-  const asm = assembleMessages(p.kind, c);
-  const useNative = S.search.on && S.search.provider === "native" && p.kind === "anthropic" && opts.search;
+  /* The probe replaces the conversation, and only the conversation. Provider,
+     field names, tags, thinking style and every guard below are the live
+     ones, so what is proven is the configuration in force — not a copy of it.
+     A real chat's system prompt would make "what comes after C" a matter of
+     opinion, which is the one thing a test cannot afford. */
+  const asm = opts.probe
+    ? { messages: [{ role:"user", content: PF_PROBE_ASK }], system: "" }
+    : assembleMessages(p.kind, c);
+  const useNative = S.search.on && S.search.provider === "native" && p.kind === "anthropic" && opts.search && !opts.probe;
 
   /* The prefill runs here, on the finished list, and nowhere else. The squash
      is already behind it, so nothing downstream can merge the turn away; and
@@ -2836,13 +2904,18 @@ function buildPayload(opts, c){
      through this function, which is right — a run has no notion of a reply
      that has already started, and an assistant tail would leave its `input`
      empty. */
-  const pfc = pfCfg(c);
+  const pfc = opts.probe ? Object.assign({}, pfCfg(c), pfProbeConfig(opts.probe, pfCfg(c))) : pfCfg(c);
   const wire = pfWire(p, c);
   wire.tools = !!useNative;
+  /* The test exists to find out whether a refusal still holds, so it is the
+     one caller that is not bound by the last one. */
+  if (opts.probe) wire.refused = false;
   const pf = opts.noPrefill
     ? { applied:false, reason:PF_REASON.SUPPRESSED, detail:{} }
     : applyPrefill(asm.messages, pfc, wire, opts.mode);
-  lastPrefill = pf;
+  /* A probe is not a message. Recording it would overwrite the panel's report
+     on the last thing the user actually sent. */
+  if (!opts.probe) lastPrefill = pf;
   const openThinking = !!(pf.applied && pf.detail.reasoningField && pfc.ensureThinking);
 
   if (p.kind === "anthropic"){
@@ -2963,6 +3036,127 @@ async function runSearch(query){
 /* ==========================================================
    SENDING
    ========================================================== */
+/* Sends one probe and reports what came back, without interpreting it. */
+async function pfProbe(kind, signal){
+    const req = buildPayload({ probe: kind }, current);
+    req.body.stream = false;
+    /* Enough room that a thinking model has something left for the reply. */
+    req.body.max_tokens = 256;
+    const res = await fetch(req.url, { method:"POST", headers:req.headers, body:JSON.stringify(req.body), signal:signal });
+    if (!res.ok) return { ok:false, status:res.status, detail: await errDetail(res), prefill:req.prefill };
+    let j = null;
+    try { j = await res.json(); } catch(_) { j = null; }
+    return { ok:true, text: pfReplyText(activeProv(current).kind, j), prefill:req.prefill };
+}
+const PF_SAY_CLASS = { ok:"hint pf-ok", warn:"hint pf-warn", bad:"hint pf-bad", run:"hint pf-run" };
+function pfSay(state, text){
+    const el = document.getElementById("pfTestStat");
+    if (!el) return;
+    el.textContent = text;
+    el.className = PF_SAY_CLASS[state] || "hint";
+}
+async function pfTest(){
+    const btn = document.getElementById("pfTestBtn");
+    if (streaming){ pfSay("warn", "A reply is still coming in \u2014 wait for it to finish, then test."); return; }
+    const p = activeProv();
+    if (!p || !p.apiKey || !p.model){ pfSay("bad", "Add a connection with a key and a model first."); return; }
+    const cfg = pfCfg();
+    const wire = pfWire(p, null);
+    /* Answered without spending a request, because the answer is already
+       known and sending one would only produce a 400 to translate. */
+    if (wire.thinking){
+        pfSay("bad", "Claude won't take a prefilled reply while thinking is on. Set Thinking effort to Off in this panel to use the prefill on this connection.");
+        return;
+    }
+    const runsWillSkip = reasonStyle(p) === "hermes" && p.hermesRuns && !runsIsDown(p);
+    const ctrl = new AbortController();
+    const timer = setTimeout(function(){ ctrl.abort(); }, 45000);
+    if (btn){ btn.disabled = true; btn.textContent = "Testing\u2026"; }
+    pfSay("run", "Sending a short test to " + p.name + "\u2026");
+    try {
+        const first = await pfProbe("text", ctrl.signal);
+
+        if (!first.ok){
+            /* Which half failed? The turn and the flag went out together, so
+               a second probe without the flag is what separates "this model
+               won't take a prefill at all" from "it won't take this field",
+               and those are different repairs. */
+            if (PF_REFUSAL.test(first.detail)){
+                markPrefillDown(p);
+                pfSay("bad", p.model + " won't take a prefilled reply at all (" + first.status + "). Claude 4.6 and newer refuse one. It's been noted on this connection, so messages won't be spent on it \u2014 saving the connection tries again.");
+                return;
+            }
+            const flag = String(cfg.flagField || "").trim();
+            if (flag){
+                const bare = await pfProbe("bare", ctrl.signal);
+                if (bare.ok){
+                    pfSay("bad", "The turn is fine, but \"" + flag + "\" was rejected (" + first.status + "). Clear the continuation flag, or pick the field set that matches this service. " + first.detail.slice(0, 140));
+                    return;
+                }
+            }
+            pfSay("bad", p.name + " refused the test (" + first.status + "). " + (first.detail || "No details given.").slice(0, 200));
+            return;
+        }
+
+        /* A successful send is better evidence than an old refusal. */
+        if (p.prefillDownAt){
+            const real = S.providers.find(function(x){ return x.id === p.id; });
+            if (real){ delete real.prefillDownAt; saveSettings(); }
+        }
+
+        /* The reply is only evidence if the request carried a prefill. Every
+           skip has a reason and the panel already has words for it, so say
+           that rather than read tea leaves in an ordinary answer. */
+        if (!first.prefill || !first.prefill.applied){
+            const why = first.prefill ? (PF_STATUS[first.prefill.reason] || first.prefill.reason) : "no report came back";
+            pfSay("warn", "Nothing was prefilled, so there is nothing to check \u2014 " + why);
+            return;
+        }
+
+        const verdict = pfProbeVerdict(first.text);
+        const notes = [];
+        if (runsWillSkip) notes.push("Runs mode is on for this connection, and a run carries no prefill \u2014 turn it off on the connection for the prefill to reach your messages.");
+
+        if (verdict === "restarted"){
+            pfSay("warn", "The turn was accepted but " + p.model + " started the answer over instead of carrying on, so this service is dropping the prefilled reply. "
+                + (notes.join(" ") || "A relay in front of the service is the usual cause."));
+            return;
+        }
+        if (verdict === "empty"){
+            pfSay("warn", "Accepted, and nothing came back to check \u2014 the model may have spent the whole reply on thinking. Lower Thinking effort and test again. " + notes.join(" "));
+            return;
+        }
+
+        /* The thinking field is a separate question: a service can take the
+           turn and still reject the field riding on it. Only asked when there
+           is a field to ask about and a wire that carries one. */
+        let seedNote = "";
+        const seedField = String(cfg.reasoningField || "").trim();
+        if (verdict === "continued" && seedField && cfg.thinkOn && wire.fields && String(cfg.openTag || "").trim()){
+            const seed = await pfProbe("seed", ctrl.signal);
+            if (!seed.ok){
+                pfSay("warn", "The prefill works, but \"" + seedField + "\" was rejected (" + seed.status + "), so the thinking seed won't arrive. Clear the thinking field, or pick the field set that matches this service. " + notes.join(" "));
+                return;
+            }
+            seedNote = " The thinking field \"" + seedField + "\" was accepted too.";
+        }
+
+        const flagNote = String(cfg.flagField || "").trim() ? " Flag \"" + cfg.flagField.trim() + "\" accepted." : "";
+        if (verdict === "continued"){
+            pfSay(notes.length ? "warn" : "ok",
+                "Prefill works on " + p.name + " / " + p.model + " \u2014 it carried on from the prefilled words instead of starting over." + flagNote + seedNote + (notes.length ? " " + notes.join(" ") : ""));
+            return;
+        }
+        pfSay("warn", "The request was accepted, but the reply didn't follow the test closely enough to prove it carried on. The prefill is very likely working; send a real message to be sure." + (notes.length ? " " + notes.join(" ") : ""));
+    } catch (err){
+        if (err && err.name === "AbortError") pfSay("bad", "The test took too long and was stopped. The service may be slow or unreachable.");
+        else pfSay("bad", friendlyError(err, p));
+    } finally {
+        clearTimeout(timer);
+        if (btn){ btn.disabled = false; btn.textContent = "Test prefill"; }
+    }
+}
+
 /* One read of a failed response, from whichever shape it came back in. */
 async function errDetail(res){
   try {
@@ -3691,6 +3885,16 @@ function renderPrefill(){
   setToggle($("#tgPfTools"), cfg.skipOnTools);
   const st = $("#pfStatus");
   if (st) st.textContent = pfStatusText();
+  /* A verdict describes the settings it was produced under. Once any of them
+     move it is describing something that no longer exists, so it goes. */
+  const ts = $("#pfTestStat");
+  if (ts && ts.dataset.for !== pfFingerprint()){ ts.textContent = ""; ts.className = "hint"; ts.dataset.for = pfFingerprint(); }
+}
+/* Everything a test result depends on. */
+function pfFingerprint(){
+  const c = pfCfg(), p = activeProv();
+  return [p ? p.id : "", p ? p.model : "", c.flagField, c.reasoningField, c.openTag, c.closeTag,
+          c.thinkOn ? 1 : 0, chatEffort()].join("\u0000");
 }
 /* One write path: the merged view is snapshotted onto whatever scope cfgSet
    is pointed at, so a chat that has been touched keeps the settings it had
@@ -5320,10 +5524,11 @@ on("#tgSquash", "click", function(){
 on("#effortSeg", "click", function(e){
   const b = e.target.closest("[data-effort]");
   if (!b) return;
-  cfgSet("effort", b.dataset.effort); renderEffort();
+  cfgSet("effort", b.dataset.effort); renderEffort(); renderPrefill();
 });
 
 /* ---------- prefill ---------- */
+on("#pfTestBtn", "click", pfTest);
 on("#tgPrefill", "click", function(){ pfSet({ on: !pfCfg().on }); renderPrefill(); });
 on("#pfProfile", "change", function(e){
   const pr = PF_PROFILES[e.target.value];
@@ -5337,9 +5542,9 @@ on("#pfText",  "change", function(e){ pfSet({ text:e.target.value }); });
    claiming credit for it rather than showing a name it no longer holds. */
 on("#pfFlag",  "change", function(e){ pfSet({ flagField:e.target.value.trim(), profile:"" }); renderPrefill(); });
 on("#pfSeed",  "change", function(e){ pfSet({ reasoningField:e.target.value.trim(), profile:"" }); renderPrefill(); });
-on("#pfOpen",  "change", function(e){ pfSet({ openTag:e.target.value }); });
-on("#pfClose", "change", function(e){ pfSet({ closeTag:e.target.value }); });
-on("#tgPfThink",    "click", function(e){ const v = !pfCfg().thinkOn;         pfSet({ thinkOn:v });        setToggle(e.currentTarget, v); });
+on("#pfOpen",  "change", function(e){ pfSet({ openTag:e.target.value }); renderPrefill(); });
+on("#pfClose", "change", function(e){ pfSet({ closeTag:e.target.value }); renderPrefill(); });
+on("#tgPfThink",    "click", function(e){ const v = !pfCfg().thinkOn;         pfSet({ thinkOn:v });        setToggle(e.currentTarget, v); renderPrefill(); });
 on("#tgPfEnsure",   "click", function(e){ const v = !pfCfg().ensureThinking;  pfSet({ ensureThinking:v }); setToggle(e.currentTarget, v); });
 on("#tgPfEcho",     "click", function(e){ const v = !pfCfg().echo;            pfSet({ echo:v });           setToggle(e.currentTarget, v); });
 on("#tgPfContinue", "click", function(e){ const v = !pfCfg().applyToContinue; pfSet({ applyToContinue:v }); setToggle(e.currentTarget, v); });
