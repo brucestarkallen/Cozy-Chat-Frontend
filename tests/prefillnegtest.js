@@ -49,8 +49,8 @@ const MUTATIONS=[
    '  if (tail && tail.role === "assistant" && false){\n    return { applied:false, reason:PF_REASON.NOTHING_TO_DO, detail:detail };\n  }'],
 
   ['a trailing space survives into the turn Anthropic rejects it on',
-   '  msg.content = msg.content.replace(/\\s+$/, "");\n  if (flag.name)',
-   '  if (flag.name)'],
+   '  msg.content = msg.content.replace(/\\s+$/, "");',
+   ''],
 
   ['the saved reply starts mid-sentence because the prefill is not echoed',
    '  if (cfg.echo && msg.content) detail.echo = msg.content;',
@@ -205,6 +205,27 @@ const MUTATIONS=[
   ['the shipped default puts a Moonshot field on every other service',
    '  flagField:"", reasoningField:"",',
    '  flagField:"partial", reasoningField:"reasoning_content",'],
+
+  ['a prefilled opening tag goes out unclosed, so the whole reply lands in the thinking block',
+   `  if (!detail.reasoningField && cfg.thinkOn && cfg.openTag && cfg.closeTag
+      && msg.content.indexOf(cfg.openTag) === 0
+      && msg.content.indexOf(cfg.closeTag) < 0){
+    msg.content = msg.content + cfg.closeTag;
+    detail.closedTag = true;
+  }`,
+   ''],
+
+  ['a closing tag is bolted on to a prefill that already had one',
+   '      && msg.content.indexOf(cfg.closeTag) < 0){',
+   '      && true){'],
+
+  ['the prefill tag and the catch list disagree, so reasoning sits in the prose',
+   `  const pf = (typeof pfCfg === "function") ? pfCfg() : null;
+  if (pf && pf.on && pf.thinkOn){
+    const m = String(pf.openTag || "").trim().match(/^<([a-zA-Z][\\w-]*)>$/);
+    if (m && names.indexOf(m[1]) < 0) names.push(m[1]);
+  }`,
+   ''],
 
   ['a green light survives the settings it was given for',
    `  return [p ? p.id : "", p ? p.model : "", c.flagField, c.reasoningField, c.openTag, c.closeTag,

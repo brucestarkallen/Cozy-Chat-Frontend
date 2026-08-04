@@ -571,7 +571,7 @@ network-first, so a refresh always gets the newest version.
 `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`, `swtest.js`,
 `scrolltest.js`, `styletest.js`, `hiddentest.js`, `coherencetest.js` and
 `installtest.sh` — runs under Node with jsdom (`npm i jsdom fake-indexeddb`).
-1405 checks across the matching engine, JSON tolerance, prompt assembly,
+1421 checks across the matching engine, JSON tolerance, prompt assembly,
 multi-block replies, proposal supersede, undo truth, button visibility,
 projects, retrieval, streaming, SSE framing and Hermes tool activity,
 stream/chat binding, touch reorder, reader-owned scrolling, backup
@@ -579,7 +579,7 @@ round-trips, migration, prefill on every wire shape, and negative tests that
 deliberately reintroduce fixed bugs to prove the guards fire.
 
 `tests/prefillnegtest.js` is a mutation harness rather than part of the gate:
-it puts each of the 39 prefill bugs back, one at a time, and requires the gate
+it puts each of the 42 prefill bugs back, one at a time, and requires the gate
 to catch it. It edits `index.html` in place, so it keeps a `.negbak` on disk
 and puts the file back at startup if a run was interrupted. Run it after
 changing a prefill guard — `node tests/prefillnegtest.js`, or in slices,

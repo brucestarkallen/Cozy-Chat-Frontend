@@ -12,7 +12,7 @@ worker, `install.sh` the Termux installer, `tests/` the gate.
     done
     bash tests/installtest.sh
 
-1405 checks as of v5.19.0, measured from real output.
+1421 checks as of v5.20.0, measured from real output.
 
 `tests/inerttest.js` is in the loop but prints SKIP without a second checkout
 to compare against. It answers the question a passing gate does not: whether a
@@ -20,8 +20,13 @@ new feature changed the request Cozy was already sending. Run it against the
 previous release after anything that touches prompt assembly, `buildPayload()`
 or `applyReasoning()`:
 
-    git worktree add /tmp/cozy-prev <previous tag or sha>
+    git worktree add /tmp/cozy-prev <the commit before your work>
     OLD=/tmp/cozy-prev node tests/inerttest.js
+
+Compare against the commit your work sits on, not an older favourite. Cozy has
+more than one session pushing to it, and a baseline several releases back
+reports somebody else's deliberate change as a difference in yours — which
+reads like a regression and is not one.
 
 `tests/prefillnegtest.js` is held out of that loop because it is a *meta*
 gate: it runs a prefill gate once per mutation against a mutated `index.html`,
@@ -29,7 +34,7 @@ plus a control run of each, and
 takes over ten minutes. Run it on its own after touching a prefill guard, in
 slices if a session cannot hold a long call:
 
-    node tests/prefillnegtest.js          # all 39
+    node tests/prefillnegtest.js          # all 42
     node tests/prefillnegtest.js 0 9      # a slice
 
 It edits `index.html` in place. A `.negbak` is written before the first
@@ -175,6 +180,16 @@ field and a rejected turn are different repairs.
 **A verdict describes the settings it was produced under.** `pfFingerprint()`
 lists them; when it moves, the line is cleared. Every control in that list has
 to re-render, or a green light outlives what it was about.
+
+**A tag that is seeded must be a tag that is closed and caught.** Two
+mechanisms put a whole reply in the thinking block or spill reasoning into the
+prose, and neither is the model misbehaving. `splitReasoning()` treats
+everything after an unclosed opening tag as thinking, so a prefill that seeds
+one into the visible text and leaves the model to close it produces an empty
+message and a thinking block containing the story — `applyPrefill()` closes it
+instead. And `thinkTags` and the prefill's `openTag` are two settings that had
+to agree with nothing checking them, so `tagPairs()` now takes the prefill's
+own tag from the setting that produced it.
 
 **The shipped default is the one that cannot fail.** `PF_DEFAULT` carries no
 `flagField` and no `reasoningField`. `partial` is a Moonshot field, and on

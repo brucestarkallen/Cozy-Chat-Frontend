@@ -439,7 +439,10 @@ console.log(NL+'=== O2. WHAT IT DOES BEFORE ANYTHING IS CONFIGURED ===');
   ck('the turn still goes out',tail.role==='assistant'&&req.prefill.applied===true,req.prefill.reason);
   ck('carrying nothing a service could reject',
     JSON.stringify(Object.keys(tail).sort())==='["content","role"]',Object.keys(tail).join(','));
-  ck('the prefill text is kept whole',tail.content==='<think>I should continue the story.',tail.content);
+  ck('the prefill text goes out with its tag closed',
+    tail.content==='<think>I should continue the story.</think>',tail.content);
+  ck('so an out-of-the-box reply cannot land entirely in the thinking block',
+    JSON.parse(w.eval('JSON.stringify(splitReasoning('+JSON.stringify('<think>I should continue the story.</think>The rain fell.')+'))')).text==='The rain fell.');
   await sleep(60);
   dom.window.close();
 }
@@ -459,6 +462,53 @@ console.log(NL+'=== P. THE SETTING BELONGS TO THE CHAT ===');
   ck('and it survives a reload',
     JSON.parse(w.localStorage.getItem('cozychat:settings')).prefill.text==='chat one text');
   await sleep(60);  dom.window.close();
+}
+
+console.log(NL+'=== Q. THE SEED CANNOT SWALLOW THE REPLY ===');
+{
+  const dom=await boot(base());const w=dom.window;
+  // splitReasoning treats everything after an unclosed opening tag as
+  // thinking, so a prefill that seeds one and stays in the visible text puts
+  // the whole story in the thinking block and leaves the message empty
+  const o=JSON.parse(run(w,U,{text:'<think>I should continue the story.',reasoningField:''},{}));
+  const sent=o.msgs[o.msgs.length-1].content;
+  ck('a tag left in the text is closed before it goes out',sent==='<think>I should continue the story.</think>',sent);
+  ck('and the report says so',o.r.detail.closedTag===true);
+  const sp=JSON.parse(w.eval('JSON.stringify(splitReasoning('+JSON.stringify(o.r.detail.echo+'The rain fell. Ichigo drew his blade.')+'))'));
+  ck('so the seed reads as thinking',sp.think==='I should continue the story.',sp.think);
+  ck('and the story reads as the reply',sp.text==='The rain fell. Ichigo drew his blade.',sp.text);
+
+  const closed=JSON.parse(run(w,U,{text:'<think>plan</think>Once upon',reasoningField:''},{}));
+  ck('a tag the user already closed is left alone',
+    closed.msgs[1].content==='<think>plan</think>Once upon',closed.msgs[1].content);
+  ck('and is not reported as closed here',closed.r.detail.closedTag===undefined);
+
+  const seeded=JSON.parse(run(w,U,{text:'<think>plan</think>Once upon'},{}));
+  ck('a tag that moved into the thinking field needs no closing',seeded.r.detail.closedTag===undefined);
+  ck('and the text is what is left',seeded.msgs[1].content==='Once upon');
+
+  const openEnded=JSON.parse(run(w,U,{text:'<think>plan',reasoningField:'',closeTag:''},{}));
+  ck('with no closing tag configured nothing is invented',openEnded.msgs[1].content==='<think>plan');
+
+  const off=JSON.parse(run(w,U,{text:'<think>plan',reasoningField:'',thinkOn:false},{}));
+  ck('and nothing is closed when the split is switched off',off.msgs[1].content==='<think>plan');
+
+  // two settings that have to agree, and nothing was checking them
+  w.eval("newConvo();S.thinkTags='think';pfSet({on:true,thinkOn:true,openTag:'<reason>',closeTag:'</reason>'})");
+  const sp2=JSON.parse(w.eval('JSON.stringify(splitReasoning("<reason>the beat</reason>The rain fell."))'));
+  ck('the prefill\'s own tag is caught even when the list misses it',sp2.think==='the beat',sp2.think);
+  ck('so the reasoning does not sit in the middle of the prose',sp2.text==='The rain fell.',sp2.text);
+  const pairs=JSON.parse(w.eval('JSON.stringify(tagPairs())'));
+  ck('the catch list still has what it always had',pairs.some(p=>p[0]==='<think>'));
+  w.eval("pfSet({openTag:'<think>',closeTag:'</think>'})");
+  const dedup=JSON.parse(w.eval('JSON.stringify(tagPairs())'));
+  ck('a tag already in the list is not added twice',
+    dedup.filter(p=>p[0]==='<think>').length===1,String(dedup.filter(p=>p[0]==='<think>').length));
+  w.eval("pfSet({on:false,openTag:'<reason>',closeTag:'</reason>'})");
+  const offPairs=JSON.parse(w.eval('JSON.stringify(tagPairs())'));
+  ck('a prefill that is off adds nothing to the list',!offPairs.some(p=>p[0]==='<reason>'));
+  await sleep(60);
+  dom.window.close();
 }
 
 console.log(NL+'RESULT: '+(fail?('FAILURES: '+fail+' of '+(pass+fail)):('ALL PASS ('+pass+' checks)')));
