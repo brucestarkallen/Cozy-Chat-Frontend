@@ -1,5 +1,10 @@
-node_modules/
+# no trailing slash: with one, the pattern matches a directory only, and a
+# node_modules SYMLINK (how a second checkout borrows the first one's deps)
+# slipped past it into a commit.
+node_modules
 package.json
 package-lock.json
 # left behind only when the mutation harness is interrupted
 index.html.negbak
+# scratch verifiers written during a session, never part of the gate
+tests/_*.js
