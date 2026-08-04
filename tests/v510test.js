@@ -82,8 +82,17 @@ console.log('=== 2. PARSE FAILURE FEEDS BACK TOO ===');
       editError:"the edit block wasn't valid JSON \\u2014 ask for it again"});
   })()`);
   const p=assembled(w);
-  ck('parse-failure note present', /your <docedits> block failed to parse/.test(p));
+  ck('parse-failure note present', /your edit block failed to parse/.test(p));
   ck('tells the model HOW to fix it', /strictly valid JSON/.test(p) && /no trailing commas/.test(p));
+  /* v5.19.0: the note used to spell the tag. A model reads its own past
+     replies; one that ends in app prose naming the tag gets written back, and
+     the echo then trips the parser. No note the app appends to a turn may
+     contain it. */
+  /* The system prompt teaches the tag and must spell it. The rule is about
+     the conversation: nothing the app appends to a TURN may contain it. */
+  ck('no conversation turn carries the block tag',
+    !JSON.parse(p).messages.some(m=>String(m.content).indexOf('<docedits>')>=0));
+  ck('the note says whose words it is', /\[cozy \u2014 machine state/.test(p));
   dom.window.close();
 }
 
@@ -106,7 +115,20 @@ console.log('=== 3. WIRE-ONLY: NEVER STORED, NEVER SHOWN, FREE WHEN CLEAN ===');
   // files is guarded in v5131test. The stored message stays clean below.
   const clean=body.find(m=>String(m.content).indexOf('clean reply, no edits')===0);
   ck('a reply without edits keeps its prose first on the wire', !!clean);
-  ck('and now carries the no-edits truth', !!clean && /no file edits were proposed/.test(String(clean.content)));
+  /* v5.19.0: "nothing was changed" answers "is it done?", and that is only
+     ever asked about the newest reply. It used to be stamped on every
+     zero-edit turn in the chat — dozens of identical copies teaching the
+     model to write one itself. A0 is not the newest reply here. */
+  ck('an older zero-edit reply carries no such note',
+    !!clean && !/no file edits were proposed/.test(String(clean.content)));
+  w.eval(`(()=>{ current.messages.push({id:'U3',role:'user',content:'and?',ts:Date.now()});
+    current.messages.push({id:'A2',role:'assistant',content:'still nothing',ts:Date.now()}); })()`);
+  const p2=assembled(w);
+  const newest=JSON.parse(p2).messages.filter(m=>String(m.content).indexOf('still nothing')===0)[0];
+  ck('the newest zero-edit reply does carry the no-edits truth',
+    !!newest && /no file edits were proposed/.test(String(newest.content)));
+  ck('and only that one does', (p2.match(/no file edits were proposed/g)||[]).length===1,
+    (p2.match(/no file edits were proposed/g)||[]).length);
   ck('stored message content untouched', w.eval(`current.messages.find(m=>m.id==='A1').content`)==='sure');
   ck('the user never sees the note in the thread', !/\[state of the edits/.test(d.querySelector('#thread').textContent));
   const notes=(p.match(/\[state of the edits/g)||[]).length;

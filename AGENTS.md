@@ -12,7 +12,7 @@ worker, `install.sh` the Termux installer, `tests/` the gate.
     done
     bash tests/installtest.sh
 
-1370 checks as of v5.18.0, measured from real output.
+1405 checks as of v5.19.0, measured from real output.
 
 `tests/inerttest.js` is in the loop but prints SKIP without a second checkout
 to compare against. It answers the question a passing gate does not: whether a
@@ -86,6 +86,34 @@ longer look different from each other.
   inside the retrieval budget arrives whole and is not labelled an excerpt —
   otherwise the excerpt rule forbids a full rewrite of a file the model can
   see all of.
+
+## App notes inside a turn
+
+Cozy appends notes to an assistant turn on the wire — the edit-state note, the
+parse-failure note, "nothing was changed". They belong next to the reply they
+describe, but they are **not** the reply, and two rules follow from that:
+
+- **Every one is wrapped by `appNote()`**, which names Cozy as the author and
+  tells the model never to write one. Unattributed, they sat inside the
+  assistant's own turn, so the model read its past replies as ending that way
+  and began writing them itself.
+- **No note may spell a tag the parser scans for.** The system prompt teaches
+  `<docedits>` and must; a note may not. When the note named it, every echo put
+  an unclosed opener in a real reply — parsed as a cut-off block, reported as
+  "cut off before anything usable arrived", and stripped from the tag to the
+  end of the message, so the visible reply stopped mid-sentence. `v519test.js`
+  asserts no conversation turn contains the tag while the system prompt does.
+
+"Nothing was changed" answers "is it done?", which is only ever asked about the
+newest reply. It goes on the last assistant message and nowhere else — stamped
+on every turn it was dozens of identical copies teaching the model to write it.
+
+**An unclosed opener is a cut-off block only when the tail opens like one** — a
+list, an object, or a fence. The tag turns up in ordinary prose, and treating
+that as truncation deletes the rest of a reply that was never truncated.
+Likewise a block cut off after emptying keeps its warning: with nothing staged,
+the warning is the whole story, and dropping it described the reply as one that
+proposed no edits at all.
 
 ## The seam between the user and the instruction set
 

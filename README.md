@@ -114,6 +114,20 @@ Tap **Test** before saving.
 - **The assistant knows it edited your file.** Applied changes are announced
   on the file itself, so it never apologizes for an edit it made or offers to
   redo work already done.
+- **The assistant stops quoting Cozy back at you.** Notes Cozy adds to a reply
+  on the wire — what happened to each edit, whether anything was changed — used
+  to sit inside the reply unlabelled, on every reply. The model read its own
+  past answers as ending that way and started writing the notes itself; and
+  because one of them named the edit-block tag, each echo was mistaken for a
+  cut-off block, so the visible message was chopped at "…making them requires
+  a" and an **Ask again** card appeared under a reply that had never been cut
+  off. The notes now say Cozy wrote them, spell no tag, and "nothing was
+  changed" appears once, on the newest reply, instead of on every one.
+- **Naming the block in a sentence no longer eats your message.** An unfinished
+  block is only treated as cut off when what follows it actually opens one. A
+  real truncation is still caught, still stages whatever arrived, and still
+  offers the one-tap re-request; a block that arrived empty and unfinished now
+  keeps its warning instead of being reported as a reply that proposed nothing.
 - **One copy of a file, ever.** Attaching a file used to freeze its contents
   into the message you sent it with, and that frozen copy then rode on every
   later request — attach it on four turns and five different bodies went out
@@ -553,11 +567,11 @@ network-first, so a refresh always gets the newest version.
 | `send()` | Sends and reads the streaming reply |
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
-**Tests.** Everything in `tests/` — `v518test.js` down to `v2test.js`, plus
+**Tests.** Everything in `tests/` — `v519test.js` down to `v2test.js`, plus
 `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`, `swtest.js`,
 `scrolltest.js`, `styletest.js`, `hiddentest.js`, `coherencetest.js` and
 `installtest.sh` — runs under Node with jsdom (`npm i jsdom fake-indexeddb`).
-1370 checks across the matching engine, JSON tolerance, prompt assembly,
+1405 checks across the matching engine, JSON tolerance, prompt assembly,
 multi-block replies, proposal supersede, undo truth, button visibility,
 projects, retrieval, streaming, SSE framing and Hermes tool activity,
 stream/chat binding, touch reorder, reader-owned scrolling, backup
