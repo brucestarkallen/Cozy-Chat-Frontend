@@ -114,6 +114,21 @@ Tap **Test** before saving.
 - **The assistant knows it edited your file.** Applied changes are announced
   on the file itself, so it never apologizes for an edit it made or offers to
   redo work already done.
+- **One copy of a file, ever.** Attaching a file used to freeze its contents
+  into the message you sent it with, and that frozen copy then rode on every
+  later request — attach it on four turns and five different bodies went out
+  under the same name, four of them dead. The assistant would quote a dead
+  copy, fail to find that text in the real file, and re-propose changes you'd
+  already applied. Now the body is worked out when the message is sent: a file
+  you can edit is the only truth for its name, older copies of the same name
+  collapse to one line saying where the current text is, and what you typed
+  stays the newest thing in your turn.
+- **An applied edit is always visible to the assistant.** On a long file in
+  **smart** mode, only the relevant parts are sent — and the part your applied
+  edit landed in could be one of the parts left out, while the instructions
+  still said it was there. Applied edits are now kept in the excerpt no matter
+  what else scores. Undone edits aren't, because they aren't in the file. And
+  a smart file small enough to fit whole is no longer labelled an excerpt.
 - **Edits can't hide in thinking.** Reasoning models sometimes emit the
   docedits block inside their thinking or on a separate reasoning channel;
   those blocks are now parsed, staged as normal confirmation cards, and
@@ -538,11 +553,11 @@ network-first, so a refresh always gets the newest version.
 | `send()` | Sends and reads the streaming reply |
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
-**Tests.** Everything in `tests/` — `v517test.js` down to `v2test.js`, plus
+**Tests.** Everything in `tests/` — `v518test.js` down to `v2test.js`, plus
 `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`, `swtest.js`,
 `scrolltest.js`, `styletest.js`, `hiddentest.js`, `coherencetest.js` and
 `installtest.sh` — runs under Node with jsdom (`npm i jsdom fake-indexeddb`).
-1327 checks across the matching engine, JSON tolerance, prompt assembly,
+1370 checks across the matching engine, JSON tolerance, prompt assembly,
 multi-block replies, proposal supersede, undo truth, button visibility,
 projects, retrieval, streaming, SSE framing and Hermes tool activity,
 stream/chat binding, touch reorder, reader-owned scrolling, backup

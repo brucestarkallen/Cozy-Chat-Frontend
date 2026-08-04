@@ -12,7 +12,7 @@ worker, `install.sh` the Termux installer, `tests/` the gate.
     done
     bash tests/installtest.sh
 
-1327 checks as of v5.17.1, measured from real output.
+1370 checks as of v5.18.0, measured from real output.
 
 `tests/inerttest.js` is in the loop but prints SKIP without a second checkout
 to compare against. It answers the question a passing gate does not: whether a
@@ -56,6 +56,53 @@ code.
   checkout against uncommitted work restores HEAD and destroys the work.
 - **Fetch before push.** Unrecognized coherent changes in the tree are a
   concurrent instance's in-flight work: audit them, never revert them.
+
+## Files on the wire
+
+One rule, and every part of the file subsystem is downstream of it: **the file
+the model reads is the file that exists.** Anything that puts a second body for
+the same name in front of it — a stale copy, a dropped excerpt, a heading that
+describes something other than what was sent — is the same defect wearing a
+different hat, and it always produces the same three symptoms: text located
+that isn't there, edits already applied proposed again, and turns that no
+longer look different from each other.
+
+- **A file's contents are never stored in a conversation.** `addAttachments()`
+  keeps the text on the message because that is what the user attached, but
+  `assembleMessages()` decides at request time which bodies actually go out —
+  `attachmentPlan()` / `attachmentBody()`. A conversation is append-only; a
+  file is mutable. Writing the second into the first is what put five copies of
+  one file on the wire. Two rules resolve it: an editable file of that name is
+  the only truth for that name, so no snapshot of it is sent at all; among
+  snapshots of a name with no editable file, only the newest carries its text.
+  Every suppressed copy leaves one line saying where the current text is, so
+  the turn still records that a file was attached there.
+- **`authorshipLine()` must never be able to lie.** It tells the model its
+  applied edits are already present in the text above. Anything that trims the
+  file has to keep those spans — `appliedTextsByFile()` feeds them to
+  `relevantChunks()` as must-keeps. Undone edits are excluded (they are not in
+  the file) and `replace_all` is excluded (its replacement is the whole file).
+- **A heading describes what was actually sent.** A smart-mode file that fits
+  inside the retrieval budget arrives whole and is not labelled an excerpt —
+  otherwise the excerpt rule forbids a full rewrite of a file the model can
+  see all of.
+
+## The seam between the user and the instruction set
+
+Anthropic has no system role inside the message list, so a system block travels
+as a user turn. Consecutive user turns then merge — here, and again at the API.
+Unlabelled, the instruction set's standing blocks read as the newest thing the
+user said. `sysAsUser()` names the seam, which leaves exactly one unlabelled
+user voice on the wire: the person typing. The label is Anthropic-only; on a
+real system role it would be noise.
+
+The fold itself is not optional on that wire. Consecutive same-role turns are
+merged by the first-party API but rejected by Bedrock and by proxies in front
+of it, so the shape has to leave `assembleMessages()` already correct. That is
+why the fold handles mixed string/block content: a turn carrying an image is a
+list of blocks, and requiring two strings used to leave an image turn sitting
+next to a renamed system block as two user turns in a row. Empty strings are
+dropped rather than folded in — an empty text block is a 400.
 
 ## Prefill
 
