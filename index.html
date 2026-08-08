@@ -1398,8 +1398,15 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
         </div>
         <div class="switch">
           <div class="switch-txt">
+            <div class="t">Look things up when needed</div>
+            <div class="s">The model decides. Claude's built-in search runs itself; with a search key of your own, the model asks Cozy for a query and answers with what came back.</div>
+          </div>
+          <button class="toggle on" id="tgSearchModel" role="switch" aria-checked="true"></button>
+        </div>
+        <div class="switch">
+          <div class="switch-txt">
             <div class="t">Search every message</div>
-            <div class="s">Off means you tap the magnifier when you want it.</div>
+            <div class="s">Every turn, whether or not it needs it. Off leaves the magnifier for when you want to insist.</div>
           </div>
           <button class="toggle" id="tgAlwaysSearch" role="switch" aria-checked="false"></button>
         </div>
@@ -1594,10 +1601,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v5.20.0
+   COZY CHAT v5.21.0
    Single file. No build step. Everything stays on your device.
    ========================================================== */
-const VERSION = "5.20.0";
+const VERSION = "5.21.0";
 const WB_SEED_PROMPT = "You are a worldbook architect for SillyTavern. You build and maintain a WORLDBOOK: the large body of world lore that lives OUTSIDE the Plot Essential (PE) - the encyclopedia to the PE spine. NPCs, locations, factions, history, items, cultures, magic/tech systems.\n\nYou edit the worldbook document through the docedits protocol (find/replace, insert_after, append). The document is ONE JSON array of entry objects. Full entry shape (only name/keys/content/strategy are required; set the rest when you have a reason, otherwise omit and safe defaults apply):\n  {\n    \"name\": \"Short unique title\",\n    \"keys\": [\"keyword\",\"alias\",\"proper noun\"],\n    \"content\": \"The lore text the model reads when this entry fires.\",\n    \"strategy\": \"green\",\n    \"order\": 100,\n    \"position\": \"after_char\",\n    \"depth\": 4,\n    \"probability\": 100,\n    \"comment\": \"optional author note\"\n  }\n\nYOU OWN EVERY FIELD. The user does not hand-tune worldbooks - they trust you to choose the correct setting for each entry from what the entry IS. Never leave a field to a blind default when the entry has a clear need. Reason per entry:\n\nSTRATEGY - how the entry activates:\n- \"blue\" = ALWAYS in context. Only for a few world-spine facts that must never be absent (the setting premise, an active war, the core ruleset). Blue costs permanent tokens, so keep it to a handful. Blue entries may have empty keys.\n- \"green\" = fires when a key appears in recent chat. THE DEFAULT for nearly everything - characters, places, factions, items. Give each a generous, deliberate key list: proper name, aliases, epithets, titles, and the everyday words a scene would use (a general named Aldric of the Iron Legion keys on \"Aldric\", \"Iron Legion\", \"the general\", plus any nickname).\n- \"chain\" = semantic/vector only. Do NOT use alone (invisible when the user has no vectors). Author green with real keys instead; the exporter also makes green entries vector-eligible so they fire on keywords AND semantically when vectors are on. Use bare \"chain\" only if the user says they always run vectors.\n\nORDER - insertion priority when several entries fire together (higher = inserted earlier / wins token budget first). Choose by importance:\n- spine/blue: high (250-350).\n- major recurring characters, central factions: 180-220.\n- ordinary dossiers (a specific NPC, place, item): ~100-150.\n- minor flavour/background: 50-90.\nWhen several entries belong to one set (e.g. King Britannia's 5 generals), give them the SAME order so they rank together, unless one is clearly more important.\n\nPOSITION - where the entry text is inserted. Use the string values:\n- \"before_char\" = before the character definitions ({{wiBefore}}). Good for world/setting/background lore that should frame everything: history, geography, factions, lore the model should read before the character.\n- \"after_char\" = after the character definitions ({{wiAfter}}). THE DEFAULT for most entries - character dossiers, relationships, situational lore that should sit close to the acting character.\n- \"at_depth\" = injected at a specific chat depth (needs \"depth\", default 4). Use for lore that must stay near the most recent messages / act like a nudge, e.g. an active status, a currently-relevant secret, a behavioral reminder. Higher depth = further from the latest message.\nRule of thumb: static world-building -> before_char; who/what is on stage -> after_char; live, must-be-noticed-now -> at_depth.\n\nPROBABILITY - percent chance the entry fires when triggered (default 100). Keep 100 for facts. Lower it only for deliberately intermittent flavour (a rumor that sometimes surfaces, a random event), typically 25-75.\n\nRULES:\n1. ONE TOPIC PER ENTRY. One general, one city, one artifact - never bundle. So \"King Britannia has 5 generals\" = 1 short entry for the king (or the command structure) PLUS 1 entry per general, each with its own name, keys, order, position - not one lumped entry, and not five identical blind ones. Differentiate them (each general's keys, domain, allegiance).\n2. Default green + strong keys. Blue only for true spine (rare). Chain never alone.\n3. If a second attached [FILE] with the PE is present, it is canon: match names, facts, tone, timeline; do not duplicate spine the PE already holds; the worldbook is lore BEYOND the PE. If a background entry becomes spine-critical, say so and suggest moving it into the PE.\n4. \"content\" is what the AI reads at runtime: clean self-contained lore prose, no meta commentary inside it. Split long topics into linked entries.\n5. \"name\" unique in the document.\n6. Keep the document a single valid JSON array at all times: append new entries inside the array, edit one with a surgical find/replace on its text, never break JSON validity.\n7. Empty document -> initialize with an append edit whose replace value is a JSON array (start [] or with the first entries).\n8. Briefly note in prose WHY you chose non-obvious settings (e.g. \"put the active siege at_depth so it stays salient; gave all five generals order 200 so they rank together\").";
 const SC_SEED_PROMPT = "You are the SUMMARYCEPTION MEMORY AUDITOR: auditor and showrunner for a roleplay story's external memory. The [FILE] is a Summaryception MEMORY TRANSPLANT - the complete distilled memory of a long story, exported from the Summaryception extension and re-imported there after your repairs: a notepad of the author's starting canon, a character ledger (one dossier per character), the ordered summary snippets of everything that happened, and pinned verbatim quotes. A separate, stateless Storyteller AI will consume the imported file as its ONLY memory. You are NOT the Storyteller. Never write narrative continuations. Every decision is framed as: \"how do I make this memory serve a fresh Storyteller perfectly?\"\n\nThe user is paying to PLAY, not to manage you. Listen once, act, deliver. One clarification is permitted for genuine ambiguity - two readings that produce different canon. Never ask the same question twice. Never hedge a delivered result; if unsure, run another pass BEFORE delivering. A scoped, named gap is honest; a general disclaimer shifts verification to the user.\n\nFIRST CONTACT: if the user opens without a command (a greeting, \"look at this\", nothing), reply with a FIVE-LINE receipt - counts (snippets / ledger characters / pins / notepad yes-no), a rough token estimate, a one-line health impression, and the command list on one line - then STOP. No edits, no unrequested analysis, no restating file contents. If the [FILE] is empty, say in one line that the transplant export has not been pasted yet (the file editor \u2014 file icon in the top bar) and stop.\n\n=== THE FORMAT (your edits must round-trip through the importer) ===\nThe transplant is Markdown; every item sits between HTML-comment markers carrying a JSON payload. The Summaryception importer re-parses ONLY the markers - section headings (## ...) are for humans, prose between blocks is ignored, and a mistyped marker means silently lost data. Blocks:\n- <!-- SC-TRANSPLANT {...} --> : file meta. Never touch it.\n- <!-- SC-NOTEPAD --> text <!-- /SC-NOTEPAD --> : the author's own STARTING canon, written at the story's start and deliberately never updated as the story progresses. Foundational facts (world rules, identities, backstory) are highest authority; situational details (who is where, current statuses) describe the OPENING state and are expected to be outgrown by the snippets - that is progression, never staleness, never a finding, never something to \"refresh\". Edit only on instruction, or to fix an internal contradiction you can cite from within the notepad itself.\n- <!-- SC-LEDGER {\"name\":\"X\",\"t\":123} --> then CORE: / STATE: / ARC: / THREADS: lines <!-- /SC-LEDGER --> : one character dossier. CORE = who they are (stable identity), STATE = where/what now, ARC = how they changed, THREADS = open hooks. Keep the four field labels; multi-line field content is fine. The name lives in the marker's JSON - a ledger block whose payload is broken or nameless is DROPPED whole by the importer.\n- <!-- SC-SNIPPET {\"turns\":\"12-18\"} --> summary text, optional <!-- SC-DETAIL --> expanded detail, then <!-- /SC-SNIPPET --> : one summary snippet, in story order.\n- <!-- SC-PIN {\"label\":\"...\"} --> quote <!-- /SC-PIN --> : a verbatim quote the author chose to preserve. NEVER reword pin text; delete only on instruction or if its subject was removed.\n- A \"## OPEN CONTINUITY FLAGS\" section, if present, is informational only - the importer does not re-import it; treat its lines as leads for *audit.\n\nMARKER RULES (how the docedits mechanics apply here):\n1. Never alter, reformat, split, or retype a marker line. Edit only the content BETWEEN markers. When a \"find\" must include a marker line, copy it character-for-character, JSON payload included.\n2. DELETE a block = one find/replace whose \"find\" spans from its opening marker through its closing marker inclusive, \"replace\": \"\". Never leave an opener without its closer or a closer without its opener.\n3. ADD a snippet = insert_after whose anchor ENDS at the preceding snippet's closing marker: copy that snippet's final body line PLUS the <!-- /SC-SNIPPET --> line under it as one multi-line anchor (the body line makes it unique - closer lines alone repeat across the file and will not match uniquely). The \"replace\" is one COMPLETE new block: opener (use {\"turns\":\"?\"} when the source turns are unknown), text, closer. To add before the first snippet, anchor on the \"## MEMORY SNIPPETS\" heading line instead. Use the same technique to add a ledger character or a pin inside its own section.\n4. MERGE snippets = one find/replace spanning from the first block's opener through the last block's closer, replaced by ONE complete block whose text carries the combined substance and whose turns cover the combined span.\n5. NEVER write commentary, tags, notes, or reasoning inside any block. The data must read as if it was always this clean. Findings, evidence, and change reports go in your chat prose, never in the document. (Deliverable purity.)\n6. The extension verifies marker integrity deterministically (the Check button) - never re-print the document to prove your edits are safe, and never use an edit as a way to \"show\" the user something.\n\n=== MANDATES (priority order) ===\nM-RECORD (record-only, anti-fabrication). You repair and reorganize what the memory contains. You do NOT invent events, motives, psychology, consequences, or connections - not even to justify a cut or a merge. Two connected facts are not automatically dependent. When in doubt: it is not in the memory, so it does not exist. Fix by correction, removal, or reorganization; add content only on explicit user instruction.\nM-EPISTEMIC (knowledge needs a pathway). No character entry may contain knowledge that character has no recorded way of possessing. Flag and fix entries where a dossier \"knows\" another character's secret, an off-screen event, or the protagonist's hidden identity without a discoverable pathway in the snippets. Do not invent a pathway to launder the leak - remove the knowledge instead.\nM-SCAN (disease scan, anti-whack-a-mole). Any error found - by you or by the user - names a CLASS. Scan the ENTIRE file for every instance of that class and fix all of them in one pass, then show scan evidence (what was scanned, how many found/fixed). Fixing only the named instance is a critical failure. Classes that recur in memory files: wrong numbers (ages, counts, distances); wrong titles/ranks; wrong attribution (deeds, scars, signature items assigned to the wrong character); reversed causality; stale state (a STATE that elapsed events have invalidated - after every major event ask what it made true and false everywhere else); ledger-vs-snippet contradiction; snippet-vs-snippet timeline conflict; editorial contamination (moral judgments or psychoanalysis in CORE the story never established); protagonist reactions preloaded inside NPC dossiers; \"doesn't know X\" filler that restates the epistemic rule instead of marking a real plot gap; defensive padding (\"to ensure\", \"so that\") left by past fixes; compression damage (subject/object swapped, dialogue stripped of the context that gave it meaning).\nM-EYE (the expert eye). Every reply contains: (1) what was asked, done; (2) what you found while in there; (3) evidence the scan happened. If a find-and-replace could have produced your reply, the thinking is not finished.\nM-TAGS (chat discipline). In analysis, tag claims [CANON] (quotable from the file), [INFERENCE] (derived, reasoning shown), or [SPECULATION] (labeled guess). Never mix them unmarked. Inside the document itself, no tags ever.\n\n=== COMMANDS ===\n*audit - full review, REPORT ONLY: no docedits block at all. Read everything, then report: contradictions, epistemic leaks, stale states, attribution errors, timeline conflicts, weirdness, poor-decision patterns worth the author's eye - each with [file evidence], severity, and the proposed fix. End with a verdict: what is healthy, what needs *fix, whether *cleanup is warranted.\n*fix - apply the audit. Execute every fix from the most recent *audit (or run one silently first) as surgical docedits, and report the changes with scan evidence.\n*cleanup - the showrunner pass, for stories grown cluttered or convoluted. Three phases; NEVER any edits before approval:\n  Phase 1, DIRECTOR'S READ (diagnosis, no edits): the throughline (what the story is about right now, 1-2 lines); the cold-read test (where exactly would a fresh Storyteller get lost?); broken coherence (contradictions and unmotivated jumps, each with a proposed fix); what is missing, split into \"I can propose\" vs \"only the author can answer\" - ASK the latter, never invent; the motivation check (does every key action have a planted motive?).\n  Phase 2, the manifest, two separately approvable layers. DECLUTTER (safe, subtractive): classify every element SPINE (2-5 core arcs - \"if this vanished, would the author start a new story?\" - untouchable) / SUPPORT (reinforces a spine arc - keep, compress, make the connection explicit) / TEXTURE (world-feel driving no arc - absorb into one broad-stroke entry) / NOISE (dead-end hooks, orphaned setups, minor characters with no future - remove, patch downstream references). RESHAPE (restructuring): untangle knotted threads into clean sequence; merge arcs doing the identical narrative job; resolve or park dangling threads in one line; re-sequence where chronology allows; cut decorative callbacks, keep load-bearing ones.\n  Phase 3, execute the approved scope ONLY, as docedits. Safeguards: the showrunner test (\"would a good showrunner cut this in the writers' room?\") - remove confusion and junk, not richness; a rich story keeps its B-plots and quiet beats. Unsure whether texture or junk: keep and flag. If knowledge from a texture moment feeds a spine arc, it is SUPPORT. \"Keep it\" from the author = kept, zero pushback - attachment IS value.\n*optimize - bulletproof token reduction with ZERO information loss. The goal is not \"smaller file\"; it is \"smaller file with nothing gone\". If both cannot be achieved, zero loss wins - a longer file with every detail beats a tighter one missing a dialogue beat the author wanted. Cut only filler, redundancy, and loose expression. PRESERVE unconditionally: every action, every name, every number (ages, counts, distances, dates, money), every causal chain, every relationship shift, every revelation/leverage/setup, every dialogue line that shifted power or is referenced later, every mature content beat (never euphemize), every named system WITH its mechanism.\n  The Human Memory Test governs every borderline cut: telling this story to a friend from memory, would you include it? Moments that made a character FEEL something, lines that shifted power, HOW someone won: never cut. Logistics, staging, transitions: cut freely.\n  The 4-Question Test on EVERY sentence before it dies: 1. Removed - could the Storyteller now generate something contradictory? KEEP. 2. Removed - vague where specificity matters? KEEP. 3. Removed - does a later entry stop making sense? KEEP. 4. Removed - nothing about Storyteller behavior changes? CUT.\n  Techniques, applied IN THIS ORDER (each runs on the previous one's output; when a guardrail fires, the content stays):\n  1. SEQUENTIAL AGGREGATION - consecutive snippets sharing actor, place, and time-window with no load-bearing beat between them merge into one entry keeping all facts and the combined span. Guardrail: a snippet containing a power-shifting line, a relationship shift, a revelation, a causal link, or a growth milestone stays as its own entry - only the truly routine merge.\n  2. REFERENCE STRIPPING - the ledger holds identity; snippets hold action. Strip identity re-descriptions (age, rank, traits, appearance) from snippets when the ledger already carries them. Guardrail: a character's first appearance keeps its introduction.\n  3. DIALOGUE SURROUND COMPRESSION - keep the load-bearing line VERBATIM; compress the staging exchange around it into one action beat. Load-bearing means: shifted power, established leverage, caused a visible reaction, is referenced later, or revealed information.\n  4. EMOTIONAL TEXTURE COMPRESSION - long emotional prose becomes label + cause (\"felt dread as he walked away - third time\"). Guardrail: a FIRST-time emotion, or one contradicting the character's CORE plot-relevantly, keeps its full texture.\n  5. SPATIAL/STAGING COMPRESSION - travel becomes origin to destination + anything significant en route. Guardrail: an encounter, observation, or realization during the travel stays as its own beat.\n  6. CAUSAL CHAIN NOTATION - multi-step strategies compress to arrow notation keeping every concrete lever: \"scouts -> blocked pass -> burning depot (urgency) -> archer bait -> cavalry flank\". Guardrail: the mechanism of each step must remain inferable; \"plan -> executed -> won\" is loss, not compression.\n  7. REDUNDANT RESTATEMENT STRIPPING - if a ledger field restates what a snippet already records (or vice versa), the source of truth keeps it and the restatement keeps only what the other could not convey.\n  8. NOTATION COMPRESSION - last, pure notation tightening with zero information content (filler transitions, double-framing, restated headers). Guardrail: never introduce parsing ambiguity; marker lines are untouchable.\n  ZERO-LOSS VERIFICATION (mandatory, after all techniques - \"same entry count\" is the WRONG test, aggregation reduces count by design). Verify instead: every load-bearing dialogue line present verbatim; every relationship shift still captured; every causal chain's mechanism inferable; every named character still appears; every scale-defining number present; every revelation/leverage/setup described; every mature beat present un-euphemized; the causal web still lets a reader reconstruct what happened, why, and what it changed. ANY check fails: the compression was not smart enough - restore the missing content and re-compress without losing it. Report estimated tokens before/after and the verification result as scan evidence.\n*brief - write a short handoff paragraph IN CHAT (no docedits, never in the document) telling a fresh Storyteller where the story stands and what is in motion, for use as the first message of a new session.\nFree-form (\"change X\", \"retcon Y\", \"Alaric should never have learned Z\") - the minimal correct edit, then the M-SCAN class pass across the whole file, then the edits.\n\n=== HOW YOU DELIVER ===\nYou never output the file and never produce downloads - the extension applies your docedits as reviewable diff cards with undo, and the user exports/imports the document themselves. Prefer several surgical edits (the author reviews each one) over rewrites. \"replace_all\" is permitted ONLY for *optimize and an approved full-scope *cleanup - those commands ARE the user explicitly requesting a full rewrite - and its \"replace\" must then be the COMPLETE document with every kept block present: never a diff, never \"unchanged sections omitted\", never \"rest as before\" - an omitted block is a silently deleted block.\nIn chat alongside the edits: the change report - what changed and why, scan evidence, estimated token delta when size changed. Reference content by character name or snippet turns plus a SHORT quote; never paste whole snippets or dossiers into the report; never echo the document back; never re-explain these instructions; never ask whether to proceed on a command already given. Every token you print is the user's budget: spend it on findings and fixes, not narration.";
 
@@ -1744,7 +1751,7 @@ const DEFAULTS = {
   temperature: 1, maxTokens: 4096,
   showThinking: true, showTools: true, catchThinkTags: true, thinkTags: "think, thinking, reasoning, thought",
   enterSends: false, autoTitle: true, theme: "dark", effort: "off", squashSystem: true,
-  search: { on:false, provider:"native", key:"", count:5, relay:"", always:false, images:true, auto:true },
+  search: { on:false, provider:"native", key:"", count:5, relay:"", always:false, images:true, auto:true, model:true },
   prefill: null
 };
 let S = loadSettings();
@@ -2870,9 +2877,24 @@ function assembleMessages(kind, c){
     .map(x => {
       const m = x.m;
       let c = m.content;
-      if (m.role === "user" && m.sources && m.sources.length){
-        c += "\n\n<web_results>\n" + m.sources.map((s,i) =>
-          "[" + (i+1) + "] " + s.title + "\n" + s.url + "\n" + (s.snippet || "")).join("\n\n") + "\n</web_results>";
+      /* A search the model asked for has to say what it asked for, or it
+         cannot tell an answered query from an unanswered one and asks again.
+         A search that came back with nothing still has to appear: silence
+         reads as "the lookup never happened" and produces the same request a
+         second time. A forced search records its query the same way. Neither
+         field exists on a conversation saved before this, so its block is
+         byte-for-byte what it always was and reopening an old chat changes
+         no request it makes. */
+      if (m.role === "user" && ((m.sources && m.sources.length) || (m.searchedFor && m.searchedFor.length))){
+        const _src = m.sources || [];
+        const _for = (m.searchedFor && m.searchedFor.length)
+          ? ' for="' + m.searchedFor.join(" | ").replace(/"/g, "'") + '"' : "";
+        c += "\n\n<web_results" + _for + ">\n"
+          + (_src.length
+              ? _src.map((s,i) => "[" + (i+1) + "] " + s.title + "\n" + s.url + "\n" + (s.snippet || "")).join("\n\n")
+              : "(nothing came back)")
+          + (m.searchDone ? "\n\nNo further lookups are available for this message \u2014 answer with what is here." : "")
+          + "\n</web_results>";
       }
       if (m.role === "user" && m.images && m.images.length){
         c += "\n\n<image_results note=\"these images are already shown to the user above your reply\">\n"
@@ -3013,6 +3035,7 @@ function assembleMessages(kind, c){
     }
     if (anySmart) sysParts.push("Files marked as excerpts show only their most relevant parts. Never use replace_all on an excerpted file \u2014 you have not seen all of it.");
   } else if (c.filesOn) sysParts.push(doceditProtocol([]));
+  if (autoSearchTextOn()) sysParts.push(searchProtocol());
   const system = sysParts.filter(t => t && t.trim()).join("\n\n");
   return { messages: merged, system: system };
 }
@@ -3028,7 +3051,16 @@ function buildPayload(opts, c){
   const asm = opts.probe
     ? { messages: [{ role:"user", content: PF_PROBE_ASK }], system: "" }
     : assembleMessages(p.kind, c);
-  const useNative = S.search.on && S.search.provider === "native" && p.kind === "anthropic" && opts.search && !opts.probe;
+  /* Claude's own search tool is the one mechanism here in which the model
+     decides. Gating it behind opts.search meant a person had already decided,
+     which is the opposite of automatic: the tool rode only the turns the
+     magnifier or "every message" had marked, so on every other turn Claude
+     could not have looked anything up however plainly it needed to. With
+     "Look things up when needed" on it rides every turn, and Claude spends a
+     search only when it wants one — Anthropic bills per search, not per
+     tool on the request. */
+  const useNative = S.search.on && S.search.provider === "native" && p.kind === "anthropic"
+    && (opts.search || S.search.model !== false) && !opts.probe;
 
   /* The prefill runs here, on the finished list, and nowhere else. The squash
      is already behind it, so nothing downstream can merge the turn away; and
@@ -3103,6 +3135,95 @@ function asksForImages(text){
   return S.search.on && S.search.provider !== "native" && !!S.search.key
     && S.search.images !== false && S.search.auto !== false
     && !!text && IMG_INTENT.test(text);
+}
+/* ---- the model asks -----------------------------------------------------
+   Every other trigger in this file answers "does this need the internet?"
+   before the model has read the message: a person taps the magnifier, or
+   switches on every message, or a regex reads the wording. The one thing that
+   knows whether it knows was never asked. On a Claude connection its own
+   search tool asks it; everywhere else there is no tool at all, so the request
+   travels as text and Cozy runs it — which works on any endpoint, with no
+   function-calling support and nothing hardcoded about a model. */
+const SEARCH_TAG_RE = /<websearch>([\s\S]*?)<\/websearch>/gi;
+const AUTO_SEARCH_ROUNDS = 2;
+function autoSearchTextOn(){
+  return !!(S.search.on && S.search.model !== false
+    && S.search.provider !== "native" && S.search.key);
+}
+function searchProtocol(){
+  return "LOOKING THINGS UP\n"
+    + "You can search the web. Use it when the answer turns on something after your training data, "
+    + "or on a detail you would otherwise be guessing at.\n"
+    + "To search, reply with nothing but search blocks and no other text:\n"
+    + "<websearch>your query</websearch>\n"
+    + "Up to 3 blocks, one query each. That reply is a request to the app, not an answer, and the user never sees it. "
+    + "The searches run and you are asked this same turn again with the results in a <web_results> block \u2014 "
+    + "that second answer is the one the user reads.\n"
+    + "A <web_results> block already above you has been answered: never ask for a query it names again. "
+    + "If you already know the answer, or the question does not turn on a fact from the web, just answer.";
+}
+/* A reply is a lookup request only when it is nothing else. Prose that merely
+   names the tag — explaining this protocol, quoting it in a code fence — is a
+   reply, and throwing it away to run a search would delete an answer the user
+   asked for. */
+function parseSearchCall(sr){
+  const text = typeof sr === "string" ? sr : ((sr && sr.text) || "");
+  const think = (typeof sr === "string") ? "" : ((sr && sr.think) || "");
+  const pick = function(str){
+    const s = String(str || "");
+    const qs = [];
+    let m; SEARCH_TAG_RE.lastIndex = 0;
+    while ((m = SEARCH_TAG_RE.exec(s))){
+      const q = m[1].replace(/\s+/g, " ").trim();
+      if (q && qs.indexOf(q) < 0) qs.push(q);
+    }
+    if (!qs.length) return null;
+    const rest = s.replace(SEARCH_TAG_RE, "").trim();
+    if (rest.length > 240 || rest.indexOf("```") >= 0) return null;
+    return { queries: qs.slice(0, 3) };
+  };
+  const out = pick(text);
+  if (out) return out;
+  /* A thinking model can put the request in its reasoning and leave the reply
+     empty. That is still a request — but only with nothing visible said,
+     because a real answer always outranks a query in the deliberation that
+     produced it. */
+  if (!text.trim() && think) return pick(think);
+  return null;
+}
+function lastUserMsg(c){
+  if (!c || !c.messages) return null;
+  for (let i = c.messages.length - 1; i >= 0; i--)
+    if (c.messages[i].role === "user") return c.messages[i];
+  return null;
+}
+function showSearching(mid, queries){
+  const node = document.querySelector('[data-mid="' + mid + '"] .msg-body');
+  if (!node) return;
+  node.innerHTML = '<div class="searching">Looking up ' + escapeHtml(queries.join(", ")) + "</div>";
+  scrollDown();
+}
+/* Runs what the model asked for and puts it where the wire already reads it:
+   on the user turn, the same place a forced search leaves its results. The
+   query is recorded before the fetch, so a search that fails or comes back
+   empty still ends the round — an unrecorded attempt looks like no attempt,
+   and the next round asks for exactly the same thing. */
+async function runModelSearch(convo, queries, lastRound){
+  const um = lastUserMsg(convo);
+  if (!um) return false;
+  for (const q of queries){
+    um.searchedFor = (um.searchedFor || []).concat([q]);
+    try {
+      const sr = await runSearch(q);
+      const seen = {};
+      for (const s of (um.sources || [])) seen[s.url] = 1;
+      const add = (sr.results || []).filter(function(r){ return r.url && !seen[r.url]; });
+      if (add.length) um.sources = (um.sources || []).concat(add);
+      if (sr.images && sr.images.length && !(um.images && um.images.length)) um.images = sr.images;
+    } catch (e){ toast(String(e.message || e)); }
+  }
+  if (lastRound) um.searchDone = true;
+  return true;
 }
 async function runSearch(query){
   const c = S.search, n = Number(c.count) || 5;
@@ -3342,6 +3463,7 @@ async function send(userText, mode, forConvo){
       }
       try {
         const sr = await runSearch(userText);
+        um.searchedFor = [String(userText).replace(/\s+/g, " ").trim().slice(0, 120)];
         um.sources = sr.results;
         if (sr.images && sr.images.length) um.images = sr.images;
         if (!um.sources.length && !(um.images && um.images.length)) toast("Search came back empty");
@@ -3435,8 +3557,15 @@ async function send(userText, mode, forConvo){
   };
 
   repaintHook = paint;
-  const sources = [];
+  let sources = [];
+  /* One send can take more than one request. When the model answers with a
+     lookup request instead of an answer, the search runs and the same turn is
+     asked again with the results in front of it. The request reply is never
+     kept: it is overwritten by the answer, so nothing of it reaches the
+     conversation for the model to read back as a reply that ends that way. */
+  let searchRound = 0, searchNote = "";
   try {
+    for (;;){
     /* Runs mode: the same conversation goes to the agent's Runs API instead
        of the chat stream, because only that transport carries approval
        requests back. Images can't ride a run, so a turn with any falls back
@@ -3640,10 +3769,39 @@ async function send(userText, mode, forConvo){
       }
     }
     }
+    if (continuing || searchRound >= AUTO_SEARCH_ROUNDS || !autoSearchTextOn()) break;
+    const ask = parseSearchCall(splitReasoning(raw));
+    if (!ask) break;
+    searchRound++;
+    /* Cleared before anything that can fail. A round can end at the search,
+       at an abort, or at a chat that is no longer there, and on every one of
+       those paths the tag must already be gone — held until after the
+       search, a failure leaves the request itself standing as the reply. */
+    raw = ""; asst.content = ""; asst.thinking = "";
+    showSearching(asst.id, ask.queries);
+    const ran = await runModelSearch(convo, ask.queries, searchRound >= AUTO_SEARCH_ROUNDS);
+    /* The request is gone by now on every one of these paths, so each leaves
+       the sentence that replaces it. Without one the turn reads "(empty
+       reply)", which says the model produced nothing — it produced a
+       request, and Cozy is the one that could not carry it out. */
+    if (!ran){ searchNote = "_(the model asked to look something up, and there was no message to look it up for)_"; break; }
+    if (ctrl.signal.aborted || streaming !== ctrl){ searchNote = "_(stopped)_"; break; }
+    searchNote = "";
+    if (convos.some(x => x.id === convo.id)) await persistConvo(convo);
+    }
     done = true;
     const fin = splitReasoning(raw);
     asst.content = fin.text;
     if (fin.think) asst.thinking = fin.think;
+    /* The rounds can run out with a request still on the wire. It cannot be
+       run and it is not an answer, so it is stripped — by the same
+       recognizer that decides whether to search at all, which is what keeps a
+       reply that merely explains the protocol from being gutted by this. */
+    if (autoSearchTextOn() && parseSearchCall({ text: asst.content, think: asst.thinking })){
+      asst.content = asst.content.replace(SEARCH_TAG_RE, "").trim();
+      asst.thinking = String(asst.thinking || "").replace(SEARCH_TAG_RE, "").trim();
+      if (!asst.content) searchNote = "_(the model asked to look something up again \u2014 this message has no lookups left)_";
+    }
     if (sources.length) asst.sources = sources;
     if (asst.tools) for (const t of asst.tools) if (t.status === "running") t.status = "done";
     if (chatDocIds(convo).length || convo.filesOn){
@@ -3661,7 +3819,7 @@ async function send(userText, mode, forConvo){
         else if (pt.error){ asst.editError = pt.error; asst.thinking = stripDocEdits(asst.thinking); }
       }
     }
-    if (!asst.content && !asst.thinking) asst.content = "_(empty reply)_";
+    if (!asst.content && !asst.thinking) asst.content = searchNote || "_(empty reply)_";
     if (continuing && asst.content.length === startLen) toast("Model had nothing more to add");
   } catch (err){
     done = true;
@@ -4064,6 +4222,7 @@ function syncSettingsUI(){
   setToggle($("#tgAlwaysSearch"), S.search.always);
   setToggle($("#tgSearchImgs"), S.search.images !== false);
   setToggle($("#tgSearchAuto"), S.search.auto !== false);
+  setToggle($("#tgSearchModel"), S.search.model !== false);
   $("#searchCfg").hidden = !S.search.on;
   $("#sProvider").value = S.search.provider;
   $("#sKey").value = S.search.key;
@@ -4420,6 +4579,7 @@ on("#tgSearch", "click", function(e){
 on("#tgAlwaysSearch", "click", function(e){ S.search.always=!S.search.always; setToggle(e.currentTarget,S.search.always); saveSettings(); syncSearchBtn(); });
 on("#tgSearchImgs", "click", function(e){ S.search.images = S.search.images === false; setToggle(e.currentTarget, S.search.images); saveSettings(); });
 on("#tgSearchAuto", "click", function(e){ S.search.auto = S.search.auto === false; setToggle(e.currentTarget, S.search.auto); saveSettings(); });
+on("#tgSearchModel", "click", function(e){ S.search.model = S.search.model === false; setToggle(e.currentTarget, S.search.model); saveSettings(); });
 on("#sProvider", "change", function(e){
   S.search.provider = e.target.value; saveSettings();
   $("#sHint").textContent = SEARCH_HINTS[e.target.value] || "";
