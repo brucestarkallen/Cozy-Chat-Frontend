@@ -175,7 +175,13 @@ console.log('\n=== 6. WEB SEARCH ===');
   ck('sources block rendered', !!d.querySelector('.sources'));
   const sent=JSON.parse(chatCall.opts.body);
   const lastUser=sent.messages[sent.messages.length-1].content;
-  ck('results injected into the prompt', lastUser.includes('<web_results>')&&lastUser.includes('a.com'));
+  /* The opener carries the query it searched for since v5.21.0, so matching
+     the closed tag matched a shape that no longer exists. What is being
+     asked is whether the results reached the prompt, which is the opener
+     plus a result in it. */
+  ck('results injected into the prompt', lastUser.includes('<web_results')&&lastUser.includes('a.com'));
+  ck('and the block names what was searched for', lastUser.includes('<web_results for="who won">'),
+     lastUser.slice(lastUser.indexOf('<web_results')).slice(0,40));
   ck('visible message stays clean', !d.querySelector('.msg.user .msg-body').textContent.includes('web_results'));
   // window left open; closing mid-async trips jsdom
 }

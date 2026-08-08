@@ -87,7 +87,10 @@ console.log('=== 2. TAVILY: PICTURES RIDE THE SAME REQUEST ===');
   const lastUser=chatBody.messages[chatBody.messages.length-1].content;
   ck('the model is told what the user already sees', lastUser.indexOf('<image_results')>=0 && lastUser.indexOf('already shown to the user')>=0);
   ck('down to the exact pictures', lastUser.indexOf('https://img.x/zaraki.jpg')>=0 && lastUser.indexOf('Kenpachi Zaraki')>=0);
-  ck('text sources still injected beside them', lastUser.indexOf('<web_results>')>=0 && lastUser.indexOf('w.x/b')>=0);
+  /* The opener carries the query since v5.21.0; what is asked here is that
+     the text results ride the same turn as the pictures, not how the tag is
+     spelled. */
+  ck('text sources still injected beside them', lastUser.indexOf('<web_results')>=0 && lastUser.indexOf('w.x/b')>=0);
 }
 
 console.log('=== 3. THE TOGGLE REALLY TURNS THE SPEND OFF ===');

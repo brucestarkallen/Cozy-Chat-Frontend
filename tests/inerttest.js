@@ -145,8 +145,15 @@ const SHAPES=[
    `assembleMessages('openai',current)`],
 ];
 
+/* A shape's result must not depend on the shapes before it. Settings are one
+   shared object per window, so a setup that switches something on — search,
+   say — was still on for every shape after it, and the comparison reported a
+   later shape as changed because of an earlier one. Re-seeding from the same
+   fixture makes each shape mean only what it says. */
 function runShape(w,setup,call){
   return w.eval(`(()=>{
+    localStorage.setItem('cozychat:settings', ${JSON.stringify(JSON.stringify(settings()))});
+    S = loadSettings();
     convos=[];current=null;newConvo();
     ${setup}
     const out = ${call};
