@@ -362,6 +362,13 @@ your reply — so it says so in plain words instead of showing a raw 400.
 **Web search**
 - Off by default. Turn it on in Settings → Search and a magnifier appears next to
   the message box — tap for one message, or set it to search everything.
+- **Look things up when needed** (on) hands the decision to the model, which is
+  the only participant that knows whether it knows. On a Claude connection its
+  own search tool rides every turn and Claude spends a search only when it
+  wants one. On any other service the model answers with a lookup request
+  instead of an answer, Cozy runs the query and asks the same turn again with
+  the results in front of it — what you read is that second answer. Two
+  lookups per message; the request itself is never shown and never kept.
 
 | Service | Free allowance | Notes |
 |---|---|---|
@@ -562,21 +569,30 @@ network-first, so a refresh always gets the newest version.
 | `loadModels()` | Fetches the model dropdown from `/models` |
 | `connLabel()` | Shows the model once instead of connection name + model |
 | `runSearch()` | Web search calls per service |
+| `searchProtocol()` / `parseSearchCall()` | How a model asks for a lookup, and what counts as one |
+| `runModelSearch()` | Runs what it asked for and puts the results where the wire reads them |
 | `toolLogHtml()` | The agent tool-activity log on a message |
 | `renderMarkdown()` | Markdown → HTML |
 | `send()` | Sends and reads the streaming reply |
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
 **Tests.** Everything in `tests/` — `v519test.js` down to `v2test.js`, plus
-`domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`, `swtest.js`,
-`scrolltest.js`, `styletest.js`, `hiddentest.js`, `coherencetest.js` and
-`installtest.sh` — runs under Node with jsdom (`npm i jsdom fake-indexeddb`).
-1421 checks across the matching engine, JSON tolerance, prompt assembly,
+`searchtest.js`, `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`,
+`swtest.js`, `scrolltest.js`, `styletest.js`, `hiddentest.js`,
+`coherencetest.js` and `installtest.sh` — runs under Node with jsdom
+(`npm i jsdom fake-indexeddb`).
+1488 checks across the matching engine, JSON tolerance, prompt assembly,
 multi-block replies, proposal supersede, undo truth, button visibility,
 projects, retrieval, streaming, SSE framing and Hermes tool activity,
 stream/chat binding, touch reorder, reader-owned scrolling, backup
-round-trips, migration, prefill on every wire shape, and negative tests that
-deliberately reintroduce fixed bugs to prove the guards fire.
+round-trips, migration, prefill on every wire shape, model-decided search, and
+negative tests that deliberately reintroduce fixed bugs to prove the guards
+fire.
+
+`tests/searchnegtest.js` is the same kind of harness for the search guards:
+it puts each of the 11 lookup bugs back and requires `tests/searchtest.js` to
+catch it. `node tests/searchnegtest.js`, or in slices, `node
+tests/searchnegtest.js 0 4`.
 
 `tests/prefillnegtest.js` is a mutation harness rather than part of the gate:
 it puts each of the 42 prefill bugs back, one at a time, and requires the gate

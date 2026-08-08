@@ -7,12 +7,12 @@ worker, `install.sh` the Termux installer, `tests/` the gate.
 
     npm i jsdom fake-indexeddb        # once per workspace
     for t in tests/*.js; do
-      [ "$t" = tests/prefillnegtest.js ] && continue
+      case "$t" in tests/prefillnegtest.js|tests/searchnegtest.js) continue;; esac
       node "$t" || exit 1
     done
     bash tests/installtest.sh
 
-1421 checks as of v5.20.0, measured from real output.
+1488 checks as of v5.21.0, measured from real output.
 
 `tests/inerttest.js` is in the loop but prints SKIP without a second checkout
 to compare against. It answers the question a passing gate does not: whether a
@@ -27,6 +27,11 @@ Compare against the commit your work sits on, not an older favourite. Cozy has
 more than one session pushing to it, and a baseline several releases back
 reports somebody else's deliberate change as a difference in yours — which
 reads like a regression and is not one.
+
+`tests/searchnegtest.js` is held out for the same reason as the one below it:
+it runs the search gate twelve times over. `node tests/searchnegtest.js`, or
+`node tests/searchnegtest.js 0 4` for a slice. It keeps the same `.negbak`
+bargain.
 
 `tests/prefillnegtest.js` is held out of that loop because it is a *meta*
 gate: it runs a prefill gate once per mutation against a mutated `index.html`,
@@ -119,6 +124,59 @@ that as truncation deletes the rest of a reply that was never truncated.
 Likewise a block cut off after emptying keeps its warning: with nothing staged,
 the warning is the whole story, and dropping it described the reply as one that
 proposed no edits at all.
+
+## Looking things up
+
+Every trigger that predates v5.21.0 answered "does this need the internet?"
+**before the model had read the message** — a magnifier tap, "search every
+message", or a regex on the wording. The one participant that knows whether it
+knows was never asked, and on a Claude connection the tool that *would* have
+asked it was gated behind `opts.search`: the person had to decide first, which
+is the opposite of automatic. Two mechanisms replace that, and the rule under
+both is that the decision belongs to the model.
+
+- **On Anthropic with the native provider**, `useNative` no longer waits for
+  `opts.search`. The tool rides every turn; Anthropic bills per *search*, not
+  per tool on the request, so an unused one costs nothing. The magnifier and
+  "every message" still force it. `skipOnTools` means a prefill now skips on a
+  Claude connection with search on — that is the documented trade, not a bug.
+- **Everywhere else** there is no tool, so the request travels as text:
+  `searchProtocol()` teaches a `<websearch>` block, `parseSearchCall()`
+  recognizes one, `runModelSearch()` runs it, and the loop in `send()` asks the
+  same turn again. Text, not function calling, is what makes it work on any
+  endpoint including the Hermes Runs transport, with nothing hardcoded about a
+  model.
+
+Four rules hold it together, each with a mutation in `searchnegtest.js`:
+
+- **A reply is a request only when it is nothing else.** One recognizer decides
+  both whether to search and whether to strip, so prose that merely names the
+  tag — explaining the protocol, quoting it in a fence — can never be gutted
+  by the stripper. Two recognizers would drift apart and one of them would eat
+  an answer.
+- **The request is cleared the moment it is recognized**, before anything that
+  can fail. A round can end at the search, at an abort, at a superseded send,
+  or at its last permitted round, and on every one of those paths the tag is
+  already gone. Held until after the search, a failure leaves the request
+  standing as the reply. Each exit leaves the sentence that replaces it —
+  `searchNote` — because "(empty reply)" says the model produced nothing, when
+  it produced a request Cozy could not carry out.
+- **A search that came back empty still goes on the wire.** Silence reads as
+  "the lookup never happened" and produces the identical request a second time,
+  so the query is recorded *before* the fetch and an empty result ships as
+  `(nothing came back)`.
+- **`<web_results>` names what was asked for.** A forced search records its
+  query too — without it the model cannot tell an answered query from an
+  unanswered one, whoever asked for the search. A conversation saved before
+  this release has neither `searchedFor` nor `searchDone`, so its block is
+  byte-for-byte what it was and reopening an old chat changes no request it
+  makes; `searchtest.js` pins that shape and `v2test.js` pins the live forced
+  path that now names its query.
+
+`inerttest.js` re-seeds settings before every shape. It used to share one
+settings object across the whole run, so a shape that switched search on left
+it on for every shape after it and the comparison reported a later shape as
+changed because of an earlier one.
 
 ## The seam between the user and the instruction set
 
