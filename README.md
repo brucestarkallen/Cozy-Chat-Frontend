@@ -256,6 +256,10 @@ It only affects blocks that end up adjacent. Anything separated by a user or
 assistant turn is never merged.
 
 **Thinking**
+- **A level the model refuses can't eat your message.** If a service rejects
+  the effort you picked, Cozy steps down one rung, sends the turn again, and
+  caps that connection there — the picker stops offering the refused rung until
+  you re-save the connection, which is the cure printed right under it.
 - Shown in a collapsible block
 - Handles models with a separate reasoning field *and* models that write
   `<think>…</think>` inline. The tags never leak into the reply text.
@@ -582,15 +586,15 @@ network-first, so a refresh always gets the newest version.
 | `send()` | Sends and reads the streaming reply |
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
-**Tests.** Everything in `tests/` — `v5220test.js` down to `v2test.js`, plus
+**Tests.** Everything in `tests/` — `v5221test.js` down to `v2test.js`, plus
 `searchtest.js`, `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`,
 `swtest.js`, `scrolltest.js`, `styletest.js`, `hiddentest.js`,
 `coherencetest.js` and `installtest.sh` — runs under Node with jsdom
 (`npm i jsdom fake-indexeddb`).
-1477 checks across the matching engine, JSON tolerance, prompt assembly,
+1516 checks across the matching engine, JSON tolerance, prompt assembly,
 multi-block replies, proposal supersede, undo truth, button visibility,
-projects and their instruction blocks, per-connection effort ladders,
-retrieval, streaming, SSE framing and Hermes tool activity,
+projects and their instruction blocks, per-connection effort ladders with
+self-healing levels, retrieval, streaming, SSE framing and Hermes tool activity,
 stream/chat binding, touch reorder, reader-owned scrolling, backup
 round-trips, migration, prefill on every wire shape, model-decided search, and
 negative tests that deliberately reintroduce fixed bugs to prove the guards
