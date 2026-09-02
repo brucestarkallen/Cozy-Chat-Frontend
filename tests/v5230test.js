@@ -53,10 +53,11 @@ console.log('=== 1. A PROJECT BLOCK AFTER THE MARKER LANDS AFTER THE CHAT ===');
   const asm=JSON.parse(w.eval('JSON.stringify(assembleMessages("openai"))'));
   const j=JSON.stringify(asm.messages);
   ck('the system fold holds neither post block', asm.system.indexOf('SET POST')<0 && asm.system.indexOf('CURRENT ARC')<0);
-  ck('the set\'s post block comes first, then the project\'s, both after the chat',
-     j.indexOf('hello')<j.indexOf('SET POST') && j.indexOf('SET POST')<j.indexOf('CURRENT ARC'), j.slice(0,200));
+  ck('the global set\'s post block stays OUT of the project', j.indexOf('SET POST')<0, j.slice(0,200));
+  ck('the project\'s lands after the chat', j.indexOf('hello')<j.indexOf('CURRENT ARC'));
   const tail=asm.messages[asm.messages.length-1];
-  ck('the project block keeps its role', tail.role==='user' && tail.content==='CURRENT ARC: the siege begins.', tail.role+': '+tail.content);
+  ck('the project block keeps its role — merging with the user\'s own last message, one user voice',
+     tail.role==='user' && tail.content==='hello\n\nCURRENT ARC: the siege begins.', tail.role+': '+tail.content);
 }
 
 console.log('=== 2. A PROJECT BLOCK WEAVES IN AT A DEPTH, AFTER THE SET\'S ===');
@@ -74,9 +75,10 @@ console.log('=== 2. A PROJECT BLOCK WEAVES IN AT A DEPTH, AFTER THE SET\'S ===')
     current.messages.push({id:uid(),role:"user",content:"newest",ts:3});`);
   const asm=JSON.parse(w.eval('JSON.stringify(assembleMessages("openai"))'));
   const j=JSON.stringify(asm.messages);
-  ck('both weave in one message up from the newest, set first',
-     j.indexOf('second')<j.indexOf('SET DEPTH') && j.indexOf('SET DEPTH')<j.indexOf('PROJECT DEPTH') && j.indexOf('PROJECT DEPTH')<j.indexOf('newest'), j.slice(0,240));
-  ck('neither leaks into the system fold', asm.system.indexOf('DEPTH')<0, asm.system);
+  ck('the project block weaves in one message up from the newest',
+     j.indexOf('second')<j.indexOf('PROJECT DEPTH') && j.indexOf('PROJECT DEPTH')<j.indexOf('newest'), j.slice(0,240));
+  ck('the global set\'s depth block stays OUT of the project', j.indexOf('SET DEPTH')<0);
+  ck('and nothing leaks into the system fold', asm.system.indexOf('DEPTH')<0, asm.system);
 }
 
 console.log('=== 3. ROLES AND THE FOLD, INSIDE THE PROJECT LAYER ===');
@@ -91,7 +93,7 @@ console.log('=== 3. ROLES AND THE FOLD, INSIDE THE PROJECT LAYER ===');
   const dom=await boot(st);const w=dom.window;
   w.eval(`newConvo(null,"pr1"); current.messages.push({id:uid(),role:"user",content:"hello",ts:1});`);
   const asm=JSON.parse(w.eval('JSON.stringify(assembleMessages("openai"))'));
-  ck('a leading system block folds, after the set\'s prompt', asm.system==='BASE\n\nPROJECT SYSTEM ZERO', JSON.stringify(asm.system));
+  ck('a leading system block folds — no global prompt beside it', asm.system==='PROJECT SYSTEM ZERO', JSON.stringify(asm.system));
   const j=JSON.stringify(asm.messages);
   ck('once a non-system block passes, later system blocks stay messages — order is never rewritten by the fold',
      j.indexOf('PROJECT USER BLOCK')<j.indexOf('PROJECT SYSTEM ONE') && j.indexOf('PROJECT SYSTEM ONE')<j.indexOf('hello'), j.slice(0,240));
@@ -105,10 +107,10 @@ console.log('=== 4. OLDER PROJECT SHAPES KEEP THE WIRE THEY ALWAYS HAD ===');
   st.projects=[{id:'pr1',name:'Legacy',instructions:'PROJECT LAW: stay in canon.',presetId:null,docIds:[]}];
   const dom=await boot(st);const w=dom.window;
   w.eval(`newConvo(null,"pr1"); current.messages.push({id:uid(),role:"user",content:"go",ts:1});`);
-  ck('a pre-v5.22 text still produces its exact request', w.eval('assembleMessages("openai").system')==='BASE\n\nPROJECT LAW: stay in canon.');
+  ck('a pre-v5.22 text still lands as project-law system text', w.eval('assembleMessages("openai").system')==='PROJECT LAW: stay in canon.');
   const sh=JSON.parse(w.eval('JSON.stringify(S.projects[0])'));
   ck('and the block is the full format now', sh.injections[0].role==='system' && sh.injections[0].pos==='relative' && sh.injections[0].depth===0);
-  ck('with the marker at the end', sh.order.join(',')===sh.injections[0].id+',__chat__', sh.order.join(','));
+  ck('between the two markers', sh.order.join(',')==='__main__,'+sh.injections[0].id+',__chat__', sh.order.join(','));
 }
 {
   const st=base();
@@ -116,9 +118,9 @@ console.log('=== 4. OLDER PROJECT SHAPES KEEP THE WIRE THEY ALWAYS HAD ===');
     injections:[{id:'b1',name:'x',text:'LAW TWO',enabled:true}],order:['b1']}];
   const dom=await boot(st);const w=dom.window;
   w.eval(`newConvo(null,"pr1"); current.messages.push({id:uid(),role:"user",content:"go",ts:1});`);
-  ck('a v5.22 block list keeps its exact request too', w.eval('assembleMessages("openai").system')==='BASE\n\nLAW TWO');
+  ck('a v5.22 block list lands the same way', w.eval('assembleMessages("openai").system')==='LAW TWO');
   const sh=JSON.parse(w.eval('JSON.stringify(S.projects[0])'));
-  ck('defaults filled, marker appended', sh.injections[0].role==='system' && sh.order.join(',')==='b1,__chat__');
+  ck('defaults filled, both markers in place', sh.injections[0].role==='system' && sh.order.join(',')==='__main__,b1,__chat__', sh.order.join(','));
 }
 
 console.log('=== 5. THE EDITOR IS THE INSTRUCTION-SET EDITOR ===');
@@ -129,8 +131,9 @@ console.log('=== 5. THE EDITOR IS THE INSTRUCTION-SET EDITOR ===');
     order:['b1','__chat__']}];
   const dom=await boot(st);const w=dom.window,d=w.document;
   w.eval('openProjEditor("pr1")'); await sleep(60);
-  ck('the conversation marker renders, last', !!d.querySelector('#projInjList [data-row="__chat__"]')
-      && d.querySelectorAll('#projInjList [data-row]')[1].dataset.row==='__chat__');
+  ck('the markers render, main first and conversation last', !!d.querySelector('#projInjList [data-row="__main__"]')
+      && d.querySelectorAll('#projInjList [data-row]')[0].dataset.row==='__main__'
+      && d.querySelectorAll('#projInjList [data-row]')[2].dataset.row==='__chat__');
   ev(w,d.querySelector('#projInjList [data-edit="b1"]'),'click'); await sleep(40);
   ck('sent-as and position are there', !!d.querySelector('#projInjList [data-pinjrole="b1"]') && !!d.querySelector('#projInjList [data-pinjpos="b1"]'));
   ck('no depth input while relative', !d.querySelector('#projInjList [data-pinjdepth="b1"]'));
@@ -149,18 +152,18 @@ console.log('=== 5. THE EDITOR IS THE INSTRUCTION-SET EDITOR ===');
   ev(w,d.querySelector('#projInjList [data-edit="b1"]'),'click'); await sleep(40); // close the editor first
   layout(w,'#projInjList');
   const g=d.querySelector('#projInjList [data-grip="b1"]');
-  g.dispatchEvent(pev(w,'pointerdown',20));
-  g.dispatchEvent(pev(w,'pointermove',100));
-  g.dispatchEvent(pev(w,'pointerup',100));
+  g.dispatchEvent(pev(w,'pointerdown',60));
+  g.dispatchEvent(pev(w,'pointermove',120));
+  g.dispatchEvent(pev(w,'pointerup',120));
   await sleep(40);
-  ck('dragged below the marker, it sits after the conversation', w.eval('S.projects[0].order.join(",")')==='__chat__,b1', w.eval('S.projects[0].order.join(",")'));
+  ck('dragged below the marker, it sits after the conversation', w.eval('S.projects[0].order.join(",")')==='__main__,__chat__,b1', w.eval('S.projects[0].order.join(",")'));
   w.eval('(function(){const i=S.projects[0].injections[0]; i.pos="relative"; i.role="system"; saveSettings();})()');
   ck('and the wire agrees', w.eval(`(function(){newConvo(null,"pr1");current.messages.push({id:uid(),role:"user",content:"hi",ts:1});
       const m=assembleMessages("openai").messages; return m[m.length-1].content;})()`)==='A');
   // new blocks land before the marker
   ev(w,d.querySelector('#projAddInjBtn'),'click'); await sleep(40);
   const sh=JSON.parse(w.eval('JSON.stringify({o:S.projects[0].order,n:S.projects[0].injections.map(i=>i.id)})'));
-  ck('a new block lands just before the conversation marker', sh.o.length===3 && sh.o[1]==='__chat__' && sh.n.indexOf(sh.o[0])>=0 && sh.o[2]==='b1', sh.o.join(','));
+  ck('a new block lands just before the conversation marker', sh.o.length===4 && sh.o[0]==='__main__' && sh.n.indexOf(sh.o[1])>=0 && sh.o[2]==='__chat__' && sh.o[3]==='b1', sh.o.join(','));
 }
 
 console.log('');

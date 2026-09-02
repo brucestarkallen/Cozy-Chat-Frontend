@@ -1,6 +1,7 @@
 // TEST FILE — run with: node tests/v54test.js
-// Guards v5.4.0: a project carries instructions, an instruction set, and
-// files into every chat inside it; smart context sends the parts of a long
+// Guards v5.4.0: a project carries its instructions and files into every chat
+// inside it (since v5.24.0 that is the ONLY set its chats use — global sets
+// stay outside projects); smart context sends the parts of a long
 // file that matter for the message, in document order, and refuses a full
 // rewrite of a file the model only saw in part; the assistant can edit
 // project files; deleting a project frees its chats and deleting a file
@@ -87,7 +88,7 @@ console.log('=== 2. A PROJECT TRAVELS WITH ITS CHATS ===');
   const w=dom.window,d=w.document;
   await w.eval(`(async function(){
     const doc=await newDoc("canon.md","The hero is Jovan Oda.\\nHe fights in Karakura.");
-    S.projects=[{id:"pr1",name:"Bleach RP",instructions:"PROJECT LAW: stay in canon.",presetId:"w",docIds:[doc.id]}];
+    S.projects=[{id:"pr1",name:"Bleach RP",instructions:"PROJECT LAW: stay in canon.",docIds:[doc.id]}];
     saveSettings(); renderSidebar();
   })()`);
   await sleep(80);
@@ -96,11 +97,11 @@ console.log('=== 2. A PROJECT TRAVELS WITH ITS CHATS ===');
   head.querySelector('[data-projnew]').dispatchEvent(new w.Event('click',{bubbles:true}));
   await sleep(80);
   ck('a chat born there belongs to it', w.eval('current.projectId')==='pr1');
-  ck('and is pinned to the project\'s instruction set', w.eval('current.cfg.presetId')==='w');
+  ck('and nothing global is pinned from the project', w.eval('current.cfg.presetId')==='d');
   w.eval('current.messages.push({id:uid(),role:"user",content:"who is the hero?",ts:Date.now()})');
   const asm=w.eval('JSON.stringify(assembleMessages("openai"))');
   ck('project instructions reach the system prompt', asm.indexOf('PROJECT LAW: stay in canon.')>=0);
-  ck('after the set\'s own prompt', asm.indexOf('WRITER SET')>=0 && asm.indexOf('WRITER SET')<asm.indexOf('PROJECT LAW'));
+  ck('and the global set stays outside the project', asm.indexOf('WRITER SET')<0 && asm.indexOf('BASE')<0);
   ck('the project file rides along', asm.indexOf('The hero is Jovan Oda.')>=0);
   ck('the sidebar counts it', d.querySelector('.proj-head .ph-n').textContent==='1');
   // a chat outside the project sees none of it

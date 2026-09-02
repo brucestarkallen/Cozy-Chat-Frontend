@@ -187,18 +187,20 @@ Tap **Test** before saving.
   an unparseable edit block is re-sent as valid JSON without you asking.
 
 **Projects** (sidebar → **+ Project**)
-- A project groups chats and gives them shared ground: its own **instructions** —
-  a full instruction set's worth of blocks, named and toggleable, sent as any
-  role, ordered around the conversation marker or woven in at a depth — an
-  **instruction set** for new chats born inside it, and **project files** every
-  chat in it can read — and the assistant can edit.
+- A project is a self-contained workspace. Its chats use the project's own
+  instruction set — main system prompt, named toggleable blocks, any role,
+  the conversation marker, in-chat depths — and nothing else: **global
+  instruction sets stay outside projects**. Plus **project files** every chat
+  in it can read — and the assistant can edit.
+- **Start from a global set** copies one into the project — a real copy:
+  editing it there never touches the global one, and global edits never reach in.
 - Chats in a project sit under its own heading in the sidebar; **+** on the
   heading starts a chat there, **✎** opens the project's settings.
-- Move any chat in or out under Settings → Chat → **Project**.
+- Move any chat in or out under Settings → Chat → **Project**. The chat's own
+  pinned global set is never lost — it sleeps while the chat lives inside and
+  wakes up exactly as saved when the chat moves out.
 - Project instructions are live — edit them once, every chat in the project
-  follows. They live on the project itself, so switching instruction sets never
-  touches them. The instruction set is pinned per chat at creation, the same
-  rule as every other setting.
+  follows.
 - Deleting a project never deletes anything else: its chats stay, its files stay.
 
 **Smart context** (retrieval)
@@ -587,12 +589,12 @@ network-first, so a refresh always gets the newest version.
 | `send()` | Sends and reads the streaming reply |
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
-**Tests.** Everything in `tests/` — `v5230test.js` down to `v2test.js`, plus
+**Tests.** Everything in `tests/` — `v5240test.js` down to `v2test.js`, plus
 `searchtest.js`, `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`,
 `swtest.js`, `scrolltest.js`, `styletest.js`, `hiddentest.js`,
 `coherencetest.js` and `installtest.sh` — runs under Node with jsdom
 (`npm i jsdom fake-indexeddb`).
-1539 checks across the matching engine, JSON tolerance, prompt assembly,
+1571 checks across the matching engine, JSON tolerance, prompt assembly,
 multi-block replies, proposal supersede, undo truth, button visibility,
 projects and their instruction blocks, per-connection effort ladders with
 self-healing levels, retrieval, streaming, SSE framing and Hermes tool activity,

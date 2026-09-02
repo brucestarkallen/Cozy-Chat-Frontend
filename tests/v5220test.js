@@ -56,11 +56,11 @@ console.log('=== 1. A PROJECT\'S OLD TEXT BECOMES ITS FIRST BLOCK, WIRE UNCHANGE
     saveSettings(); newConvo(null,"pr1");
     current.messages.push({id:uid(),role:"user",content:"who is the hero?",ts:Date.now()});`);
   const sys=w.eval('assembleMessages("openai").system');
-  ck('the request is byte-for-byte the one the old text produced', sys==='BASE\n\nPROJECT LAW: stay in canon.', JSON.stringify(sys));
+  ck('the old text still sends as the project\'s whole system prompt', sys==='PROJECT LAW: stay in canon.', JSON.stringify(sys));
   const shape=w.eval('JSON.stringify({inj:S.projects[0].injections,order:S.projects[0].order,old:"instructions" in S.projects[0]})');
   const sh=JSON.parse(shape);
   ck('the text migrated into one named block', sh.inj.length===1 && sh.inj[0].text==='PROJECT LAW: stay in canon.' && sh.inj[0].enabled===true);
-  ck('with an order holding it before the conversation marker', sh.order.length===2 && sh.order[0]===sh.inj[0].id && sh.order[1]==='__chat__', sh.order.join(','));
+  ck('with an order holding it between the two markers', sh.order.length===3 && sh.order[0]==='__main__' && sh.order[1]===sh.inj[0].id && sh.order[2]==='__chat__', sh.order.join(','));
   ck('and the old field is gone', sh.old===false);
   w.eval('newConvo()'); // outside the project
   w.eval('current.messages.push({id:uid(),role:"user",content:"hi",ts:Date.now()})');
@@ -80,27 +80,28 @@ console.log('=== 2. BLOCKS SEND IN THE PROJECT\'S ORDER — ENABLED AND NON-EMPT
     saveSettings(); newConvo(null,"pr1");
     current.messages.push({id:uid(),role:"user",content:"go",ts:1});`);
   const sys=w.eval('assembleMessages("openai").system');
-  ck('enabled blocks ride, in the project\'s order', sys==='BASE\n\nFIRST LAW\n\nTHIRD LAW', JSON.stringify(sys));
+  ck('enabled blocks ride, in the project\'s order', sys==='FIRST LAW\n\nTHIRD LAW', JSON.stringify(sys));
   ck('a switched-off block stays home', sys.indexOf('SECOND LAW')<0);
   ck('a blank block sends nothing', sys.indexOf('b4')<0 && !/\\n\\n\\n/.test(sys));
   w.eval('S.projects[0].order=orderMoveTo(S.projects[0].order,"b3",0)');
   const sys2=w.eval('assembleMessages("openai").system');
-  ck('reordering the list reorders the wire', sys2==='BASE\n\nTHIRD LAW\n\nFIRST LAW', JSON.stringify(sys2));
+  ck('reordering the list reorders the wire', sys2==='THIRD LAW\n\nFIRST LAW', JSON.stringify(sys2));
 }
 
-console.log('=== 3. THE SET CANNOT TOUCH THE PROJECT\'S BLOCKS ===');
+console.log('=== 3. THE PROJECT\'S SET IS THE WHOLE LAYER ===');
 {
   const dom=await boot(base());const w=dom.window;
-  w.eval(`S.projects=[{id:"pr1",name:"P",presetId:null,docIds:[],
+  w.eval(`S.projects=[{id:"pr1",name:"P",docIds:[],
     injections:[{id:"b1",name:"one",text:"PROJECT LAW",enabled:true}],order:["b1"]}];
     saveSettings(); newConvo(null,"pr1");
     current.messages.push({id:uid(),role:"user",content:"go",ts:1});`);
+  const before=w.eval('assembleMessages("openai").system');
+  ck('a chat in the project uses the project\'s set alone', before==='PROJECT LAW', JSON.stringify(before));
   w.eval('switchPreset("w")');
   await sleep(60);
-  const sys=w.eval('assembleMessages("openai").system');
-  ck('switching the set swaps the set\'s prompt only', sys==='WRITER SET\n\nPROJECT LAW', JSON.stringify(sys));
+  ck('switching the global set changes nothing inside the project', w.eval('assembleMessages("openai").system')==='PROJECT LAW');
   ck('the project\'s blocks are where they were', w.eval('S.projects[0].injections.length')===1 && w.eval('S.projects[0].injections[0].text')==='PROJECT LAW');
-  ck('and the set never absorbed one', w.eval('PS().injections.length')===0);
+  ck('and the global set never absorbed one', w.eval('PS().injections.length')===0);
 }
 
 console.log('=== 4. THE EDITOR: RENDER, ADD, ARROWS, TOGGLE, RENAME, DELETE ===');
@@ -114,16 +115,16 @@ console.log('=== 4. THE EDITOR: RENDER, ADD, ARROWS, TOGGLE, RENAME, DELETE ==='
     order:["b1","b2","b3"]}];
     saveSettings(); openProjEditor("pr1");`);
   await sleep(60);
-  ck('every block renders a row, plus the conversation marker', d.querySelectorAll('#projInjList [data-row]').length===4);
-  ck('every row has a grip', d.querySelectorAll('#projInjList [data-grip]').length===4);
+  ck('every block renders a row, plus the two markers', d.querySelectorAll('#projInjList [data-row]').length===5);
+  ck('every row has a grip', d.querySelectorAll('#projInjList [data-grip]').length===5);
   ev(w,d.querySelector('#projAddInjBtn'),'click'); await sleep(40);
   ck('add makes a block and opens it for editing', w.eval('S.projects[0].injections.length')===4
       && !!d.querySelector('#projInjList .ord-editor [data-pinjname]'));
-  const nid=w.eval('S.projects[0].order[3]');
-  ck('the new block landed at the end of the order', w.eval('S.projects[0].injections[3].id')===nid);
+  const nid=w.eval('(function(){const o=S.projects[0].order;return o[o.length-2];})()');
+  ck('the new block landed just before the conversation marker', w.eval('S.projects[0].injections[3].id')===nid);
   // arrows move a row one step
   d.querySelector('#projInjList [data-up="b2"]').dispatchEvent(new w.Event('click',{bubbles:true})); await sleep(40);
-  ck('arrow-up swaps with the row above', w.eval('S.projects[0].order.slice(0,3).join(",")')==='b2,b1,b3', w.eval('S.projects[0].order.join(",")'));
+  ck('arrow-up swaps with the row above', w.eval('S.projects[0].order.slice(0,4).join(",")')==='__main__,b2,b1,b3', w.eval('S.projects[0].order.join(",")'));
   // toggle switches a block off
   d.querySelector('#projInjList [data-pinjon="b1"]').dispatchEvent(new w.Event('click',{bubbles:true})); await sleep(40);
   ck('the toggle switches the block off', w.eval('S.projects[0].injections.find(x=>x.id==="b1").enabled')===false);
@@ -166,22 +167,22 @@ console.log('=== 5. DRAG REORDERS THE PROJECT\'S LIST, SAME GESTURE AS THE SET\'
   const g=d.querySelector('#projInjList [data-grip="b1"]');
   g.dispatchEvent(pev(w,'pointerdown',20));
   ck('the row is grabbed on contact', g.classList.contains('armed'));
-  g.dispatchEvent(pev(w,'pointermove',150));
+  g.dispatchEvent(pev(w,'pointermove',200));
   ck('the drop slot highlights mid-drag', !!d.querySelector('#projInjList .drop-target'));
-  g.dispatchEvent(pev(w,'pointerup',150));
-  ck('released below the rest, it lands last', ordNow()==='b2,b3,__chat__,b1', ordNow());
+  g.dispatchEvent(pev(w,'pointerup',200));
+  ck('released below the rest, it lands last', ordNow()==='__main__,b2,b3,__chat__,b1', ordNow());
   // a tap on the grip is a no-op
   layout(w,'#projInjList');
   const g2=d.querySelector('#projInjList [data-grip="b2"]');
-  g2.dispatchEvent(pev(w,'pointerdown',20)); g2.dispatchEvent(pev(w,'pointerup',20));
-  ck('a tap moves nothing', ordNow()==='b2,b3,__chat__,b1', ordNow());
+  g2.dispatchEvent(pev(w,'pointerdown',60)); g2.dispatchEvent(pev(w,'pointerup',60));
+  ck('a tap moves nothing', ordNow()==='__main__,b2,b3,__chat__,b1', ordNow());
   // a cancelled pointer leaves the order alone
   layout(w,'#projInjList');
   const g3=d.querySelector('#projInjList [data-grip="b3"]');
-  g3.dispatchEvent(pev(w,'pointerdown',60));
+  g3.dispatchEvent(pev(w,'pointerdown',100));
   g3.dispatchEvent(pev(w,'pointermove',5));
   g3.dispatchEvent(pev(w,'pointercancel',5));
-  ck('a cancelled drag changes nothing', ordNow()==='b2,b3,__chat__,b1', ordNow());
+  ck('a cancelled drag changes nothing', ordNow()==='__main__,b2,b3,__chat__,b1', ordNow());
   ck('no drag styling survives the cancel', !d.querySelector('#projInjList .armed, #projInjList .dragging, #projInjList .drop-target'));
 }
 
