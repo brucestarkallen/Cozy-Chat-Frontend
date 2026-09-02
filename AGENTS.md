@@ -12,7 +12,7 @@ worker, `install.sh` the Termux installer, `tests/` the gate.
     done
     bash tests/installtest.sh
 
-1488 checks as of v5.21.0, measured from real output.
+1477 checks as of v5.22.0, measured from real output.
 
 `tests/inerttest.js` is in the loop but prints SKIP without a second checkout
 to compare against. It answers the question a passing gate does not: whether a

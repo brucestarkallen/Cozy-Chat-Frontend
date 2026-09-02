@@ -153,7 +153,8 @@ console.log('\n=== 7. EFFORT PICKER UI ===');
   ev(w,d.querySelector('#settingsBtn'),'click');
   d.querySelectorAll('.tab')[1].dispatchEvent(new w.Event('click',{bubbles:true}));
   ck('saved level highlighted', d.querySelector('#effortSeg button.on').dataset.effort==='medium');
-  ck('four levels offered', d.querySelectorAll('#effortSeg button').length===4);
+  ck('the levels this connection can say are offered', Array.from(d.querySelectorAll('#effortSeg button')).map(b=>b.dataset.effort).join(',')==='off,low,medium,high,xhigh,max',
+     Array.from(d.querySelectorAll('#effortSeg button')).map(b=>b.dataset.effort).join(','));
   d.querySelector('[data-effort="high"]').dispatchEvent(new w.Event('click',{bubbles:true}));
   ck('tapping changes it', w.eval('S.effort')==='high');
   ck('highlight follows', d.querySelector('#effortSeg button.on').dataset.effort==='high');

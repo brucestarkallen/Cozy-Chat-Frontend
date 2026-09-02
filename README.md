@@ -187,15 +187,17 @@ Tap **Test** before saving.
   an unparseable edit block is re-sent as valid JSON without you asking.
 
 **Projects** (sidebar → **+ Project**)
-- A project groups chats and gives them shared ground: its own **instructions**,
-  an **instruction set** for new chats born inside it, and **project files** every
-  chat in it can read — and the assistant can edit.
+- A project groups chats and gives them shared ground: its own **instructions** —
+  as many blocks as you like, each named and toggleable, dragged into the order
+  they send in — an **instruction set** for new chats born inside it, and
+  **project files** every chat in it can read — and the assistant can edit.
 - Chats in a project sit under its own heading in the sidebar; **+** on the
   heading starts a chat there, **✎** opens the project's settings.
 - Move any chat in or out under Settings → Chat → **Project**.
 - Project instructions are live — edit them once, every chat in the project
-  follows. The instruction set is pinned per chat at creation, the same rule
-  as every other setting.
+  follows. They live on the project itself, so switching instruction sets never
+  touches them. The instruction set is pinned per chat at creation, the same
+  rule as every other setting.
 - Deleting a project never deletes anything else: its chats stay, its files stay.
 
 **Smart context** (retrieval)
@@ -257,9 +259,13 @@ assistant turn is never merged.
 - Shown in a collapsible block
 - Handles models with a separate reasoning field *and* models that write
   `<think>…</think>` inline. The tags never leak into the reply text.
-- **Effort** — Settings → Chat: Off / Low / Medium / High.
-  Every service spells this differently, so the app sends the right shape for
-  each one and works it out from your connection and model name:
+- **Effort** — Settings → Chat. The picker offers what the connection in front
+  of it can say: Off / Low / Medium / High everywhere, plus the rungs newer
+  models added above High — XHigh and Max on Claude and recent OpenAI models,
+  Max on GLM. A level saved on one connection is spoken as the nearest thing
+  another can say, never a name it would reject. Every service spells this
+  differently, so the app sends the right shape for each one and works it out
+  from your connection and model name:
 
 | Service | What gets sent |
 |---|---|
@@ -576,14 +582,15 @@ network-first, so a refresh always gets the newest version.
 | `send()` | Sends and reads the streaming reply |
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
-**Tests.** Everything in `tests/` — `v519test.js` down to `v2test.js`, plus
+**Tests.** Everything in `tests/` — `v5220test.js` down to `v2test.js`, plus
 `searchtest.js`, `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`,
 `swtest.js`, `scrolltest.js`, `styletest.js`, `hiddentest.js`,
 `coherencetest.js` and `installtest.sh` — runs under Node with jsdom
 (`npm i jsdom fake-indexeddb`).
-1488 checks across the matching engine, JSON tolerance, prompt assembly,
+1477 checks across the matching engine, JSON tolerance, prompt assembly,
 multi-block replies, proposal supersede, undo truth, button visibility,
-projects, retrieval, streaming, SSE framing and Hermes tool activity,
+projects and their instruction blocks, per-connection effort ladders,
+retrieval, streaming, SSE framing and Hermes tool activity,
 stream/chat binding, touch reorder, reader-owned scrolling, backup
 round-trips, migration, prefill on every wire shape, model-decided search, and
 negative tests that deliberately reintroduce fixed bugs to prove the guards
