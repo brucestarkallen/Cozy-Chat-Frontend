@@ -60,7 +60,7 @@ console.log('=== 1. A PROJECT\'S OLD TEXT BECOMES ITS FIRST BLOCK, WIRE UNCHANGE
   const shape=w.eval('JSON.stringify({inj:S.projects[0].injections,order:S.projects[0].order,old:"instructions" in S.projects[0]})');
   const sh=JSON.parse(shape);
   ck('the text migrated into one named block', sh.inj.length===1 && sh.inj[0].text==='PROJECT LAW: stay in canon.' && sh.inj[0].enabled===true);
-  ck('with an order holding it', sh.order.length===1 && sh.order[0]===sh.inj[0].id);
+  ck('with an order holding it before the conversation marker', sh.order.length===2 && sh.order[0]===sh.inj[0].id && sh.order[1]==='__chat__', sh.order.join(','));
   ck('and the old field is gone', sh.old===false);
   w.eval('newConvo()'); // outside the project
   w.eval('current.messages.push({id:uid(),role:"user",content:"hi",ts:Date.now()})');
@@ -114,8 +114,8 @@ console.log('=== 4. THE EDITOR: RENDER, ADD, ARROWS, TOGGLE, RENAME, DELETE ==='
     order:["b1","b2","b3"]}];
     saveSettings(); openProjEditor("pr1");`);
   await sleep(60);
-  ck('every block renders a row', d.querySelectorAll('#projInjList [data-row]').length===3);
-  ck('every row has a grip', d.querySelectorAll('#projInjList [data-grip]').length===3);
+  ck('every block renders a row, plus the conversation marker', d.querySelectorAll('#projInjList [data-row]').length===4);
+  ck('every row has a grip', d.querySelectorAll('#projInjList [data-grip]').length===4);
   ev(w,d.querySelector('#projAddInjBtn'),'click'); await sleep(40);
   ck('add makes a block and opens it for editing', w.eval('S.projects[0].injections.length')===4
       && !!d.querySelector('#projInjList .ord-editor [data-pinjname]'));
@@ -169,19 +169,19 @@ console.log('=== 5. DRAG REORDERS THE PROJECT\'S LIST, SAME GESTURE AS THE SET\'
   g.dispatchEvent(pev(w,'pointermove',150));
   ck('the drop slot highlights mid-drag', !!d.querySelector('#projInjList .drop-target'));
   g.dispatchEvent(pev(w,'pointerup',150));
-  ck('released below the rest, it lands last', ordNow()==='b2,b3,b1', ordNow());
+  ck('released below the rest, it lands last', ordNow()==='b2,b3,__chat__,b1', ordNow());
   // a tap on the grip is a no-op
   layout(w,'#projInjList');
   const g2=d.querySelector('#projInjList [data-grip="b2"]');
   g2.dispatchEvent(pev(w,'pointerdown',20)); g2.dispatchEvent(pev(w,'pointerup',20));
-  ck('a tap moves nothing', ordNow()==='b2,b3,b1', ordNow());
+  ck('a tap moves nothing', ordNow()==='b2,b3,__chat__,b1', ordNow());
   // a cancelled pointer leaves the order alone
   layout(w,'#projInjList');
   const g3=d.querySelector('#projInjList [data-grip="b3"]');
   g3.dispatchEvent(pev(w,'pointerdown',60));
   g3.dispatchEvent(pev(w,'pointermove',5));
   g3.dispatchEvent(pev(w,'pointercancel',5));
-  ck('a cancelled drag changes nothing', ordNow()==='b2,b3,b1', ordNow());
+  ck('a cancelled drag changes nothing', ordNow()==='b2,b3,__chat__,b1', ordNow());
   ck('no drag styling survives the cancel', !d.querySelector('#projInjList .armed, #projInjList .dragging, #projInjList .drop-target'));
 }
 

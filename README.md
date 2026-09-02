@@ -188,9 +188,10 @@ Tap **Test** before saving.
 
 **Projects** (sidebar → **+ Project**)
 - A project groups chats and gives them shared ground: its own **instructions** —
-  as many blocks as you like, each named and toggleable, dragged into the order
-  they send in — an **instruction set** for new chats born inside it, and
-  **project files** every chat in it can read — and the assistant can edit.
+  a full instruction set's worth of blocks, named and toggleable, sent as any
+  role, ordered around the conversation marker or woven in at a depth — an
+  **instruction set** for new chats born inside it, and **project files** every
+  chat in it can read — and the assistant can edit.
 - Chats in a project sit under its own heading in the sidebar; **+** on the
   heading starts a chat there, **✎** opens the project's settings.
 - Move any chat in or out under Settings → Chat → **Project**.
@@ -586,12 +587,12 @@ network-first, so a refresh always gets the newest version.
 | `send()` | Sends and reads the streaming reply |
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
-**Tests.** Everything in `tests/` — `v5221test.js` down to `v2test.js`, plus
+**Tests.** Everything in `tests/` — `v5230test.js` down to `v2test.js`, plus
 `searchtest.js`, `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`,
 `swtest.js`, `scrolltest.js`, `styletest.js`, `hiddentest.js`,
 `coherencetest.js` and `installtest.sh` — runs under Node with jsdom
 (`npm i jsdom fake-indexeddb`).
-1516 checks across the matching engine, JSON tolerance, prompt assembly,
+1539 checks across the matching engine, JSON tolerance, prompt assembly,
 multi-block replies, proposal supersede, undo truth, button visibility,
 projects and their instruction blocks, per-connection effort ladders with
 self-healing levels, retrieval, streaming, SSE framing and Hermes tool activity,
