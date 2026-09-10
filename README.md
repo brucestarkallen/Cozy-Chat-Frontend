@@ -227,6 +227,14 @@ Drag by the handle, or use the arrows.
 the chat; anything below it is sent after, right before the reply. The main
 system prompt is an item too, so it can be moved like anything else.
 
+**Never forget** (Settings → Instructions, and per project). The top of a long
+conversation is where instructions go to be forgotten — a persona 50,000
+tokens back is a persona in name only. This re-sends the standing instructions
+near the newest message every turn, at a depth you choose: the main prompt
+alone, or everything above the chat. Off is free; the hint and the context
+meter both count what the copy costs. (The same trick the big chat apps use to
+keep a persona alive — here it's visible and yours to control.)
+
 A block set to **In-chat** ignores the list and slots into the conversation
 itself, at a depth counted back from the newest message — depth 0 sits right
 before the reply, depth 4 sits four messages up. Shallow depths stay in the
@@ -589,12 +597,12 @@ network-first, so a refresh always gets the newest version.
 | `send()` | Sends and reads the streaming reply |
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
-**Tests.** Everything in `tests/` — `v5250test.js` down to `v2test.js`, plus
+**Tests.** Everything in `tests/` — `v5260test.js` down to `v2test.js`, plus
 `searchtest.js`, `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`,
 `swtest.js`, `scrolltest.js`, `styletest.js`, `hiddentest.js`,
 `coherencetest.js` and `installtest.sh` — runs under Node with jsdom
 (`npm i jsdom fake-indexeddb`).
-1634 checks across the matching engine, JSON tolerance, prompt assembly,
+1657 checks across the matching engine, JSON tolerance, prompt assembly,
 multi-block replies, proposal supersede, undo truth, button visibility,
 projects and their instruction blocks, per-connection effort ladders with
 self-healing levels, retrieval, streaming, SSE framing and Hermes tool activity,
