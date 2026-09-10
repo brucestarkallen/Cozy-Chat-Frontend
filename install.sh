@@ -204,4 +204,5 @@ esac
 warn "Heads up: a browser keeps separate storage per address, so the local"
 warn "copy at http://127.0.0.1:$PORT/ starts empty even if you have chats on"
 warn "the github.io version. To bring them over: open the old one, Back up,"
-warn "then open the local one and Restore."
+warn "then open the local one and Restore. From then on the disk copy"
+warn "(cozy-vault.json) keeps them — clearing the browser can't take them."

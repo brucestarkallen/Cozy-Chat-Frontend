@@ -589,12 +589,12 @@ network-first, so a refresh always gets the newest version.
 | `send()` | Sends and reads the streaming reply |
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
-**Tests.** Everything in `tests/` — `v5243test.js` down to `v2test.js`, plus
+**Tests.** Everything in `tests/` — `v5250test.js` down to `v2test.js`, plus
 `searchtest.js`, `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`,
 `swtest.js`, `scrolltest.js`, `styletest.js`, `hiddentest.js`,
 `coherencetest.js` and `installtest.sh` — runs under Node with jsdom
 (`npm i jsdom fake-indexeddb`).
-1603 checks across the matching engine, JSON tolerance, prompt assembly,
+1634 checks across the matching engine, JSON tolerance, prompt assembly,
 multi-block replies, proposal supersede, undo truth, button visibility,
 projects and their instruction blocks, per-connection effort ladders with
 self-healing levels, retrieval, streaming, SSE framing and Hermes tool activity,
@@ -685,5 +685,16 @@ Conversations and files live in IndexedDB, settings and keys in localStorage. No
 uploaded anywhere — requests go straight from your phone to whichever service
 you connected.
 
-Clearing Chrome's site data wipes it, so use **Back up** now and then — one
-file carrying every chat, file, and setting.
+**Served from Termux, nothing can wipe you out.** The little server also keeps
+`cozy-vault.json` on disk — every change is mirrored there within a second or
+two, same shape as a backup file. Clear Chrome's site data, switch browsers,
+reinstall Chrome: open Cozy again and everything is simply back, restored from
+disk. An intentional delete-all empties the vault too (your choice is
+respected), while a wiped browser can never overwrite it (the app refuses to
+mirror an empty state that still has no settings). Updates never touch the
+file — that is covered by the install test, not by hope.
+
+Anywhere else (github.io, any static host), there is no server and no disk
+copy — the app makes no vault requests at all, and clearing Chrome's site
+data wipes everything, so use **Back up** now and then — one file carrying
+every chat, file, and setting, restorable anywhere.

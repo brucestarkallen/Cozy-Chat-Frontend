@@ -34,6 +34,22 @@ code=$(curl -s -o /dev/null -w "%{http_code}" -H "If-Modified-Since: Wed, 01 Jan
 [ "$code" = "200" ] && ok "no 304, so a browser cannot hold a stale copy" || bad "got $code"
 cozy status 2>/dev/null | grep -q "v2.0.0" && ok "status shows the version on disk" || bad "status wrong"
 
+echo "--- the vault endpoint ---"
+curl -s --max-time 3 http://127.0.0.1:8803/index.html | grep -q 'name="cozy-vault"' && ok "the served page advertises the vault" || bad "no vault tag in the served page"
+grep -q 'name="cozy-vault"' "$COZY_DIR/index.html" && bad "the tag leaked into the file on disk" || ok "the file on disk stays clean"
+code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 http://127.0.0.1:8803/api/vault)
+[ "$code" = "404" ] && ok "no vault yet answers 404" || bad "expected 404, got $code"
+curl -s --max-time 3 -X PUT --data '{"app":"cozy-chat","conversations":[],"docs":[]}' http://127.0.0.1:8803/api/vault | grep -q '"ok": true' && ok "vault accepts a write" || bad "vault refused a write"
+[ -f "$COZY_DIR/cozy-vault.json" ] && ok "and it is on disk next to the app" || bad "no vault file on disk"
+curl -s --max-time 3 http://127.0.0.1:8803/api/vault | grep -q '"app":"cozy-chat"' && ok "and reads back what was written" || bad "no read-back"
+code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 -X PUT --data 'this is not json' http://127.0.0.1:8803/api/vault)
+[ "$code" = "400" ] && ok "garbage is refused" || bad "garbage got $code"
+code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 -X PUT --data '{"x":1}' http://127.0.0.1:8803/api/vault)
+[ "$code" = "400" ] && ok "json that is not a vault blob is refused too" || bad "wrong blob got $code"
+curl -s --max-time 3 http://127.0.0.1:8803/api/vault | grep -q '"app":"cozy-chat"' && ok "the good copy survived both" || bad "a bad write overwrote it"
+cozy update >/dev/null 2>&1
+[ -f "$COZY_DIR/cozy-vault.json" ] && ok "the vault survives an app update (reset --hard)" || bad "an update ate the vault"
+
 echo "--- the launcher updates itself ---"
 sed -i 's/^LAUNCHER_V=2/LAUNCHER_V=3/' "$PREFIX/bin/cozy"   # pretend ours is newer than repo's
 sed -i 's/^LAUNCHER_V=2/LAUNCHER_V=9/' /tmp/upd/origin/install.sh

@@ -22,6 +22,7 @@ self.addEventListener("fetch", e => {
   if (req.method !== "GET") return;
   const url = new URL(req.url);
   if (url.origin !== location.origin) return;   // never touch API traffic
+  if (url.pathname.indexOf("/api/") === 0) return;  // the vault is network, never cache
 
   const isApp = req.mode === "navigate"
     || req.destination === "document"
