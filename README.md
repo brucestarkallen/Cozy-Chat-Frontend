@@ -271,7 +271,7 @@ assistant turn is never merged.
   the effort you picked, Cozy steps down one rung, sends the turn again, and
   caps that connection there — the picker stops offering the refused rung until
   you re-save the connection, which is the cure printed right under it.
-- Shown in a collapsible block
+- Shown in a collapsible block, with a Copy button on the block
 - Handles models with a separate reasoning field *and* models that write
   `<think>…</think>` inline. The tags never leak into the reply text.
 - **Effort** — Settings → Chat. The picker offers what the connection in front
@@ -597,12 +597,12 @@ network-first, so a refresh always gets the newest version.
 | `send()` | Sends and reads the streaming reply |
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
-**Tests.** Everything in `tests/` — `v5260test.js` down to `v2test.js`, plus
+**Tests.** Everything in `tests/` — `v5261test.js` down to `v2test.js`, plus
 `searchtest.js`, `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`,
 `swtest.js`, `scrolltest.js`, `styletest.js`, `hiddentest.js`,
 `coherencetest.js` and `installtest.sh` — runs under Node with jsdom
 (`npm i jsdom fake-indexeddb`).
-1657 checks across the matching engine, JSON tolerance, prompt assembly,
+1665 checks across the matching engine, JSON tolerance, prompt assembly,
 multi-block replies, proposal supersede, undo truth, button visibility,
 projects and their instruction blocks, per-connection effort ladders with
 self-healing levels, retrieval, streaming, SSE framing and Hermes tool activity,
