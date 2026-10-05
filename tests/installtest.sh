@@ -34,30 +34,54 @@ code=$(curl -s -o /dev/null -w "%{http_code}" -H "If-Modified-Since: Wed, 01 Jan
 [ "$code" = "200" ] && ok "no 304, so a browser cannot hold a stale copy" || bad "got $code"
 cozy status 2>/dev/null | grep -q "v2.0.0" && ok "status shows the version on disk" || bad "status wrong"
 
-echo "--- the vault endpoint ---"
-curl -s --max-time 3 http://127.0.0.1:8803/index.html | grep -q 'name="cozy-vault"' && ok "the served page advertises the vault" || bad "no vault tag in the served page"
-grep -q 'name="cozy-vault"' "$COZY_DIR/index.html" && bad "the tag leaked into the file on disk" || ok "the file on disk stays clean"
-code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 http://127.0.0.1:8803/api/vault)
-[ "$code" = "404" ] && ok "no vault yet answers 404" || bad "expected 404, got $code"
-curl -s --max-time 3 -X PUT --data '{"app":"cozy-chat","conversations":[],"docs":[]}' http://127.0.0.1:8803/api/vault | grep -q '"ok": true' && ok "vault accepts a write" || bad "vault refused a write"
-[ -f "$COZY_DIR/cozy-vault.json" ] && ok "and it is on disk next to the app" || bad "no vault file on disk"
-curl -s --max-time 3 http://127.0.0.1:8803/api/vault | grep -q '"app":"cozy-chat"' && ok "and reads back what was written" || bad "no read-back"
-code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 -X PUT --data 'this is not json' http://127.0.0.1:8803/api/vault)
+echo "--- the phone keeps the data ---"
+curl -s --max-time 3 http://127.0.0.1:8803/index.html | grep -q 'name="cozy-store"' && ok "the served page says the phone keeps the data" || bad "no store tag in the served page"
+grep -q 'name="cozy-store"' "$COZY_DIR/index.html" && bad "the tag leaked into the file on disk" || ok "the file on disk stays clean"
+curl -s --max-time 3 http://127.0.0.1:8803/api/store/hello | grep -q "\"dataDir\": \"$HOME/.cozychat\"" && ok "the data lives in ~/.cozychat, outside the app" || bad "wrong data dir" "$(curl -s http://127.0.0.1:8803/api/store/hello)"
+code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 -X PUT -H "X-Cozy-Base: 0" --data '{"id":"t1","title":"kept"}' http://127.0.0.1:8803/api/store/chat/t1)
+[ "$code" = "200" ] && ok "a chat is written" || bad "write got $code"
+[ -f "$HOME/.cozychat/chats/t1.json" ] && ok "as a file on the phone" || bad "no chat file"
+code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 -X PUT -H "X-Cozy-Base: 0" --data '{"id":"t1","title":"stale"}' http://127.0.0.1:8803/api/store/chat/t1)
+[ "$code" = "409" ] && ok "a write from an old revision is refused" || bad "stale write got $code"
+code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 -X PUT -H "X-Cozy-Base: 1" --data 'this is not json' http://127.0.0.1:8803/api/store/chat/t1)
 [ "$code" = "400" ] && ok "garbage is refused" || bad "garbage got $code"
-code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 -X PUT --data '{"x":1}' http://127.0.0.1:8803/api/vault)
-[ "$code" = "400" ] && ok "json that is not a vault blob is refused too" || bad "wrong blob got $code"
-curl -s --max-time 3 http://127.0.0.1:8803/api/vault | grep -q '"app":"cozy-chat"' && ok "the good copy survived both" || bad "a bad write overwrote it"
+curl -s --max-time 3 http://127.0.0.1:8803/api/store/chat/t1 | grep -q '"title":"kept"' && ok "the good copy survived both" || bad "a bad write overwrote it"
 cozy update >/dev/null 2>&1
-[ -f "$COZY_DIR/cozy-vault.json" ] && ok "the vault survives an app update (reset --hard)" || bad "an update ate the vault"
+[ -f "$HOME/.cozychat/chats/t1.json" ] && ok "the chats survive an app update (reset --hard)" || bad "an update ate the chats"
+code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 http://127.0.0.1:8803/.server.pid)
+[ "$code" = "404" ] && ok "the server's own files are not served" || bad ".server.pid got $code"
 
-echo "--- the launcher updates itself ---"
-sed -i 's/^LAUNCHER_V=2/LAUNCHER_V=3/' "$PREFIX/bin/cozy"   # pretend ours is newer than repo's
-sed -i 's/^LAUNCHER_V=2/LAUNCHER_V=9/' /tmp/upd/origin/install.sh
-cd origin && git add -A && git commit -qm three && cd ..
+echo "--- an old server is relit when the launcher rewrites itself ---"
+# exactly the first update from v5.26.1: the running server is the old
+# serve.py (no /api/version), started by the old launcher, and the release
+# rewrites the cozy command too
+git -C "$SRC" show d79dfe9:serve.py > "$COZY_DIR/serve.py"
+cozy restart >/dev/null 2>&1; sleep 1
+code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://127.0.0.1:8803/api/version)
+[ "$code" = "404" ] && ok "an old server is running (it has no /api/version)" || bad "not the old server" "$code"
+sed -i 's/^LAUNCHER_V=3/LAUNCHER_V=4/' "$PREFIX/bin/cozy"      # pretend ours differs from the repo's
+sed -i 's/^LAUNCHER_V=3/LAUNCHER_V=9/' /tmp/upd/origin/install.sh
+echo "# release three" >> /tmp/upd/origin/serve.py
+cd origin && echo '<!-- COZY CHAT v3.0.0 --><h1>three</h1>' > index.html && git add -A && git commit -qm three && cd ..
 cozy >/tmp/upd/r3.log 2>&1; sleep 1
 grep -q "Updating the cozy command itself" /tmp/upd/r3.log && ok "detects its own launcher is stale" || bad "did not self-update" "$(head -4 /tmp/upd/r3.log)"
 grep -q "^LAUNCHER_V=9" "$PREFIX/bin/cozy" && ok "launcher rewritten to the repo version" || bad "launcher not rewritten"
-curl -s --max-time 3 http://127.0.0.1:8803/index.html >/dev/null 2>&1 && ok "still serving after self-update" || bad "broke after self-update"
+grep -q "Updated 2.0.0 -> 3.0.0" /tmp/upd/r3.log && ok "and still reports the update it made" || bad "update line lost across the rewrite" "$(cat /tmp/upd/r3.log)"
+want=$(python3 -c 'import hashlib,sys; print(hashlib.sha1(open(sys.argv[1],"rb").read()).hexdigest()[:12])' "$COZY_DIR/serve.py")
+got=$(curl -s --max-time 3 http://127.0.0.1:8803/api/version | python3 -c 'import json,sys; print(json.load(sys.stdin).get("code",""))' 2>/dev/null)
+[ -n "$want" ] && [ "$want" = "$got" ] && ok "the server running is the serve.py on disk" || bad "old server still serving" "want $want got $got"
+curl -s --max-time 3 http://127.0.0.1:8803/api/store/chat/t1 | grep -q '"title":"kept"' && ok "and it still has the chats" || bad "chats lost across the relight"
+
+echo "--- a server with no pid on record is still the one replaced ---"
+rm -f "$COZY_DIR/.server.pid"
+echo "# release four" >> /tmp/upd/origin/serve.py
+cd origin && echo '<!-- COZY CHAT v4.0.0 --><h1>four</h1>' > index.html && git add -A && git commit -qm four && cd ..
+cozy >/tmp/upd/r4.log 2>&1; sleep 1
+grep -q "already in use" /tmp/upd/r4.log && bad "refused its own orphan" "$(cat /tmp/upd/r4.log)" || ok "an orphan Cozy server does not block the start"
+want=$(python3 -c 'import hashlib,sys; print(hashlib.sha1(open(sys.argv[1],"rb").read()).hexdigest()[:12])' "$COZY_DIR/serve.py")
+got=$(curl -s --max-time 3 http://127.0.0.1:8803/api/version | python3 -c 'import json,sys; print(json.load(sys.stdin).get("code",""))' 2>/dev/null)
+[ "$want" = "$got" ] && ok "the new server answers" || bad "wrong server" "want $want got $got"
+[ -f "$COZY_DIR/.server.pid" ] && kill -0 "$(cat "$COZY_DIR/.server.pid")" 2>/dev/null && ok "and its pid is on record again" || bad "no pid"
 
 pkill -f "serve.py 8803" >/dev/null 2>&1
 [ "$FAILED" = "0" ] && echo "ALL PASS" || echo "FAILURES PRESENT"

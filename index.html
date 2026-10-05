@@ -879,6 +879,30 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
   *{animation-duration:.01ms !important;transition-duration:.01ms !important}
   .thread{scroll-behavior:auto}
 }
+/* ---------- the phone's server is away ---------- */
+.store-banner{padding:9px 16px;background:var(--surface-2);border-bottom:1px solid var(--border);color:var(--ember);font-size:13px;line-height:1.45;flex:none}
+/* ---------- what the model saw ---------- */
+.msg-sent{display:inline-block;margin-top:8px;padding:2px 0;background:none;border:0;color:var(--muted);font:inherit;font-size:12px;cursor:pointer;text-decoration:underline;text-decoration-color:var(--border);text-underline-offset:3px}
+.msg-sent:hover,.msg-sent:focus-visible{color:var(--text-2)}
+.sent-tabs{display:flex;gap:6px;padding:10px 18px 0;flex:none}
+.sent-tab{flex:1;padding:8px 10px;border-radius:10px;border:1px solid var(--border-soft);background:transparent;color:var(--text-2);font:inherit;font-size:13px;cursor:pointer}
+.sent-tab.on{background:var(--surface-2);color:var(--text);font-weight:600;border-color:var(--border)}
+.sent-sub{margin:0 0 12px}
+.sent-foot{margin-top:12px}
+.sent-part{border:1px solid var(--border-soft);border-radius:10px;padding:9px 11px;margin-bottom:8px;background:var(--surface)}
+.sent-row{display:flex;align-items:center;gap:8px}
+.sent-name{flex:1;min-width:0;padding:2px 0;background:none;border:0;color:var(--text);font:inherit;font-size:13.5px;text-align:left;cursor:pointer;overflow-wrap:anywhere}
+.sent-name::before{content:"\25B8";display:inline-block;width:15px;color:var(--muted)}
+.sent-name[aria-expanded="true"]::before{content:"\25BE"}
+.sent-role{flex:1;min-width:0;color:var(--ember);font-size:12.5px;font-weight:600}
+.sent-tok{color:var(--muted);font-size:12px;white-space:nowrap}
+.sent-copy{flex:none;padding:3px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-2);font:inherit;font-size:12px;cursor:pointer}
+.sent-where{margin:3px 0 0 15px;color:var(--muted);font-size:12px}
+.sent-text{margin:8px 0 0;padding:9px 10px;border-radius:8px;background:var(--surface-2);color:var(--text);white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.5;max-height:55vh;overflow:auto}
+.sent-fields{color:var(--text-2)}
+.sent-req{margin-bottom:14px}
+.sent-req-head{display:flex;align-items:center;gap:8px;margin:2px 0 8px;font-size:13px;color:var(--text-2)}
+.sent-req-head span{flex:1;min-width:0;overflow-wrap:anywhere}
 </style>
 </head>
 <body>
@@ -960,6 +984,7 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
         </svg>
       </button>
     </header>
+    <div class="store-banner" id="storeBanner" role="status" hidden></div>
 
     <div class="file-pop" id="filePop">
       <div class="fname" id="fileName"></div>
@@ -1168,7 +1193,7 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
       <div class="row2">
         <div class="field">
           <label class="lbl" for="temp">Temperature</label>
-          <input type="number" id="temp" min="0" max="2" step="0.1" value="1">
+          <input type="number" id="temp" min="0" max="2" step="0.1" placeholder="Service default">
         </div>
         <div class="field">
           <label class="lbl" for="maxTok">Max reply length</label>
@@ -1433,9 +1458,7 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
       </div>
       <div class="field">
         <label class="lbl">Your data</label>
-        <div class="hint" style="margin-bottom:10px">
-          Everything lives on this phone only. Clearing your browser's site data will erase it, so back up now and then.
-        </div>
+        <div class="hint" id="dataHint" style="margin-bottom:10px"></div>
         <div class="btn-row">
           <button class="btn" id="backupBtn2">Back up to a file</button>
           <button class="btn" id="restoreBtn2">Restore from a file</button>
@@ -1611,6 +1634,28 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
   </div>
 </div>
 
+<!-- ============ WHAT THE MODEL SAW ============ -->
+<div class="modal" id="sentModal">
+  <div class="sheet" style="max-width:760px">
+    <div class="sheet-head">
+      <h3>What the model saw</h3>
+      <button class="icon-btn" id="closeSent" aria-label="Close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="sent-tabs" id="sentTabs" role="tablist">
+      <button type="button" class="sent-tab on" data-sentview="normal" role="tab" aria-selected="true">Normal</button>
+      <button type="button" class="sent-tab" data-sentview="raw" role="tab" aria-selected="false">Raw</button>
+    </div>
+    <div class="sheet-body">
+      <div class="hint sent-sub" id="sentSub"></div>
+      <div id="sentNormal"></div>
+      <div id="sentRaw" hidden></div>
+      <div class="hint sent-foot" id="sentFoot"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ============ FULL-SCREEN TEXT ============ -->
 <div class="modal" id="bigModal">
   <div class="sheet" style="max-width:760px">
@@ -1639,10 +1684,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v5.26.1
-   Single file. No build step. Everything stays on your device.
+   COZY CHAT v5.27.0
+   Single file. No build step. Served from Termux, your data lives on the phone.
    ========================================================== */
-const VERSION = "5.26.1";
+const VERSION = "5.27.0";
 const WB_SEED_PROMPT = "You are a worldbook architect for SillyTavern. You build and maintain a WORLDBOOK: the large body of world lore that lives OUTSIDE the Plot Essential (PE) - the encyclopedia to the PE spine. NPCs, locations, factions, history, items, cultures, magic/tech systems.\n\nYou edit the worldbook document through the docedits protocol (find/replace, insert_after, append). The document is ONE JSON array of entry objects. Full entry shape (only name/keys/content/strategy are required; set the rest when you have a reason, otherwise omit and safe defaults apply):\n  {\n    \"name\": \"Short unique title\",\n    \"keys\": [\"keyword\",\"alias\",\"proper noun\"],\n    \"content\": \"The lore text the model reads when this entry fires.\",\n    \"strategy\": \"green\",\n    \"order\": 100,\n    \"position\": \"after_char\",\n    \"depth\": 4,\n    \"probability\": 100,\n    \"comment\": \"optional author note\"\n  }\n\nYOU OWN EVERY FIELD. The user does not hand-tune worldbooks - they trust you to choose the correct setting for each entry from what the entry IS. Never leave a field to a blind default when the entry has a clear need. Reason per entry:\n\nSTRATEGY - how the entry activates:\n- \"blue\" = ALWAYS in context. Only for a few world-spine facts that must never be absent (the setting premise, an active war, the core ruleset). Blue costs permanent tokens, so keep it to a handful. Blue entries may have empty keys.\n- \"green\" = fires when a key appears in recent chat. THE DEFAULT for nearly everything - characters, places, factions, items. Give each a generous, deliberate key list: proper name, aliases, epithets, titles, and the everyday words a scene would use (a general named Aldric of the Iron Legion keys on \"Aldric\", \"Iron Legion\", \"the general\", plus any nickname).\n- \"chain\" = semantic/vector only. Do NOT use alone (invisible when the user has no vectors). Author green with real keys instead; the exporter also makes green entries vector-eligible so they fire on keywords AND semantically when vectors are on. Use bare \"chain\" only if the user says they always run vectors.\n\nORDER - insertion priority when several entries fire together (higher = inserted earlier / wins token budget first). Choose by importance:\n- spine/blue: high (250-350).\n- major recurring characters, central factions: 180-220.\n- ordinary dossiers (a specific NPC, place, item): ~100-150.\n- minor flavour/background: 50-90.\nWhen several entries belong to one set (e.g. King Britannia's 5 generals), give them the SAME order so they rank together, unless one is clearly more important.\n\nPOSITION - where the entry text is inserted. Use the string values:\n- \"before_char\" = before the character definitions ({{wiBefore}}). Good for world/setting/background lore that should frame everything: history, geography, factions, lore the model should read before the character.\n- \"after_char\" = after the character definitions ({{wiAfter}}). THE DEFAULT for most entries - character dossiers, relationships, situational lore that should sit close to the acting character.\n- \"at_depth\" = injected at a specific chat depth (needs \"depth\", default 4). Use for lore that must stay near the most recent messages / act like a nudge, e.g. an active status, a currently-relevant secret, a behavioral reminder. Higher depth = further from the latest message.\nRule of thumb: static world-building -> before_char; who/what is on stage -> after_char; live, must-be-noticed-now -> at_depth.\n\nPROBABILITY - percent chance the entry fires when triggered (default 100). Keep 100 for facts. Lower it only for deliberately intermittent flavour (a rumor that sometimes surfaces, a random event), typically 25-75.\n\nRULES:\n1. ONE TOPIC PER ENTRY. One general, one city, one artifact - never bundle. So \"King Britannia has 5 generals\" = 1 short entry for the king (or the command structure) PLUS 1 entry per general, each with its own name, keys, order, position - not one lumped entry, and not five identical blind ones. Differentiate them (each general's keys, domain, allegiance).\n2. Default green + strong keys. Blue only for true spine (rare). Chain never alone.\n3. If a second attached [FILE] with the PE is present, it is canon: match names, facts, tone, timeline; do not duplicate spine the PE already holds; the worldbook is lore BEYOND the PE. If a background entry becomes spine-critical, say so and suggest moving it into the PE.\n4. \"content\" is what the AI reads at runtime: clean self-contained lore prose, no meta commentary inside it. Split long topics into linked entries.\n5. \"name\" unique in the document.\n6. Keep the document a single valid JSON array at all times: append new entries inside the array, edit one with a surgical find/replace on its text, never break JSON validity.\n7. Empty document -> initialize with an append edit whose replace value is a JSON array (start [] or with the first entries).\n8. Briefly note in prose WHY you chose non-obvious settings (e.g. \"put the active siege at_depth so it stays salient; gave all five generals order 200 so they rank together\").";
 const SC_SEED_PROMPT = "You are the SUMMARYCEPTION MEMORY AUDITOR: auditor and showrunner for a roleplay story's external memory. The [FILE] is a Summaryception MEMORY TRANSPLANT - the complete distilled memory of a long story, exported from the Summaryception extension and re-imported there after your repairs: a notepad of the author's starting canon, a character ledger (one dossier per character), the ordered summary snippets of everything that happened, and pinned verbatim quotes. A separate, stateless Storyteller AI will consume the imported file as its ONLY memory. You are NOT the Storyteller. Never write narrative continuations. Every decision is framed as: \"how do I make this memory serve a fresh Storyteller perfectly?\"\n\nThe user is paying to PLAY, not to manage you. Listen once, act, deliver. One clarification is permitted for genuine ambiguity - two readings that produce different canon. Never ask the same question twice. Never hedge a delivered result; if unsure, run another pass BEFORE delivering. A scoped, named gap is honest; a general disclaimer shifts verification to the user.\n\nFIRST CONTACT: if the user opens without a command (a greeting, \"look at this\", nothing), reply with a FIVE-LINE receipt - counts (snippets / ledger characters / pins / notepad yes-no), a rough token estimate, a one-line health impression, and the command list on one line - then STOP. No edits, no unrequested analysis, no restating file contents. If the [FILE] is empty, say in one line that the transplant export has not been pasted yet (the file editor \u2014 file icon in the top bar) and stop.\n\n=== THE FORMAT (your edits must round-trip through the importer) ===\nThe transplant is Markdown; every item sits between HTML-comment markers carrying a JSON payload. The Summaryception importer re-parses ONLY the markers - section headings (## ...) are for humans, prose between blocks is ignored, and a mistyped marker means silently lost data. Blocks:\n- <!-- SC-TRANSPLANT {...} --> : file meta. Never touch it.\n- <!-- SC-NOTEPAD --> text <!-- /SC-NOTEPAD --> : the author's own STARTING canon, written at the story's start and deliberately never updated as the story progresses. Foundational facts (world rules, identities, backstory) are highest authority; situational details (who is where, current statuses) describe the OPENING state and are expected to be outgrown by the snippets - that is progression, never staleness, never a finding, never something to \"refresh\". Edit only on instruction, or to fix an internal contradiction you can cite from within the notepad itself.\n- <!-- SC-LEDGER {\"name\":\"X\",\"t\":123} --> then CORE: / STATE: / ARC: / THREADS: lines <!-- /SC-LEDGER --> : one character dossier. CORE = who they are (stable identity), STATE = where/what now, ARC = how they changed, THREADS = open hooks. Keep the four field labels; multi-line field content is fine. The name lives in the marker's JSON - a ledger block whose payload is broken or nameless is DROPPED whole by the importer.\n- <!-- SC-SNIPPET {\"turns\":\"12-18\"} --> summary text, optional <!-- SC-DETAIL --> expanded detail, then <!-- /SC-SNIPPET --> : one summary snippet, in story order.\n- <!-- SC-PIN {\"label\":\"...\"} --> quote <!-- /SC-PIN --> : a verbatim quote the author chose to preserve. NEVER reword pin text; delete only on instruction or if its subject was removed.\n- A \"## OPEN CONTINUITY FLAGS\" section, if present, is informational only - the importer does not re-import it; treat its lines as leads for *audit.\n\nMARKER RULES (how the docedits mechanics apply here):\n1. Never alter, reformat, split, or retype a marker line. Edit only the content BETWEEN markers. When a \"find\" must include a marker line, copy it character-for-character, JSON payload included.\n2. DELETE a block = one find/replace whose \"find\" spans from its opening marker through its closing marker inclusive, \"replace\": \"\". Never leave an opener without its closer or a closer without its opener.\n3. ADD a snippet = insert_after whose anchor ENDS at the preceding snippet's closing marker: copy that snippet's final body line PLUS the <!-- /SC-SNIPPET --> line under it as one multi-line anchor (the body line makes it unique - closer lines alone repeat across the file and will not match uniquely). The \"replace\" is one COMPLETE new block: opener (use {\"turns\":\"?\"} when the source turns are unknown), text, closer. To add before the first snippet, anchor on the \"## MEMORY SNIPPETS\" heading line instead. Use the same technique to add a ledger character or a pin inside its own section.\n4. MERGE snippets = one find/replace spanning from the first block's opener through the last block's closer, replaced by ONE complete block whose text carries the combined substance and whose turns cover the combined span.\n5. NEVER write commentary, tags, notes, or reasoning inside any block. The data must read as if it was always this clean. Findings, evidence, and change reports go in your chat prose, never in the document. (Deliverable purity.)\n6. The extension verifies marker integrity deterministically (the Check button) - never re-print the document to prove your edits are safe, and never use an edit as a way to \"show\" the user something.\n\n=== MANDATES (priority order) ===\nM-RECORD (record-only, anti-fabrication). You repair and reorganize what the memory contains. You do NOT invent events, motives, psychology, consequences, or connections - not even to justify a cut or a merge. Two connected facts are not automatically dependent. When in doubt: it is not in the memory, so it does not exist. Fix by correction, removal, or reorganization; add content only on explicit user instruction.\nM-EPISTEMIC (knowledge needs a pathway). No character entry may contain knowledge that character has no recorded way of possessing. Flag and fix entries where a dossier \"knows\" another character's secret, an off-screen event, or the protagonist's hidden identity without a discoverable pathway in the snippets. Do not invent a pathway to launder the leak - remove the knowledge instead.\nM-SCAN (disease scan, anti-whack-a-mole). Any error found - by you or by the user - names a CLASS. Scan the ENTIRE file for every instance of that class and fix all of them in one pass, then show scan evidence (what was scanned, how many found/fixed). Fixing only the named instance is a critical failure. Classes that recur in memory files: wrong numbers (ages, counts, distances); wrong titles/ranks; wrong attribution (deeds, scars, signature items assigned to the wrong character); reversed causality; stale state (a STATE that elapsed events have invalidated - after every major event ask what it made true and false everywhere else); ledger-vs-snippet contradiction; snippet-vs-snippet timeline conflict; editorial contamination (moral judgments or psychoanalysis in CORE the story never established); protagonist reactions preloaded inside NPC dossiers; \"doesn't know X\" filler that restates the epistemic rule instead of marking a real plot gap; defensive padding (\"to ensure\", \"so that\") left by past fixes; compression damage (subject/object swapped, dialogue stripped of the context that gave it meaning).\nM-EYE (the expert eye). Every reply contains: (1) what was asked, done; (2) what you found while in there; (3) evidence the scan happened. If a find-and-replace could have produced your reply, the thinking is not finished.\nM-TAGS (chat discipline). In analysis, tag claims [CANON] (quotable from the file), [INFERENCE] (derived, reasoning shown), or [SPECULATION] (labeled guess). Never mix them unmarked. Inside the document itself, no tags ever.\n\n=== COMMANDS ===\n*audit - full review, REPORT ONLY: no docedits block at all. Read everything, then report: contradictions, epistemic leaks, stale states, attribution errors, timeline conflicts, weirdness, poor-decision patterns worth the author's eye - each with [file evidence], severity, and the proposed fix. End with a verdict: what is healthy, what needs *fix, whether *cleanup is warranted.\n*fix - apply the audit. Execute every fix from the most recent *audit (or run one silently first) as surgical docedits, and report the changes with scan evidence.\n*cleanup - the showrunner pass, for stories grown cluttered or convoluted. Three phases; NEVER any edits before approval:\n  Phase 1, DIRECTOR'S READ (diagnosis, no edits): the throughline (what the story is about right now, 1-2 lines); the cold-read test (where exactly would a fresh Storyteller get lost?); broken coherence (contradictions and unmotivated jumps, each with a proposed fix); what is missing, split into \"I can propose\" vs \"only the author can answer\" - ASK the latter, never invent; the motivation check (does every key action have a planted motive?).\n  Phase 2, the manifest, two separately approvable layers. DECLUTTER (safe, subtractive): classify every element SPINE (2-5 core arcs - \"if this vanished, would the author start a new story?\" - untouchable) / SUPPORT (reinforces a spine arc - keep, compress, make the connection explicit) / TEXTURE (world-feel driving no arc - absorb into one broad-stroke entry) / NOISE (dead-end hooks, orphaned setups, minor characters with no future - remove, patch downstream references). RESHAPE (restructuring): untangle knotted threads into clean sequence; merge arcs doing the identical narrative job; resolve or park dangling threads in one line; re-sequence where chronology allows; cut decorative callbacks, keep load-bearing ones.\n  Phase 3, execute the approved scope ONLY, as docedits. Safeguards: the showrunner test (\"would a good showrunner cut this in the writers' room?\") - remove confusion and junk, not richness; a rich story keeps its B-plots and quiet beats. Unsure whether texture or junk: keep and flag. If knowledge from a texture moment feeds a spine arc, it is SUPPORT. \"Keep it\" from the author = kept, zero pushback - attachment IS value.\n*optimize - bulletproof token reduction with ZERO information loss. The goal is not \"smaller file\"; it is \"smaller file with nothing gone\". If both cannot be achieved, zero loss wins - a longer file with every detail beats a tighter one missing a dialogue beat the author wanted. Cut only filler, redundancy, and loose expression. PRESERVE unconditionally: every action, every name, every number (ages, counts, distances, dates, money), every causal chain, every relationship shift, every revelation/leverage/setup, every dialogue line that shifted power or is referenced later, every mature content beat (never euphemize), every named system WITH its mechanism.\n  The Human Memory Test governs every borderline cut: telling this story to a friend from memory, would you include it? Moments that made a character FEEL something, lines that shifted power, HOW someone won: never cut. Logistics, staging, transitions: cut freely.\n  The 4-Question Test on EVERY sentence before it dies: 1. Removed - could the Storyteller now generate something contradictory? KEEP. 2. Removed - vague where specificity matters? KEEP. 3. Removed - does a later entry stop making sense? KEEP. 4. Removed - nothing about Storyteller behavior changes? CUT.\n  Techniques, applied IN THIS ORDER (each runs on the previous one's output; when a guardrail fires, the content stays):\n  1. SEQUENTIAL AGGREGATION - consecutive snippets sharing actor, place, and time-window with no load-bearing beat between them merge into one entry keeping all facts and the combined span. Guardrail: a snippet containing a power-shifting line, a relationship shift, a revelation, a causal link, or a growth milestone stays as its own entry - only the truly routine merge.\n  2. REFERENCE STRIPPING - the ledger holds identity; snippets hold action. Strip identity re-descriptions (age, rank, traits, appearance) from snippets when the ledger already carries them. Guardrail: a character's first appearance keeps its introduction.\n  3. DIALOGUE SURROUND COMPRESSION - keep the load-bearing line VERBATIM; compress the staging exchange around it into one action beat. Load-bearing means: shifted power, established leverage, caused a visible reaction, is referenced later, or revealed information.\n  4. EMOTIONAL TEXTURE COMPRESSION - long emotional prose becomes label + cause (\"felt dread as he walked away - third time\"). Guardrail: a FIRST-time emotion, or one contradicting the character's CORE plot-relevantly, keeps its full texture.\n  5. SPATIAL/STAGING COMPRESSION - travel becomes origin to destination + anything significant en route. Guardrail: an encounter, observation, or realization during the travel stays as its own beat.\n  6. CAUSAL CHAIN NOTATION - multi-step strategies compress to arrow notation keeping every concrete lever: \"scouts -> blocked pass -> burning depot (urgency) -> archer bait -> cavalry flank\". Guardrail: the mechanism of each step must remain inferable; \"plan -> executed -> won\" is loss, not compression.\n  7. REDUNDANT RESTATEMENT STRIPPING - if a ledger field restates what a snippet already records (or vice versa), the source of truth keeps it and the restatement keeps only what the other could not convey.\n  8. NOTATION COMPRESSION - last, pure notation tightening with zero information content (filler transitions, double-framing, restated headers). Guardrail: never introduce parsing ambiguity; marker lines are untouchable.\n  ZERO-LOSS VERIFICATION (mandatory, after all techniques - \"same entry count\" is the WRONG test, aggregation reduces count by design). Verify instead: every load-bearing dialogue line present verbatim; every relationship shift still captured; every causal chain's mechanism inferable; every named character still appears; every scale-defining number present; every revelation/leverage/setup described; every mature beat present un-euphemized; the causal web still lets a reader reconstruct what happened, why, and what it changed. ANY check fails: the compression was not smart enough - restore the missing content and re-compress without losing it. Report estimated tokens before/after and the verification result as scan evidence.\n*brief - write a short handoff paragraph IN CHAT (no docedits, never in the document) telling a fresh Storyteller where the story stands and what is in motion, for use as the first message of a new session.\nFree-form (\"change X\", \"retcon Y\", \"Alaric should never have learned Z\") - the minimal correct edit, then the M-SCAN class pass across the whole file, then the edits.\n\n=== HOW YOU DELIVER ===\nYou never output the file and never produce downloads - the extension applies your docedits as reviewable diff cards with undo, and the user exports/imports the document themselves. Prefer several surgical edits (the author reviews each one) over rewrites. \"replace_all\" is permitted ONLY for *optimize and an approved full-scope *cleanup - those commands ARE the user explicitly requesting a full rewrite - and its \"replace\" must then be the COMPLETE document with every kept block present: never a diff, never \"unchanged sections omitted\", never \"rest as before\" - an omitted block is a silently deleted block.\nIn chat alongside the edits: the change report - what changed and why, scan evidence, estimated token delta when size changed. Reference content by character name or snippet turns plus a SHORT quote; never paste whole snippets or dossiers into the report; never echo the document back; never re-explain these instructions; never ask whether to proceed on a command already given. Every token you print is the user's budget: spend it on findings and fixes, not narration.";
 
@@ -1759,7 +1804,7 @@ function applyReasoning(body, p, c, force){
   if (style === "anthropic-budget"){
     if (eff === "off") return;
     const budget = { low:2048, medium:8192, high:24576 }[eff];
-    const max = chatMaxTok();
+    const max = chatMaxTok(c);
     body.thinking = { type:"enabled", budget_tokens: Math.max(1024, Math.min(budget, max - 512)) };
     if (body.max_tokens <= body.thinking.budget_tokens) body.max_tokens = body.thinking.budget_tokens + 1024;
     return;
@@ -1783,8 +1828,20 @@ function applyReasoning(body, p, c, force){
   if (eff !== "off") body.reasoning_effort = eff;
 }
 
+/* ---------- where the data lives ----------
+   Served by its own Termux server (serve.py), Cozy keeps nothing in the
+   browser: chats, files and settings live on the phone in ~/.cozychat, and
+   every browser that opens the app reads and writes the same files - the way
+   SillyTavern keeps its data. The server says so in the page it serves.
+   Anywhere else (github.io, any static host) there is no phone to keep them,
+   and the browser's own storage is the only home there is. A page carrying
+   the old vault tag was served by a server from before this release. */
+const STORE_MODE = document.querySelector('meta[name="cozy-store"]') ? "device"
+  : document.querySelector('meta[name="cozy-vault"]') ? "stale" : "browser";
+const DEVICE = STORE_MODE === "device";
+
 /* ---------- IndexedDB ---------- */
-const DB = (() => {
+const IDB = (() => {
   let dbp = null;
   function open(){
     if (dbp) return dbp;
@@ -1806,10 +1863,7 @@ const DB = (() => {
     return new Promise((res, rej) => {
       const t = db.transaction(name, mode), st = t.objectStore(name);
       let out; try { out = fn(st); } catch(e){ rej(e); return; }
-      t.oncomplete = () => {
-        if (mode === "readwrite" && typeof vaultTouch === "function") vaultTouch();
-        res(out && out.result !== undefined ? out.result : out);
-      };
+      t.oncomplete = () => res(out && out.result !== undefined ? out.result : out);
       t.onerror = () => rej(t.error);
       t.onabort  = () => rej(t.error || new Error("storage transaction aborted"));
     });
@@ -1826,27 +1880,557 @@ const DB = (() => {
   };
 })();
 
+/* ==========================================================
+   THE PHONE KEEPS THE DATA
+   On the phone (DEVICE), every chat, file and the settings are records on
+   the phone, each with a revision number. A save sends the record with the
+   revision it was made from; the phone refuses a write from a tab that fell
+   behind (409, with what it holds) and the two are merged here - never by
+   dropping either side. Every change is announced to every open tab, so a
+   second browser shows the first one's chats without a reload. When the
+   phone's server is away (Android can stop Termux), changes wait in a small
+   journal in this browser and are written the moment it is back.
+   ========================================================== */
+/* cyrb53 - a fast 53-bit hash */
+function hash53(str, seed){
+  let h1 = 0xdeadbeef ^ (seed || 0), h2 = 0x41c6ce57 ^ (seed || 0);
+  for (let i = 0; i < str.length; i++){
+    const ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return 4294967296 * (2097151 & h2) + (h1 >>> 0);
+}
+const jsonEq = (a, b) => JSON.stringify(a === undefined ? null : a) === JSON.stringify(b === undefined ? null : b);
+const isObj = v => !!v && typeof v === "object" && !Array.isArray(v);
+const isIdList = v => Array.isArray(v) && v.every(e => isObj(e) && typeof e.id === "string");
+/* Base, this tab, the phone: whatever only one side changed, that side's
+   value; a list of things with ids is merged thing by thing; what both
+   changed differently goes to this tab, the latest hand on it. */
+function merge3(B, L, R){
+  B = isObj(B) ? B : {}; L = isObj(L) ? L : {}; R = isObj(R) ? R : {};
+  const out = {};
+  const keys = new Set(Object.keys(B).concat(Object.keys(L), Object.keys(R)));
+  for (const k of keys){
+    const b = B[k], l = L[k], r = R[k];
+    const lc = !jsonEq(l, b), rc = !jsonEq(r, b);
+    let v;
+    if (!lc) v = r;
+    else if (!rc) v = l;
+    else if (isIdList(l) && isIdList(r) && (b === undefined || isIdList(b))) v = mergeById(b || [], l, r);
+    else if (isObj(l) && isObj(r)) v = merge3(isObj(b) ? b : {}, l, r);
+    else v = l;
+    if (v !== undefined) out[k] = v;
+  }
+  return out;
+}
+function mergeById(B, L, R){
+  const map = list => { const m = new Map(); for (const e of list) m.set(e.id, e); return m; };
+  const bm = map(B), lm = map(L), rm = map(R);
+  const order = L.map(e => e.id).concat(R.map(e => e.id).filter(id => !lm.has(id)));
+  const out = [];
+  for (const id of order){
+    const b = bm.get(id), l = lm.get(id), r = rm.get(id);
+    if (l && r) out.push(jsonEq(l, b) ? r : jsonEq(r, b) ? l : merge3(b || {}, l, r));
+    else if (l){ if (!(b && jsonEq(l, b))) out.push(l); }   // gone there: kept only if changed here
+    else if (r){ if (!(b && jsonEq(r, b))) out.push(r); }   // gone here: kept only if changed there
+  }
+  return out;
+}
+/* A chat both tabs changed. If one side's messages are the other's carried
+   further, that is the chat; otherwise each wrote different messages, and
+   the answer is null - both are kept, never blended. */
+function mergeChat(L, R){
+  const lm = Array.isArray(L.messages) ? L.messages : [], rm = Array.isArray(R.messages) ? R.messages : [];
+  const head = (a, b) => a.length <= b.length && a.every((m, i) => jsonEq(m, b[i]));
+  if (head(rm, lm)) return Object.assign({}, R, L);
+  if (head(lm, rm)) return Object.assign({}, R, L, { messages: rm });
+  return null;
+}
+function mergeFile(L, R){
+  if (String(L.text) === String(R.text)) return Object.assign({}, R, L, { text: R.text });
+  return null;
+}
+function copyOf(kind, local){
+  const copy = Object.assign({}, local, { id: uid(), updatedAt: Date.now() });
+  if (kind === "chat") copy.title = (local.title || "Chat") + " (this browser's copy)";
+  else copy.name = String(local.name || "file").replace(/(\.[^.]*)?$/, " (this browser's copy)$1");
+  return copy;
+}
+function adoptInPlace(target, data){
+  for (const k of Object.keys(target)) if (!(k in data)) delete target[k];
+  return Object.assign(target, data);
+}
+
+/* Changes the phone could not take yet. Only ever written while its server
+   is away, emptied the moment it takes them. */
+const Journal = (() => {
+  let dbp = null;
+  function open(){
+    if (dbp) return dbp;
+    dbp = new Promise((res, rej) => {
+      const r = indexedDB.open("cozychat-journal", 1);
+      r.onupgradeneeded = () => { const db = r.result; if (!db.objectStoreNames.contains("pending")) db.createObjectStore("pending", { keyPath:"k" }); };
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => { dbp = null; rej(r.error); };
+    });
+    return dbp;
+  }
+  async function run(mode, fn){
+    const db = await open();
+    return new Promise((res, rej) => {
+      const t = db.transaction("pending", mode), st = t.objectStore("pending");
+      let out; try { out = fn(st); } catch(e){ rej(e); return; }
+      t.oncomplete = () => res(out && typeof out === "object" && "readyState" in out ? out.result : out);
+      t.onerror = () => rej(t.error); t.onabort = () => rej(t.error);
+    });
+  }
+  return {
+    put: (k, job, base, sbase) => run("readwrite", st => st.put({ k:k, kind:job.kind, id:job.id, op:job.op || "put",
+      body:job.body, base:base || 0, sbase:sbase || null, ts:Date.now() })).catch(() => {}),
+    del: k => run("readwrite", st => st.delete(k)).catch(() => {}),
+    all: () => run("readonly", st => st.getAll())
+  };
+})();
+
+const Device = (() => {
+  /* not uid(): this runs while the page is still loading, before uid exists */
+  const client = "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  const rev = { chat:{}, file:{}, settings:{} };
+  const queue = new Map(), busy = new Set(), deletes = new Set(), mine = new Set();
+  let ready = false, down = false, why = "", probe = null, info = null, es = null, first = null, syncing = null, moved = null;
+  let settingsBase = null;
+  const key = (kind, id) => kind + "/" + id;
+  const at = (kind, id) => "api/store/" + kind + "/" + encodeURIComponent(id);
+  const hdr = base => ({ "content-type":"application/json", "x-cozy-base":String(base || 0), "x-cozy-client":client });
+  async function getJson(u){
+    const r = await fetch(u, { cache:"no-store" });
+    if (!r.ok) throw new Error(u + " answered " + r.status);
+    return r.json();
+  }
+
+  function banner(){
+    const b = document.getElementById("storeBanner");
+    if (!b) return;
+    b.hidden = !down;
+    if (!down) return;
+    const n = queue.size + busy.size + deletes.size;
+    b.textContent = why
+      ? "Cozy's server on this phone couldn't save (" + why + "). " + (n === 1 ? "1 change is" : n + " changes are") + " waiting here, and it keeps trying."
+      : "Cozy's server on this phone isn't answering. Start it with cozy in Termux \u2014 "
+        + (n ? (n === 1 ? "the change waiting here saves" : "the " + n + " changes waiting here save") : "this page reconnects")
+        + " the moment it's back.";
+  }
+  function setDown(reason){
+    why = reason || ""; down = true; banner();
+    if (probe) return;
+    probe = setInterval(async function(){
+      try { await getJson("api/store/hello"); } catch(_) { return; }
+      clearInterval(probe); probe = null; down = false; why = ""; banner();
+      for (const k of Array.from(deletes)) dropNow(k);
+      for (const k of Array.from(queue.keys())) flush(k);
+      resync();
+    }, 2500);
+  }
+
+  /* ---- one record ---- */
+  function put(kind, id, obj){
+    const k = key(kind, id), job = { kind:kind, id:id, body:JSON.stringify(obj) };
+    queue.set(k, job);
+    deletes.delete(k);
+    if (down){ Journal.put(k, job, rev[kind][id] || 0, kind === "settings" ? settingsBase : null); banner(); }
+    else flush(k);
+    return Promise.resolve();
+  }
+  async function flush(k){
+    if (down || busy.has(k) || !queue.has(k)) return;
+    const job = queue.get(k);
+    queue.delete(k); busy.add(k);
+    const base = job.base != null ? job.base : (rev[job.kind][job.id] || 0);
+    try {
+      const res = await fetch(at(job.kind, job.id), { method:"PUT", headers:hdr(base), body:job.body });
+      if (res.status === 200){
+        const j = await res.json();
+        rev[job.kind][job.id] = j.rev;
+        if (job.kind === "settings") settingsBase = job.body;
+        if (!queue.has(k)) Journal.del(k);
+      } else if (res.status === 409){
+        await settle(job, await res.json());
+      } else if (res.status === 410){
+        await lost(job);
+        if (!queue.has(k)) Journal.del(k);
+      } else {
+        let detail = "";
+        try { detail = (await res.json()).error || ""; } catch(_){}
+        const e = new Error("refused"); e.refused = res.status + (detail ? ", " + detail : "");
+        throw e;
+      }
+    } catch (err){
+      if (!queue.has(k)) queue.set(k, job);
+      Journal.put(k, queue.get(k), base, job.kind === "settings" ? (job.sbase || settingsBase) : null);
+      setDown(err && err.refused);
+    } finally {
+      busy.delete(k);
+      if (queue.has(k) && !down) flush(k);
+      banner();
+    }
+  }
+  /* The phone holds a newer version than the one this write was made from. */
+  async function settle(job, cur){
+    rev[job.kind][job.id] = cur.rev;
+    const local = JSON.parse(job.body), there = cur.data;
+    if (job.kind === "settings"){
+      const base = job.sbase != null ? job.sbase : settingsBase;
+      settingsBase = JSON.stringify(there);
+      adoptSettings(merge3(base ? JSON.parse(base) : {}, local, there));
+      put("settings", "main", S);
+      return;
+    }
+    const merged = job.kind === "chat" ? mergeChat(local, there) : mergeFile(local, there);
+    if (merged){
+      put(job.kind, job.id, job.kind === "chat" ? applyChat(merged) : applyFile(merged));
+      if (job.kind === "chat") repaint(job.id);
+      return;
+    }
+    /* Both wrote different words into the same thing. Neither is dropped:
+       the phone keeps what it has, and this browser's version becomes a copy
+       of its own, beside it. */
+    if (job.kind === "chat"){
+      /* This tab's chat becomes the copy - the very object, renamed and
+         re-numbered - so whatever already holds it keeps holding it: the
+         screen, and a reply still streaming into it, which lands in the copy
+         with the message it answers instead of in the other browser's chat
+         without it. The phone's version comes in beside it, untouched. */
+      /* a newer save of this tab's version may already be queued under the
+         old name: it is the copy now, and must not land on the phone's chat */
+      const oldKey = key("chat", job.id);
+      queue.delete(oldKey); Journal.del(oldKey);
+      const live = convos.find(x => x.id === job.id);
+      const copy = copyOf("chat", live || local);
+      if (live){
+        live.id = copy.id; live.title = copy.title; live.updatedAt = copy.updatedAt;
+        if (streaming && streaming.convoId === job.id) streaming.convoId = copy.id;
+      } else convos.unshift(copy);
+      convos.push(there);
+      convos.sort((a, b) => b.updatedAt - a.updatedAt);
+      put("chat", copy.id, live || copy);
+      toast("This chat was changed in another browser too, so both are kept \u2014 this browser's is \u201c" + copy.title + "\u201d.");
+      renderSidebar(); renderThread(); renderFileBtn();
+      return;
+    }
+    const oldKey = key(job.kind, job.id);
+    const latest = queue.has(oldKey) ? JSON.parse(queue.get(oldKey).body) : local;
+    queue.delete(oldKey); Journal.del(oldKey);
+    const copy = copyOf(job.kind, latest);
+    {
+      applyFile(there);
+      docs.unshift(copy);
+      toast("\u201c" + (local.name || "A file") + "\u201d was changed in another browser too, so both are kept \u2014 this browser's is \u201c" + copy.name + "\u201d.");
+    }
+    put(job.kind, copy.id, copy);
+    renderSidebar(); renderThread(); renderFileBtn();
+  }
+  /* Deleted on the phone by another tab while this one still held it. */
+  async function lost(job){
+    const k = key(job.kind, job.id);
+    delete rev[job.kind][job.id];
+    if (mine.has(k)) return;              // our own delete overtook our own write
+    try { await fetch("api/store/trash/" + job.kind + "/" + encodeURIComponent(job.id), { method:"POST", headers:hdr(0), body:job.body }); } catch(_){}
+    let name = "";
+    try { const d = JSON.parse(job.body); name = job.kind === "chat" ? d.title : d.name; } catch(_){}
+    removeLocal(job.kind, job.id);
+    toast("\u201c" + (name || "That") + "\u201d was deleted in another browser. This browser's last version is in the phone's trash folder.");
+  }
+  async function dropNow(k){
+    const cut = k.indexOf("/"), kind = k.slice(0, cut), id = k.slice(cut + 1);
+    try {
+      const r = await fetch(at(kind, id), { method:"DELETE", headers:hdr(0) });
+      if (!r.ok) throw new Error(String(r.status));
+      deletes.delete(k); Journal.del(k);
+    } catch(_){
+      deletes.add(k);
+      Journal.put(k, { kind:kind, id:id, body:null, op:"del" }, 0, null);
+      setDown();
+    }
+  }
+  function del(kind, id){
+    const k = key(kind, id);
+    queue.delete(k); mine.add(k);
+    delete rev[kind][id];
+    return dropNow(k);
+  }
+  async function clear(kind){
+    for (const k of Array.from(queue.keys())) if (k.indexOf(kind + "/") === 0) queue.delete(k);
+    for (const id of Object.keys(rev[kind])) mine.add(key(kind, id));
+    rev[kind] = {};
+    const r = await fetch("api/store/clear/" + kind, { method:"POST", headers:hdr(0) });
+    if (!r.ok) throw new Error("the phone answered " + r.status);
+  }
+
+  /* ---- what another tab changed ---- */
+  function applyChat(data){
+    const c = convos.find(x => x.id === data.id);
+    if (!c){ convos.push(data); convos.sort((a, b) => b.updatedAt - a.updatedAt); return data; }
+    /* in place, so every hand already holding this chat holds the new one -
+       and a reply streaming here right now stays exactly as it is */
+    const live = new Map((c.messages || []).map(m => [m.id, m]));
+    const msgs = (Array.isArray(data.messages) ? data.messages : []).map(m => {
+      const old = live.get(m.id);
+      return !old ? m : old.pending ? old : adoptInPlace(old, m);
+    });
+    const have = new Set(msgs.map(m => m.id));
+    for (const m of c.messages || []) if (m.pending && !have.has(m.id)) msgs.push(m);
+    adoptInPlace(c, Object.assign({}, data, { messages: msgs }));
+    return c;
+  }
+  function applyFile(data){
+    let d = docs.find(x => x.id === data.id);
+    const before = d ? d.text : null;
+    if (!d){ docs.push(data); docs.sort((a, b) => b.updatedAt - a.updatedAt); d = data; }
+    else adoptInPlace(d, data);
+    if (openDocId === d.id){
+      const ta = $("#docEditArea");
+      if (ta && ta.value === before) ta.value = d.text;   // untouched here: show theirs; typed here: leave it
+    }
+    renderFileBtn();
+    if ($("#docsModal").classList.contains("show")) renderDocList();
+    return d;
+  }
+  function adoptSettings(raw){
+    S = normalizeSettings(raw);
+    applyTheme(); syncSettingsUI(); renderInjections(); renderPresetBar(); renderSidebar(); renderThread();
+    if ($("#projModal").classList.contains("show") && curProj()){ renderProjInjections(); renderProjFiles(); }
+  }
+  function removeLocal(kind, id){
+    if (kind === "chat"){
+      if (!convos.some(c => c.id === id)) return;
+      if (streaming && streaming.convoId === id) streaming.abort();
+      convos = convos.filter(c => c.id !== id);
+      if (current && current.id === id) current = convos.filter(c => !c.archived)[0] || convos[0] || null;
+      renderSidebar(); renderThread();
+    } else if (kind === "file"){
+      if (!docs.some(d => d.id === id)) return;
+      docs = docs.filter(d => d.id !== id);
+      if (openDocId === id) closeDocEdit();
+      renderFileBtn(); renderThread();
+      if ($("#docsModal").classList.contains("show")) renderDocList();
+    }
+  }
+  function repaint(id){
+    renderSidebar();
+    if (current && current.id === id && !document.querySelector("#threadInner .msg-edit")) renderThread();
+  }
+  async function pull(kind, id){
+    const r = await fetch(at(kind, id), { cache:"no-store" });
+    const k = key(kind, id);
+    if (queue.has(k) || busy.has(k) || deletes.has(k)) return;   // a write of ours is on its way and settles against this
+    if (r.status === 404){ if (rev[kind][id]){ delete rev[kind][id]; removeLocal(kind, id); } return; }
+    if (!r.ok) return;
+    const j = await r.json();
+    if (queue.has(k) || busy.has(k) || (rev[kind][id] || 0) >= j.rev) return;
+    rev[kind][id] = j.rev;
+    if (kind === "settings"){ settingsBase = JSON.stringify(j.data); adoptSettings(j.data); return; }
+    if (kind === "chat"){ applyChat(j.data); repaint(id); return; }
+    applyFile(j.data);
+  }
+  /* What the phone holds now against what this tab knows: anything newer is
+     read, anything gone goes. Run when the event stream (re)connects and
+     when the tab comes back into view - a sleeping tab hears nothing. */
+  function resync(){
+    if (!ready || down) return Promise.resolve();
+    if (syncing) return syncing;
+    syncing = (async function(){
+      try {
+        const m = await getJson("api/store/manifest");
+        if (info && m.id !== info.id){ location.reload(); return; }
+        const want = [];
+        if ((m.settings || 0) !== (rev.settings.main || 0)) want.push(["settings", "main"]);
+        for (const pair of [["chat", "chats"], ["file", "files"]]){
+          const kind = pair[0], there = m[pair[1]] || {};
+          for (const id of Object.keys(there)) if (there[id] !== rev[kind][id] && !deletes.has(key(kind, id))) want.push([kind, id]);
+          for (const id of Object.keys(rev[kind])) if (!(id in there)){
+            const k = key(kind, id);
+            if (queue.has(k) || busy.has(k)) continue;
+            delete rev[kind][id]; removeLocal(kind, id);
+          }
+        }
+        for (const w of want) await pull(w[0], w[1]);
+      } catch(_){ setDown(); }
+      finally { syncing = null; }
+    })();
+    return syncing;
+  }
+  async function reloadAll(){
+    const a = await getJson("api/store/all");
+    ingest(a);
+    S = normalizeSettings(a.settings ? a.settings.data : {});
+    const keep = current && current.id;
+    convos = (a.chats || []).map(r => r.data).sort((x, y) => y.updatedAt - x.updatedAt);
+    docs = (a.files || []).map(r => r.data).sort((x, y) => y.updatedAt - x.updatedAt);
+    current = convos.find(c => c.id === keep) || convos.filter(c => !c.archived)[0] || convos[0] || null;
+    applyTheme(); syncSettingsUI(); renderInjections(); renderPresetBar(); renderSidebar(); renderThread();
+  }
+  function listen(){
+    if (es || typeof EventSource !== "function") return;
+    es = new EventSource("api/store/events?client=" + encodeURIComponent(client));
+    es.onopen = function(){ resync(); };
+    es.onmessage = function(e){
+      let ev; try { ev = JSON.parse(e.data); } catch(_){ return; }
+      if (!ev || ev.by === client) return;
+      if (ev.op === "reload"){ reloadAll().catch(function(){}); return; }
+      if (!ev.kind || !rev[ev.kind]) return;
+      const k = key(ev.kind, ev.id);
+      if (ev.op === "del"){
+        if (queue.has(k) || busy.has(k)) return;
+        if (rev[ev.kind][ev.id]){ delete rev[ev.kind][ev.id]; removeLocal(ev.kind, ev.id); }
+        return;
+      }
+      if (ev.op === "put" && (rev[ev.kind][ev.id] || 0) < ev.rev) pull(ev.kind, ev.id).catch(function(){});
+    };
+  }
+
+  /* ---- opening ---- */
+  function ingest(a){
+    rev.chat = {}; rev.file = {}; rev.settings = {};
+    for (const r of a.chats || []) if (r && r.data) rev.chat[r.data.id] = r.rev;
+    for (const r of a.files || []) if (r && r.data) rev.file[r.data.id] = r.rev;
+    if (a.settings && a.settings.data){ rev.settings.main = a.settings.rev; settingsBase = JSON.stringify(a.settings.data); }
+    else settingsBase = null;
+  }
+  function waiting(){
+    const t = document.getElementById("threadInner");
+    if (t) t.innerHTML = '<div class="welcome"><h2>Waiting for Cozy on this phone</h2>'
+      + "<p>Your chats are kept by Cozy's server in Termux, and it isn't answering. Run <code>cozy</code> in Termux \u2014 this page opens them by itself the moment it's up.</p></div>";
+  }
+  /* Changes this browser could not hand over last time. */
+  async function replay(){
+    let list = [];
+    try { list = await Journal.all(); } catch(_){ return; }
+    list.sort((a, b) => a.ts - b.ts);
+    for (const e of list){
+      try {
+        if (e.op === "del"){
+          const r = await fetch(at(e.kind, e.id), { method:"DELETE", headers:hdr(0) });
+          if (r.ok) await Journal.del(e.k);
+          continue;
+        }
+        let r = await fetch(at(e.kind, e.id), { method:"PUT", headers:hdr(e.base), body:e.body });
+        if (r.status === 409){
+          const cur = await r.json(), local = JSON.parse(e.body);
+          if (e.kind === "settings")
+            r = await fetch(at(e.kind, e.id), { method:"PUT", headers:hdr(cur.rev), body:JSON.stringify(merge3(e.sbase ? JSON.parse(e.sbase) : {}, local, cur.data)) });
+          else {
+            const merged = e.kind === "chat" ? mergeChat(local, cur.data) : mergeFile(local, cur.data);
+            if (merged) r = await fetch(at(e.kind, e.id), { method:"PUT", headers:hdr(cur.rev), body:JSON.stringify(merged) });
+            else { const copy = copyOf(e.kind, local); r = await fetch(at(e.kind, copy.id), { method:"PUT", headers:hdr(0), body:JSON.stringify(copy) }); }
+          }
+        } else if (r.status === 410){
+          r = await fetch("api/store/trash/" + e.kind + "/" + encodeURIComponent(e.id), { method:"POST", headers:hdr(0), body:e.body });
+        }
+        if (r.ok) await Journal.del(e.k);
+      } catch(_){}
+    }
+  }
+  /* What this browser kept before the phone did - its chats, files and
+     settings - joins the phone's (a chat the phone has stays unless this
+     copy is newer). Once the phone holds every one of them, the browser's
+     copy is emptied: from then on nothing lives here. */
+  async function importLegacy(){
+    let settings = null, chats = [], files = [];
+    try { settings = JSON.parse(localStorage.getItem("cozychat:settings") || "null"); } catch(_){ settings = null; }
+    if (!isObj(settings)) settings = null;
+    try { chats = (await IDB.all()) || []; } catch(_){ chats = []; }
+    try { files = (await IDB.docAll()) || []; } catch(_){ files = []; }
+    if (!settings && !chats.length && !files.length) return;
+    try {
+      const r = await fetch("api/store/import", { method:"POST", headers:hdr(0), body:JSON.stringify({ settings:settings, chats:chats, files:files }) });
+      if (!r.ok) return;
+      const m = await getJson("api/store/manifest");
+      const onPhone = (list, map) => list.every(x => !!(x && x.id && map && map[x.id]));
+      if (!onPhone(chats, m.chats) || !onPhone(files, m.files) || (settings && !m.settings)) return;
+      await IDB.clear(); await IDB.docClear();
+      localStorage.removeItem("cozychat:settings");
+      if (chats.length || files.length) moved = { chats:chats.length, files:files.length };
+    } catch(_){}
+  }
+  async function boot(){
+    for (let tries = 0; ; tries++){
+      try {
+        info = await getJson("api/store/hello");
+        await replay();
+        await importLegacy();
+        const a = await getJson("api/store/all");
+        ingest(a);
+        first = { chat:(a.chats || []).map(r => r.data), file:(a.files || []).map(r => r.data) };
+        S = normalizeSettings(a.settings ? a.settings.data : {});
+        break;
+      } catch(_){
+        if (!tries) waiting();
+        await new Promise(r => setTimeout(r, 2000));
+      }
+    }
+    ready = true;
+    seedBuiltinSets();
+    listen();
+    document.addEventListener("visibilitychange", function(){ if (document.visibilityState === "visible") resync(); });
+  }
+  function started(){
+    renderDataHint();
+    if (moved) toast("Moved " + moved.chats + " chat" + (moved.chats === 1 ? "" : "s") + " and " + moved.files + " file" + (moved.files === 1 ? "" : "s") + " from this browser onto the phone");
+    moved = null;
+  }
+  async function all(kind){
+    if (first && first[kind]){ const list = first[kind]; first[kind] = null; return list; }
+    const a = await getJson("api/store/all");
+    ingest(a);
+    return ((kind === "chat" ? a.chats : a.files) || []).map(r => r.data);
+  }
+  async function replace(data){
+    try {
+      const r = await fetch("api/store/replace", { method:"POST", headers:hdr(0), body:JSON.stringify(data) });
+      if (!r.ok) return false;
+      queue.clear();
+      await reloadAll();
+      return true;
+    } catch(_){ return false; }
+  }
+  return { boot:boot, started:started, put:put, del:del, clear:clear, all:all, replace:replace, resync:resync,
+           isReady:() => ready, where:() => (info && info.dataDir) || "", client:client };
+})();
+
+/* One door for every read and write of chats and files, whichever home they have. */
+const DB = {
+  all:      () => DEVICE ? Device.all("chat") : IDB.all(),
+  put:      c  => DEVICE ? Device.put("chat", c.id, c) : IDB.put(c),
+  del:      id => DEVICE ? Device.del("chat", id) : IDB.del(id),
+  clear:    () => DEVICE ? Device.clear("chat") : IDB.clear(),
+  docAll:   () => DEVICE ? Device.all("file") : IDB.docAll(),
+  docPut:   d  => DEVICE ? Device.put("file", d.id, d) : IDB.docPut(d),
+  docDel:   id => DEVICE ? Device.del("file", id) : IDB.docDel(id),
+  docClear: () => DEVICE ? Device.clear("file") : IDB.docClear()
+};
+
 /* ---------- settings ---------- */
 const DEFAULTS = {
   providers: [], activeProvider: null,
   presets: [], activePreset: null, prompts: [],
   system: "", injections: [],
-  temperature: 1, maxTokens: 4096,
+  temperature: null, maxTokens: 4096,
   showThinking: true, showTools: true, catchThinkTags: true, thinkTags: "think, thinking, reasoning, thought",
   enterSends: false, autoTitle: true, theme: "dark", effort: "off", squashSystem: true,
   search: { on:false, provider:"native", key:"", count:5, relay:"", always:false, images:true, auto:true, model:true },
   prefill: null
 };
-/* A clean browser has no settings at all; a user who deleted things by hand
-   still has them. Only the first means "restore from the vault" — and this
-   has to be read now, before anything below writes a settings key. */
-const COZY_CLEAN_SLATE = !localStorage.getItem("cozychat:settings");
-let S = loadSettings();
+/* On the phone, the settings arrive from the phone at boot (Device.boot);
+   until then S is the defaults, and nothing writes them anywhere. */
+let S = DEVICE ? normalizeSettings({}) : loadSettings();
 /* Two working agent briefs ship built-in — the Worldbook Maker and the
    Summaryception Auditor — seeded ONCE as ordinary instruction sets. They
    are fully editable and renamable, and deleting one sticks: the flag, not
    the id, decides seeding, so nothing resurrects behind the user's back. */
-(function seedSets(){
+function seedBuiltinSets(){
   if (S.seeded513) return;
   S.seeded513 = true;
   if (!S.presets.some(p => p.id === "seed-wb"))
@@ -1854,11 +2438,21 @@ let S = loadSettings();
   if (!S.presets.some(p => p.id === "seed-sc"))
     S.presets.push({ id:"seed-sc", name:"Summaryception Auditor", system: SC_SEED_PROMPT, injections: [] });
   try { saveSettings(); } catch(_){}
-})();
+}
+if (!DEVICE) seedBuiltinSets();
 function loadSettings(){
+  let raw;
+  try { raw = JSON.parse(localStorage.getItem("cozychat:settings") || "{}"); } catch(_) { raw = {}; }
+  return normalizeSettings(raw);
+}
+/* Every migration lives here, whichever home the settings came from. The
+   defaults are copied, never shared: a list taken straight from DEFAULTS was
+   the same array as DEFAULTS', so adding a connection added it to the
+   defaults too. */
+function normalizeSettings(raw){
   try {
-    const raw = JSON.parse(localStorage.getItem("cozychat:settings") || "{}");
-    const out = Object.assign({}, DEFAULTS, raw);
+    raw = (raw && typeof raw === "object" && !Array.isArray(raw)) ? raw : {};
+    const out = Object.assign(JSON.parse(JSON.stringify(DEFAULTS)), raw);
     out.search = Object.assign({}, DEFAULTS.search, raw.search || {});
     out.injections = raw.injections || [];
     out.presets = raw.presets || [];
@@ -1890,6 +2484,10 @@ function ensureOrder(p){
   if (p.remind.depth == null) p.remind.depth = 2;
   p.injections = p.injections || [];
   for (const i of p.injections){
+    /* an imported set can carry a block with no text or no role; a missing
+       text read as text.trim() threw on every send in that set */
+    if (typeof i.text !== "string") i.text = i.text == null ? "" : String(i.text);
+    if (!i.role) i.role = "system";
     if (i.pos === "top" || i.pos === "bottom") i.pos = "relative";
     else if (i.pos === "depth") i.pos = "chat";
     if (i.pos !== "relative" && i.pos !== "chat") i.pos = "relative";
@@ -1950,6 +2548,7 @@ function projEnsure(p){
   if (p.remind.depth == null) p.remind.depth = 2;
   for (const i of p.injections){
     if (i.pos !== "relative" && i.pos !== "chat") i.pos = "relative";
+    if (typeof i.text !== "string") i.text = i.text == null ? "" : String(i.text);
     if (!i.role) i.role = "system";
     if (i.depth == null) i.depth = 0;
   }
@@ -1981,7 +2580,10 @@ function PS(c){
   if (!p.injections) p.injections = [];
   return ensureOrder(p);
 }
-function saveSettings(){ localStorage.setItem("cozychat:settings", JSON.stringify(S)); vaultTouch(); }
+function saveSettings(){
+  if (DEVICE){ if (Device.isReady()) Device.put("settings", "main", S); return; }
+  localStorage.setItem("cozychat:settings", JSON.stringify(S));
+}
 /* Every conversation keeps its own connection, model, instruction set and
    sampling. Globals in S are only the starting point for a new chat, so
    opening an old one brings back exactly how it was set up, and changing
@@ -2027,7 +2629,17 @@ function activeProv(c){
   const m = cfgGet("model", null, c);
   return m && m !== p.model ? Object.assign({}, p, { model:m }) : p;
 }
-function chatTemp(c){ return Number(cfgGet("temperature", S.temperature, c)); }
+/* A temperature you set is sent; none set means none sent, and the service's
+   own default applies. An emptied box used to send 0 - Number("") - which is
+   the coldest setting there is, not "nothing". "none" on a chat is that
+   choice made for this chat alone, whatever the global value is. */
+function chatTemp(c){
+  let v = chatCfg(c).temperature;
+  if (v === undefined || v === null || v === "") v = S.temperature;
+  if (v === undefined || v === null || v === "" || v === "none") return null;
+  const t = Number(v);
+  return Number.isFinite(t) ? t : null;
+}
 function chatMaxTok(c){ return Number(cfgGet("maxTokens", S.maxTokens, c)) || 4096; }
 function chatEffort(c){ return cfgGet("effort", S.effort, c) || "off"; }
 function chatSquash(c){ return cfgGet("squashSystem", S.squashSystem !== false, c) !== false; }
@@ -2485,7 +3097,7 @@ function renderMarkdown(src){
 /* Every field a version owns. One list, read by the snapshot, the loader and
    the saver alike — a field added to the reply but not to this list used to
    stick to the message and bleed across versions. */
-const VARIANT_FIELDS = ["content","thinking","model","sources","tools","approvals","edits","editError","editWarn"];
+const VARIANT_FIELDS = ["content","thinking","model","sources","tools","approvals","edits","editError","editWarn","sent"];
 function variantSnap(m){
   const v = {};
   for (const k of VARIANT_FIELDS) v[k] = m[k];
@@ -2528,8 +3140,36 @@ async function loadConvos(){
   // Chats from before per-chat settings are pinned to today's globals once,
   // so they stop drifting when the defaults change later.
   let changed = [];
-  for (const c of convos) if (!c.cfg){ c.cfg = defaultCfg(); changed.push(c); }
+  for (const c of convos){
+    let fixed = unstick(c) > 0;
+    if (!c.cfg){ c.cfg = defaultCfg(); fixed = true; }
+    if (fixed) changed.push(c);
+  }
   for (const c of changed) await DB.put(JSON.parse(JSON.stringify(c)));
+}
+/* A reply that was still arriving when its page closed was saved halfway,
+   still flagged as arriving - and nothing will ever finish it. What came is
+   kept as a version of its own; a new version that brought nothing gives way
+   to the version before it; an empty reply that never had one goes. A chat
+   touched in the last half hour is left alone: another tab may still be
+   writing that reply. */
+function unstick(c){
+  if (!c || !Array.isArray(c.messages) || Date.now() - (c.updatedAt || 0) < 30 * 60 * 1000) return 0;
+  let n = 0;
+  const out = [];
+  for (const m of c.messages){
+    if (!m.pending){ out.push(m); continue; }
+    n++; delete m.pending;
+    if (m.role !== "assistant"){ out.push(m); continue; }
+    const empty = !String(m.content || "").trim() && !String(m.thinking || "").trim();
+    const had = Array.isArray(m.variants) ? m.variants.length : 0;
+    if (empty){ if (had){ m.vi = had - 1; syncVariant(m); out.push(m); } continue; }
+    m.variants = m.variants || [];
+    m.variants.push(variantSnap(m)); m.vi = m.variants.length - 1;
+    out.push(m);
+  }
+  c.messages = out;
+  return n;
 }
 function newConvo(seed, projectId){
   const c = { id:uid(), title:"New chat", createdAt:Date.now(), updatedAt:Date.now(),
@@ -2544,7 +3184,7 @@ function newConvo(seed, projectId){
 async function persistConvo(c){
   if (!c) return;
   c.updatedAt = Date.now();
-  await DB.put(JSON.parse(JSON.stringify(c)));
+  await DB.put(DEVICE ? c : JSON.parse(JSON.stringify(c)));
   const i = convos.findIndex(x => x.id === c.id);
   if (i > 0){ convos.splice(i,1); convos.unshift(c); }
   renderSidebar();
@@ -2834,14 +3474,14 @@ function welcomeHtml(){
 function imagesHtml(list){
   if (!list || !list.length) return "";
   return '<div class="img-strip">' + list.map(function(im){
-    return '<a href="' + escapeHtml(im.link || im.full || im.url) + '" target="_blank" rel="noopener">'
-      + '<img src="' + escapeHtml(im.url) + '" alt="' + escapeHtml(im.title || "") + '" loading="lazy"></a>';
+    return '<a href="' + escapeHtml(safeUrl(im.link || im.full || im.url)) + '" target="_blank" rel="noopener">'
+      + '<img src="' + escapeHtml(safeUrl(im.url)) + '" alt="' + escapeHtml(im.title || "") + '" loading="lazy"></a>';
   }).join("") + '</div>';
 }
 function sourcesHtml(list){
   if (!list || !list.length) return "";
   return '<details class="sources"><summary>' + list.length + ' source' + (list.length===1?"":"s") + '</summary><div class="src-list">'
-    + list.map(s => '<div class="src"><a href="' + escapeHtml(s.url) + '" target="_blank" rel="noopener">' + escapeHtml(s.title || s.url) + '</a>'
+    + list.map(s => '<div class="src"><a href="' + escapeHtml(safeUrl(s.url)) + '" target="_blank" rel="noopener">' + escapeHtml(s.title || s.url) + '</a>'
       + (s.snippet ? '<div class="snip">' + escapeHtml(s.snippet) + '</div>' : "") + '</div>').join("")
     + '</div></details>';
 }
@@ -2892,7 +3532,7 @@ function msgHtml(m, isLastAssistant){
   const think = (m.thinking && S.showThinking)
     ? '<details class="think"><summary>Thinking<button class="think-copy" data-copythink type="button">Copy</button></summary><div class="think-body">' + escapeHtml(m.thinking) + '</div></details>' : "";
   let swipe = "";
-  if (m.role === "assistant" && isLastAssistant && m.variants && m.variants.length > 1){
+  if (m.role === "assistant" && isLastAssistant && !m.pending && m.variants && m.variants.length > 1){
     swipe = '<div class="swipe">'
       + '<button data-swipe="' + m.id + '" data-dir="-1"' + (m.vi<=0?" disabled":"") + ' aria-label="Previous version">‹</button>'
       + '<span class="count">' + (m.vi+1) + '/' + m.variants.length + '</span>'
@@ -2914,8 +3554,17 @@ function msgHtml(m, isLastAssistant){
     + '<div class="msg-head"><span class="lbl">' + escapeHtml(label) + '</span>' + swipe + acts + '</div>'
     + (S.showTools !== false ? toolLogHtml(m.tools) : "") + approvalHtml(m) + think + sourcesHtml(m.sources) + imagesHtml(m.images) + attsHtml(m.attachments)
     + '<div class="msg-body">' + body + '</div>'
-    + editCardsHtml(m) + '</div>';
+    + editCardsHtml(m) + sentLineHtml(m) + '</div>';
 }
+function sentLineHtml(m){
+  if (m.role !== "assistant" || !m.sent || m.pending) return "";
+  const n = Number(m.sent.tokens) || 0;
+  return '<button class="msg-sent" data-sent="' + m.id + '">What the model saw'
+    + (n ? ' \u00b7 ' + (m.sent.exact ? "" : "~") + n.toLocaleString() + ' tokens' : "") + '</button>';
+}
+/* A link from a search service goes where it says only if it is a web
+   address; anything else (javascript:, data:) is not a link at all. */
+function safeUrl(u){ const v = String(u || "").trim(); return /^https?:\/\//i.test(v) ? v : "#"; }
 function nearBottom(){ const t = $("#thread"); return t.scrollHeight - t.scrollTop - t.clientHeight < 120; }
 function scrollDown(force){
   if (force && !userTouching){ coasting = false; if (coastTimer){ clearTimeout(coastTimer); coastTimer = null; } }
@@ -3022,7 +3671,12 @@ function attachmentBody(a, idx, plan){
       + 'current copy is attached further down, on a later message.]';
   return "```" + nm + "\n" + a.text + "\n```";
 }
-function assembleMessages(kind, c){
+/* `partsOut`, when given, is filled with what the request was built from,
+   part by part (What the model saw). It is an out-parameter on purpose: the
+   return value is the wire and nothing else - callers and the gate compare it
+   as such, and a second copy of every text riding inside it doubled every
+   count of what was sent. */
+function assembleMessages(kind, c, partsOut){
   c = c || current;
   const filesActive = !!(chatDocIds(c).length || c.filesOn);
   const plan = attachmentPlan(c);
@@ -3110,8 +3764,9 @@ function assembleMessages(kind, c){
   const n = base.length, slots = {};
   for (const L of layers)
     for (const i of L.live) if (i.pos === "chat"){
-      const at = Math.max(0, n - (Number(i.depth) || 0));
-      (slots[at] = slots[at] || []).push(i);
+      const d = Number(i.depth) || 0;
+      const at = Math.max(0, n - d);
+      (slots[at] = slots[at] || []).push({ role:i.role, text:i.text, label:i.name || "Instruction", where:depthWhere(d) });
     }
   /* The never-forget weave: the layer's standing instructions ride a second
      time, close to the newest message — the top of a long conversation is
@@ -3122,13 +3777,13 @@ function assembleMessages(kind, c){
     const rm = L.remind;
     if (!rm || rm.mode === "off") continue;
     /* slots carry injections, so the copy is shaped like one */
-    const items = [];
-    if (String(L.system || "").trim()) items.push({ role:"system", text:L.system });
+    const items = [], where = depthWhere(Number(rm.depth) || 0);
+    if (String(L.system || "").trim()) items.push({ role:"system", text:L.system, label:"Never forget \u2014 the main prompt again", where:where });
     if (rm.mode === "all")
       for (const id of L.order){
         if (id === CHAT) break;
         const i = L.byId[id];
-        if (i && i.pos === "relative") items.push(i);
+        if (i && i.pos === "relative") items.push({ role:i.role, text:i.text, label:"Never forget \u2014 " + (i.name || "Instruction") + " again", where:where });
       }
     if (items.length){
       const at = Math.max(0, n - (Number(rm.depth) || 0));
@@ -3136,9 +3791,16 @@ function assembleMessages(kind, c){
     }
   }
 
+  /* What the model saw, part by part: recorded where each part is placed,
+     from the same values, so the list can never describe another request. */
+  const wire = r => (kind === "anthropic" && r === "system") ? "user" : r;
+  const chatParts = [], preParts = [], postParts = [], topParts = [], moreSys = [];
   const convo = [];
   for (let k = 0; k <= n; k++){
-    if (slots[k]) for (const i of slots[k]) convo.push({ role:i.role, content:i.text });
+    if (slots[k]) for (const i of slots[k]){
+      convo.push({ role:i.role, content:i.text });
+      chatParts.push({ name:i.label, where:i.where, role:wire(i.role), text:i.text });
+    }
     if (k < n) convo.push(base[k]);
   }
 
@@ -3152,17 +3814,18 @@ function assembleMessages(kind, c){
     let seenChat = false, folding = true;
     for (const id of L.order){
       if (id === CHAT){ seenChat = true; continue; }
-      let role, text;
-      if (id === MAIN){ role = "system"; text = L.system || ""; }
+      let role, text, label;
+      if (id === MAIN){ role = "system"; text = L.system || ""; label = "Main system prompt"; }
       else {
         const i = L.byId[id];
         if (!i || i.pos !== "relative") continue;
-        role = i.role; text = i.text;
+        role = i.role; text = i.text; label = i.name || "Instruction";
       }
       if (!text || !text.trim()) continue;
-      if (!seenChat && folding && role === "system"){ topSys.push(text); continue; }
+      if (!seenChat && folding && role === "system"){ topSys.push(text); topParts.push({ name:label, where:"the system prompt", role:"system", text:text }); continue; }
       if (!seenChat) folding = false;
       (seenChat ? post : pre).push({ role:role, content:text });
+      (seenChat ? postParts : preParts).push({ name:label, where:seenChat ? "after the conversation" : "before the conversation", role:wire(role), text:text });
     }
   }
 
@@ -3200,10 +3863,11 @@ function assembleMessages(kind, c){
   if (tail && tail.role === "assistant" && typeof tail.content === "string")
     tail.content = tail.content.replace(/\s+$/, "");
   let sysParts = topSys.slice();
-  if (c.sysExtra && c.sysExtra.trim()) sysParts.push(c.sysExtra);
+  const addSys = (name, text) => { sysParts.push(text); moreSys.push({ name:name, where:"the system prompt", role:"system", text:text }); };
+  if (c.sysExtra && c.sysExtra.trim()) addSys("This chat only", c.sysExtra);
   const attached = allChatDocs(c);
   if (attached.length){
-    sysParts.push(doceditProtocol(attached));
+    addSys("File-editing rules", doceditProtocol(attached));
     let anySmart = false;
     const q = lastUserText(c);
     const applied = appliedByFile(c);
@@ -3224,12 +3888,12 @@ function assembleMessages(kind, c){
            rule below then forbids a full rewrite of a file it can see all of. */
         if (ex.length < d.text.length){
           anySmart = true;
-          sysParts.push("[FILE: " + d.name + " \u2014 relevant excerpts, not the whole file]\n" + ex + own);
-        } else sysParts.push("[FILE: " + d.name + "]\n" + ex + own);
-      } else sysParts.push("[FILE: " + d.name + "]\n" + d.text + own);
+          addSys("File: " + d.name + " \u2014 the parts that fit your message", "[FILE: " + d.name + " \u2014 relevant excerpts, not the whole file]\n" + ex + own);
+        } else addSys("File: " + d.name, "[FILE: " + d.name + "]\n" + ex + own);
+      } else addSys("File: " + d.name, "[FILE: " + d.name + "]\n" + d.text + own);
     }
-    if (anySmart) sysParts.push("Files marked as excerpts show only their most relevant parts. Never use replace_all on an excerpted file \u2014 you have not seen all of it.");
-  } else if (c.filesOn) sysParts.push(doceditProtocol([]));
+    if (anySmart) addSys("Excerpted files", "Files marked as excerpts show only their most relevant parts. Never use replace_all on an excerpted file \u2014 you have not seen all of it.");
+  } else if (c.filesOn) addSys("File-writing rules", doceditProtocol([]));
   /* A detached file leaves an explicit absence where its presence was.
      sentDocNames remembers what the last request actually carried — computed
      from the wire, never from which button was tapped — so every removal
@@ -3240,11 +3904,16 @@ function assembleMessages(kind, c){
     for (const d of attached) now[d.name] = 1;
     const gone = c.sentDocNames.filter(nm => !now[nm]);
     if (gone.length)
-      sysParts.push("[no longer attached to this chat: " + gone.join(", ")
+      addSys("Files no longer attached", "[no longer attached to this chat: " + gone.join(", ")
         + ". Their texts are NOT in this conversation anymore — never quote, summarize, or answer from memory of them. If the user asks about one, say you need it re-attached (the file icon in the top bar).]");
   }
-  if (autoSearchTextOn()) sysParts.push(searchProtocol());
+  if (autoSearchTextOn()) addSys("Looking things up", searchProtocol());
   const system = sysParts.filter(t => t && t.trim()).join("\n\n");
+  const parts = topParts.concat(moreSys).filter(x => x.text && x.text.trim()).concat(preParts,
+    n ? [{ name:"The conversation", where:n + " message" + (n === 1 ? "" : "s"), role:"",
+           text:base.map(m => "[" + (m.role === "user" ? "You" : "Assistant") + "]\n" + partText(m.content)).join("\n\n") }] : [],
+    chatParts, postParts);
+  if (Array.isArray(partsOut)) for (const x of parts) partsOut.push(x);
   return { messages: merged, system: system };
 }
 
@@ -3256,9 +3925,10 @@ function buildPayload(opts, c){
      ones, so what is proven is the configuration in force — not a copy of it.
      A real chat's system prompt would make "what comes after C" a matter of
      opinion, which is the one thing a test cannot afford. */
+  const asmParts = [];
   const asm = opts.probe
     ? { messages: [{ role:"user", content: PF_PROBE_ASK }], system: "" }
-    : assembleMessages(p.kind, c);
+    : assembleMessages(p.kind, c, asmParts);
   /* Claude's own search tool is the one mechanism here in which the model
      decides. Gating it behind opts.search meant a person had already decided,
      which is the opposite of automatic: the tool rode only the turns the
@@ -3289,28 +3959,39 @@ function buildPayload(opts, c){
      on the last thing the user actually sent. */
   if (!opts.probe) lastPrefill = pf;
   const openThinking = !!(pf.applied && pf.detail.reasoningField && pfc.ensureThinking);
+  const parts = asmParts.slice();
+  if (pf.applied && pf.detail.appended){
+    const tail = asm.messages[asm.messages.length - 1];
+    if (pf.detail.text) parts.push({ name:"Prefill \u2014 the reply's first words", where:"the last turn", role:"assistant", text:pf.detail.text });
+    if (pf.detail.reasoningField && tail && typeof tail[pf.detail.reasoningField] === "string")
+      parts.push({ name:"Prefill \u2014 the thinking seed", where:'the "' + pf.detail.reasoningField + '" field of the last turn', role:"assistant", text:tail[pf.detail.reasoningField] });
+  }
 
   if (p.kind === "anthropic"){
-    const body = {
-      model:p.model, max_tokens:chatMaxTok(c),
-      temperature:chatTemp(c), stream:true, messages: asm.messages
-    };
+    const body = { model:p.model, max_tokens:chatMaxTok(c) };
+    const temp = chatTemp(c);
+    if (temp != null) body.temperature = temp;
+    body.stream = true; body.messages = asm.messages;
     if (asm.system) body.system = asm.system;
-    if (useNative) body.tools = [{ type:"web_search_20250305", name:"web_search", max_uses:Number(S.search.count)||5 }];
+    if (useNative){
+      body.tools = [{ type:"web_search_20250305", name:"web_search", max_uses:Number(S.search.count)||5 }];
+      parts.push({ name:"Claude's web search tool", where:"the tools it may use", role:"", text:JSON.stringify(body.tools, null, 2) });
+    }
     applyReasoning(body, p, c, openThinking);
     return {
       url: (p.proxy || p.url).replace(/\/+$/,"") + "/messages",
       headers: { "content-type":"application/json", "x-api-key":p.apiKey,
                  "anthropic-version":"2023-06-01", "anthropic-dangerous-direct-browser-access":"true" },
       body: body,
-      prefill: pf
+      prefill: pf,
+      parts: parts
     };
   }
-  const body = {
-    model:p.model, max_tokens:chatMaxTok(c),
-    temperature:chatTemp(c), stream:true,
-    messages: asm.system ? [{ role:"system", content:asm.system }].concat(asm.messages) : asm.messages
-  };
+  const body = { model:p.model, max_tokens:chatMaxTok(c) };
+  const temp = chatTemp(c);
+  if (temp != null) body.temperature = temp;
+  body.stream = true;
+  body.messages = asm.system ? [{ role:"system", content:asm.system }].concat(asm.messages) : asm.messages;
   applyReasoning(body, p, c, openThinking);
   const headers = { "content-type":"application/json", "authorization":"Bearer " + p.apiKey };
   /* Hermes already keeps one agent session per conversation by hashing the
@@ -3328,7 +4009,8 @@ function buildPayload(opts, c){
     url: (p.proxy || p.url).replace(/\/+$/,"") + "/chat/completions",
     headers: headers,
     body: body,
-    prefill: pf
+    prefill: pf,
+    parts: parts
   };
 }
 
@@ -3497,6 +4179,328 @@ async function runSearch(query){
 /* ==========================================================
    SENDING
    ========================================================== */
+/* ==========================================================
+   WHAT THE MODEL SAW
+   Every reply keeps the request that produced it: the parts it was built
+   from (Normal), the request exactly as it went out (Raw), and what the
+   service said it counted. Long words are cut where the text itself says -
+   after a paragraph whose hash falls on the mark - and each piece is kept
+   once per chat, so the history that rides every request is stored once,
+   not once per reply. A chat keeps this for its newest SENT_KEEP replies.
+   ========================================================== */
+const SENT_KEEP = 200;
+const Sent = (() => {
+  const INLINE = 512, MIN = 1024, MAX = 16384;
+  function piecesOf(s){
+    const out = []; let cur = "";
+    for (const p of s.split(/(?<=\n\n)/)){
+      cur += p;
+      if (cur.length >= MAX || (cur.length >= MIN && hash53(p) % 4 === 0)){ out.push(cur); cur = ""; }
+    }
+    if (cur) out.push(cur);
+    return out;
+  }
+  const keyOf = p => hash53(p).toString(36) + "-" + p.length.toString(36);
+  function encode(v, pieces){
+    if (typeof v === "string"){
+      if (v.length < INLINE) return v;
+      return { $t: piecesOf(v).map(function(p){ const k = keyOf(p); pieces[k] = p; return k; }) };
+    }
+    if (Array.isArray(v)) return v.map(x => encode(x, pieces));
+    if (isObj(v)){ const o = {}; for (const k of Object.keys(v)) if (v[k] !== undefined) o[k] = encode(v[k], pieces); return o; }
+    return v;
+  }
+  function decode(v, pieces){
+    if (Array.isArray(v)) return v.map(x => decode(x, pieces));
+    if (isObj(v)){
+      const ks = Object.keys(v);
+      if (ks.length === 1 && ks[0] === "$t" && Array.isArray(v.$t))
+        return v.$t.map(function(k){ if (typeof pieces[k] !== "string") throw new Error("a piece of it is missing"); return pieces[k]; }).join("");
+      const o = {}; for (const k of ks) o[k] = decode(v[k], pieces); return o;
+    }
+    return v;
+  }
+  function refs(v, out){
+    if (Array.isArray(v)){ for (const x of v) refs(x, out); return out; }
+    if (isObj(v)){
+      const ks = Object.keys(v);
+      if (ks.length === 1 && ks[0] === "$t" && Array.isArray(v.$t)){ for (const k of v.$t) out.add(k); return out; }
+      for (const k of ks) refs(v[k], out);
+    }
+    return out;
+  }
+  /* the browser's own home for them, only where there is no phone */
+  let dbp = null;
+  function idb(){
+    if (dbp) return dbp;
+    dbp = new Promise(function(res, rej){
+      const r = indexedDB.open("cozychat-sent", 1);
+      r.onupgradeneeded = function(){ const db = r.result; if (!db.objectStoreNames.contains("boxes")) db.createObjectStore("boxes", { keyPath:"chat" }); };
+      r.onsuccess = function(){ res(r.result); };
+      r.onerror = function(){ dbp = null; rej(r.error); };
+    });
+    return dbp;
+  }
+  async function idbRun(mode, fn){
+    const db = await idb();
+    return new Promise(function(res, rej){
+      const t = db.transaction("boxes", mode), st = t.objectStore("boxes");
+      let out; try { out = fn(st); } catch(e){ rej(e); return; }
+      /* a get() that finds nothing has result undefined - that is the answer,
+         not a reason to hand back the request object itself */
+      t.oncomplete = function(){ res(out && typeof out === "object" && "readyState" in out ? out.result : out); };
+      t.onerror = function(){ rej(t.error); }; t.onabort = function(){ rej(t.error); };
+    });
+  }
+  async function keep(chat, sid, rec){
+    const pieces = {}, enc = encode(rec, pieces);
+    if (DEVICE){
+      for (let i = 0; i < 4; i++){
+        try {
+          const r = await fetch("api/sent/" + encodeURIComponent(chat) + "/" + encodeURIComponent(sid),
+            { method:"PUT", headers:{ "content-type":"application/json" }, body:JSON.stringify({ rec:enc, pieces:pieces }) });
+          if (r.ok) return true;
+        } catch(_){}
+        await new Promise(function(res){ setTimeout(res, 2000 * (i + 1)); });
+      }
+      return false;
+    }
+    try {
+      const box = (await idbRun("readonly", st => st.get(chat))) || { chat:chat, pieces:{}, records:{} };
+      Object.assign(box.pieces, pieces);
+      box.records[sid] = { ts:Date.now(), rec:enc };
+      const ids = Object.keys(box.records).sort((a, b) => box.records[a].ts - box.records[b].ts);
+      for (const id of ids.slice(0, Math.max(0, ids.length - SENT_KEEP))) delete box.records[id];
+      const used = refs(box.records, new Set());
+      for (const k of Object.keys(box.pieces)) if (!used.has(k)) delete box.pieces[k];
+      await idbRun("readwrite", st => st.put(box));
+      return true;
+    } catch(_){ return false; }
+  }
+  async function load(chat, sid){
+    let got = null;
+    if (DEVICE){
+      const r = await fetch("api/sent/" + encodeURIComponent(chat) + "/" + encodeURIComponent(sid), { cache:"no-store" });
+      if (r.status === 404) return null;
+      if (!r.ok) throw new Error("the phone answered " + r.status);
+      got = await r.json();
+    } else {
+      const box = await idbRun("readonly", st => st.get(chat));
+      const r = box && box.records && box.records[sid];
+      if (r) got = { rec:r.rec, pieces:box.pieces };
+    }
+    return got ? decode(got.rec, got.pieces || {}) : null;
+  }
+  function drop(chat){ if (!DEVICE) idbRun("readwrite", st => st.delete(chat)).catch(function(){}); }
+  function dropAll(){ if (!DEVICE) idbRun("readwrite", st => st.clear()).catch(function(){}); }
+  return { keep:keep, load:load, drop:drop, dropAll:dropAll, encode:encode, decode:decode, piecesOf:piecesOf };
+})();
+
+/* A request's words, read the way the model took them. */
+function partText(content){
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) return content.map(function(b){
+    if (typeof b === "string") return b;
+    if (b && typeof b.text === "string") return b.text;
+    if (b && (b.type === "image" || b.type === "image_url")) return "[an image]";
+    return b ? JSON.stringify(b) : "";
+  }).join("\n\n");
+  return content == null ? "" : JSON.stringify(content);
+}
+function depthWhere(d){
+  return d === 0 ? "in the chat, right before the reply" : "in the chat, " + d + " message" + (d === 1 ? "" : "s") + " up from the newest";
+}
+/* The thinking a request asked for, read off the request itself. */
+function effortOf(b){
+  if (!b) return "";
+  if (b.output_config && b.output_config.effort) return b.output_config.effort;
+  if (b.thinking && b.thinking.type === "enabled" && b.thinking.budget_tokens) return b.thinking.budget_tokens.toLocaleString() + " thinking tokens";
+  if (b.reasoning_effort) return b.reasoning_effort;
+  if (b.reasoning && b.reasoning.effort) return b.reasoning.effort;
+  if (b.model_options && b.model_options.reasoning && b.model_options.reasoning.effort) return b.model_options.reasoning.effort;
+  if ((b.thinking && b.thinking.type === "enabled") || b.enable_thinking === true || (b.reasoning && b.reasoning.enabled === true)) return "on";
+  return "";
+}
+function sentRecord(convo, p, reqs, timing){
+  const last = reqs[reqs.length - 1];
+  let host = ""; try { host = new URL(last.url).host; } catch(_){}
+  const parts = last.parts || [];
+  const usage = last.usage || null;
+  const exact = !!(usage && typeof usage.in === "number");
+  return {
+    v:1, ts:Date.now(), chat:convo.id, model:(last.body && last.body.model) || p.model || "", conn:p.name || "", host:host,
+    transport:last.transport || "chat", effort:effortOf(last.body), prefill:pfWords(last.prefill),
+    usage:usage, exact:exact, tokens: exact ? usage.in : parts.reduce((n, x) => n + estTokens(x.text), 0),
+    ttftMs:timing.ttftMs, durationMs:timing.durationMs,
+    requests: reqs.map(r => ({ url:r.url, transport:r.transport || "chat", body:r.body, usage:r.usage || null })),
+    parts: parts
+  };
+}
+/* Server-sent events end each line with LF, CRLF or a lone CR - all three
+   are in the spec, and some servers (sse-starlette's default among them)
+   send CRLF. Splitting on "\n\n" alone never found a frame boundary in a
+   CRLF stream: every frame piled up unread and the reply came back empty. A
+   CR at the very end of a chunk may be half of a CRLF, so it waits for the
+   next chunk; and the last frame of a stream counts even without the blank
+   line after it. */
+function sseFrames(st, text, final){
+  let s = st.buf + text, held = "";
+  if (!final && s.charCodeAt(s.length - 1) === 13){ held = "\r"; s = s.slice(0, -1); }
+  s = s.replace(/\r\n?/g, "\n");
+  const frames = s.split("\n\n");
+  const rest = frames.pop();
+  if (final){ st.buf = ""; if (rest.trim()) frames.push(rest); }
+  else st.buf = rest + held;
+  return frames;
+}
+
+let sentGen = 0, sentRec = null;
+function el(tag, cls, text){
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+function copyText(text, btn){
+  const say = function(ok){
+    if (!btn) return;
+    btn.dataset.label = btn.dataset.label || btn.textContent;
+    btn.textContent = ok ? "Copied" : "Couldn't copy";
+    setTimeout(function(){ btn.textContent = btn.dataset.label; }, 1400);
+  };
+  const fallback = function(){
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      const ok = !!(document.execCommand && document.execCommand("copy"));
+      ta.remove(); say(ok);
+    } catch(_){ say(false); }
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function(){ say(true); }, fallback);
+  else fallback();
+}
+function showSentView(v){
+  for (const b of $$("[data-sentview]")){ const on = b.dataset.sentview === v; b.classList.toggle("on", on); b.setAttribute("aria-selected", on ? "true" : "false"); }
+  $("#sentNormal").hidden = v !== "normal";
+  $("#sentRaw").hidden = v !== "raw";
+  if (v === "raw" && sentRec && !$("#sentRaw").childNodes.length) renderSentRaw(sentRec);
+}
+async function openSent(m){
+  const gen = ++sentGen;
+  sentRec = null;
+  $("#sentModal").classList.add("show"); $("#scrim").classList.add("show");
+  $("#sentSub").textContent = ""; $("#sentFoot").textContent = "";
+  $("#sentNormal").textContent = ""; $("#sentRaw").textContent = "";
+  $("#sentNormal").appendChild(el("div", "hint", "Fetching what was sent\u2026"));
+  showSentView("normal");
+  let rec = null, why = "";
+  try { rec = await Sent.load(m.sent.chat, m.sent.id); }
+  catch (err){ why = "It couldn't be read \u2014 " + String((err && err.message) || err) + "."; }
+  if (gen !== sentGen) return;
+  $("#sentNormal").textContent = "";
+  if (!rec){
+    $("#sentNormal").appendChild(el("div", "hint", why || ("What was sent for this reply isn't kept any more \u2014 a chat keeps it for its newest " + SENT_KEEP + " replies.")));
+    return;
+  }
+  sentRec = rec;
+  renderSentNormal(rec);
+}
+function closeSent(){
+  sentGen++;
+  $("#sentModal").classList.remove("show");
+  if (!$("#settingsModal").classList.contains("show")) $("#scrim").classList.remove("show");
+}
+function roleWord(r){ return r === "user" ? "you" : r === "assistant" ? "the assistant" : r; }
+function renderSentNormal(rec){
+  let when = ""; try { when = new Date(rec.ts).toLocaleString(); } catch(_){}
+  $("#sentSub").textContent = "Sent to " + (rec.model || "the model") + (rec.host ? " at " + rec.host : "") + (when ? " \u00b7 " + when : "");
+  const box = $("#sentNormal");
+  for (const part of rec.parts || []){
+    const text = String(part.text || "");
+    const wrap = el("div", "sent-part"), row = el("div", "sent-row");
+    const name = el("button", "sent-name", part.name || "Part");
+    name.type = "button"; name.setAttribute("aria-expanded", "false");
+    const cp = el("button", "sent-copy", "Copy"); cp.type = "button";
+    cp.addEventListener("click", function(){ copyText(text, cp); });
+    row.append(name, el("span", "sent-tok", "~" + estTokens(text).toLocaleString() + " tokens"), cp);
+    wrap.appendChild(row);
+    /* "the system prompt" already says how it went; for the rest, say whose voice it rode in */
+    const where = [part.where, part.role && part.where !== "the system prompt" ? "sent as " + roleWord(part.role) : ""].filter(Boolean).join(" \u00b7 ");
+    if (where) wrap.appendChild(el("div", "sent-where", where));
+    name.addEventListener("click", function(){
+      const open = name.getAttribute("aria-expanded") !== "true";
+      name.setAttribute("aria-expanded", open ? "true" : "false");
+      let pre = wrap.querySelector(".sent-text");
+      if (open && !pre){ pre = el("pre", "sent-text", text); wrap.appendChild(pre); }
+      if (pre) pre.hidden = !open;
+    });
+    box.appendChild(wrap);
+  }
+  if (!(rec.parts || []).length) box.appendChild(el("div", "hint", "This request was kept without its parts \u2014 Raw has it whole."));
+  $("#sentFoot").textContent = sentFootText(rec);
+}
+function sentFootText(rec){
+  const bits = [], u = rec.usage;
+  if (u && typeof u.in === "number")
+    bits.push(u.in.toLocaleString() + " tokens in" + (typeof u.out === "number" ? ", " + u.out.toLocaleString() + " out" : "")
+      + (u.cached ? " (" + u.cached.toLocaleString() + " read from cache)" : "") + " \u2014 counted by the service");
+  else bits.push("About " + Number(rec.tokens || 0).toLocaleString() + " tokens in \u2014 an estimate; the service sent no count");
+  if (typeof rec.ttftMs === "number") bits.push("first word after " + (rec.ttftMs / 1000).toFixed(1) + "s");
+  if (typeof rec.durationMs === "number") bits.push((rec.durationMs / 1000).toFixed(1) + "s all told");
+  if (rec.effort) bits.push("thinking: " + rec.effort);
+  if (rec.prefill) bits.push("prefill: " + rec.prefill);
+  const n = (rec.requests || []).length;
+  if (n > 1) bits.push(n + " requests went out for this reply \u2014 the last is the one it answered");
+  return bits.join(" \u00b7 ");
+}
+const RAW_WORDS = ["messages", "system", "instructions", "conversation_history", "input"];
+function rawSettingsOf(b){ const o = {}; for (const k of Object.keys(b || {})) if (RAW_WORDS.indexOf(k) < 0) o[k] = b[k]; return o; }
+function rawMessagesOf(b){
+  const out = [];
+  b = b || {};
+  if (typeof b.system === "string" && b.system) out.push({ role:"system", text:b.system });
+  else if (Array.isArray(b.system)) out.push({ role:"system", text:partText(b.system) });
+  if (typeof b.instructions === "string" && b.instructions) out.push({ role:"instructions", text:b.instructions });
+  for (const m of Array.isArray(b.messages) ? b.messages : []){
+    const extra = {};
+    for (const k of Object.keys(m || {})) if (k !== "role" && k !== "content") extra[k] = m[k];
+    out.push({ role:String((m && m.role) || "?"), text:partText(m && m.content), fields:Object.keys(extra).length ? JSON.stringify(extra, null, 2) : "" });
+  }
+  for (const m of Array.isArray(b.conversation_history) ? b.conversation_history : []) out.push({ role:String((m && m.role) || "?"), text:partText(m && m.content) });
+  if (typeof b.input === "string") out.push({ role:"input", text:b.input });
+  return out;
+}
+function rawBlock(role, text, fields){
+  const b = el("div", "sent-part"), row = el("div", "sent-row");
+  row.appendChild(el("span", "sent-role", role));
+  const cp = el("button", "sent-copy", "Copy"); cp.type = "button";
+  cp.addEventListener("click", function(){ copyText(text, cp); });
+  row.appendChild(cp);
+  b.append(row, el("pre", "sent-text", text));
+  if (fields) b.appendChild(el("pre", "sent-text sent-fields", fields));
+  return b;
+}
+function renderSentRaw(rec){
+  const box = $("#sentRaw");
+  box.textContent = "";
+  const reqs = rec.requests || [];
+  reqs.forEach(function(r, i){
+    const wrap = el("div", "sent-req"), head = el("div", "sent-req-head");
+    let where = r.url || ""; try { const u = new URL(r.url); where = u.host + u.pathname; } catch(_){}
+    head.appendChild(el("span", null, (reqs.length > 1 ? "Request " + (i + 1) + " of " + reqs.length + " \u2014 " : "") + "sent to " + where));
+    const all = el("button", "sent-copy", "Copy all"); all.type = "button";
+    all.addEventListener("click", function(){ copyText(JSON.stringify(r.body, null, 2), all); });
+    head.appendChild(all);
+    wrap.appendChild(head);
+    const settings = rawSettingsOf(r.body);
+    if (Object.keys(settings).length) wrap.appendChild(rawBlock("settings", JSON.stringify(settings, null, 2)));
+    for (const m of rawMessagesOf(r.body)) wrap.appendChild(rawBlock(m.role, m.text, m.fields));
+    box.appendChild(wrap);
+  });
+  if (!reqs.length) box.appendChild(el("div", "hint", "No request was kept for this reply."));
+}
+
 /* Sends one probe and reports what came back, without interpreting it. */
 async function pfProbe(kind, signal){
     const req = buildPayload({ probe: kind }, current);
@@ -3681,10 +4685,23 @@ async function send(userText, mode, forConvo){
   }
 
   const continuing = mode === "continue";
-  let asst;
+  const swiping = mode === "swipe";
+  let asst, prevVi = -1;
   if (continuing){
     asst = convo.messages[convo.messages.length - 1];
     if (!asst || asst.role !== "assistant") return;
+  } else if (swiping){
+    /* A new version of the newest reply streams into the reply itself. Its
+       earlier versions never leave the chat - they are saved with it the
+       whole way through - so a tab closed mid-swipe loses none of them. */
+    while (convo.messages.length && convo.messages[convo.messages.length - 1].role === "error") convo.messages.pop();
+    asst = convo.messages[convo.messages.length - 1];
+    if (!asst || asst.role !== "assistant" || asst.pending) return;
+    saveVariant(asst);
+    prevVi = asst.vi;
+    for (const k of VARIANT_FIELDS) delete asst[k];
+    asst.content = ""; asst.thinking = ""; asst.model = p.model; asst.ts = Date.now(); asst.pending = true;
+    renderThread();
   } else {
     asst = { id:uid(), role:"assistant", content:"", thinking:"", model:p.model, ts:Date.now(), variants:[], vi:0, pending:true };
     convo.messages.push(asst);
@@ -3766,6 +4783,30 @@ async function send(userText, mode, forConvo){
 
   repaintHook = paint;
   let sources = [];
+  /* What the model saw: every request that came back answered, word for
+     word as it went out, and what the service said it counted. */
+  const sentReqs = [], t0 = Date.now();
+  let usage = null, reqAt = t0, firstAt = null, failed = false, swipeFailed = false;
+  const mark = () => { if (firstAt == null) firstAt = Date.now(); };
+  const noteUsage = d => {
+    if (!d || typeof d !== "object") return;
+    let u = null, anth = false;
+    if (d.type === "message_start" && d.message && d.message.usage){ u = d.message.usage; anth = true; }
+    else if (d.type === "message_delta" && d.usage){
+      if (typeof d.usage.output_tokens === "number"){ usage = usage || {}; usage.out = d.usage.output_tokens; }
+      return;
+    } else if (d.usage && typeof d.usage === "object" && !d.type) u = d.usage;
+    if (!u) return;
+    usage = usage || {};
+    if (anth && typeof u.input_tokens === "number"){
+      usage.in = u.input_tokens + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0);
+      if (u.cache_read_input_tokens) usage.cached = u.cache_read_input_tokens;
+    }
+    if (typeof u.prompt_tokens === "number") usage.in = u.prompt_tokens;
+    if (typeof u.completion_tokens === "number") usage.out = u.completion_tokens;
+    const pd = u.prompt_tokens_details;
+    if (pd && typeof pd.cached_tokens === "number" && pd.cached_tokens) usage.cached = pd.cached_tokens;
+  };
   /* One send can take more than one request. When the model answers with a
      lookup request instead of an answer, the search runs and the same turn is
      asked again with the results in front of it. The request reply is never
@@ -3779,8 +4820,9 @@ async function send(userText, mode, forConvo){
        requests back. Images can't ride a run, so a turn with any falls back
        to the plain stream — approvals resume on the next text turn. */
     let useRuns = false, asmR = null;
+    const runParts = [];
     if (reasonStyle(p) === "hermes" && p.hermesRuns && !runsIsDown(p)){
-      asmR = assembleMessages("openai", convo);
+      asmR = assembleMessages("openai", convo, runParts);
       useRuns = !asmR.messages.some(function(m){ return typeof m.content !== "string"; });
     }
     /* What this request carries is what the next one diffs against — so a
@@ -3814,13 +4856,14 @@ async function send(userText, mode, forConvo){
       const msgs = asmR.messages;
       const lastM = msgs[msgs.length - 1];
       const tailIsUser = !!(lastM && lastM.role === "user");
-      const cr = await fetch(base + "/runs", { method:"POST", headers:hh, signal:ctrl.signal,
-        body: JSON.stringify({
-          input: tailIsUser ? String(lastM.content) : "",
-          conversation_history: (tailIsUser ? msgs.slice(0, -1) : msgs).map(function(m){ return { role:m.role, content:String(m.content) }; }),
-          instructions: asmR.system || undefined,
-          session_id: "cozy-" + convo.id
-        }) });
+      const runBody = {
+        input: tailIsUser ? String(lastM.content) : "",
+        conversation_history: (tailIsUser ? msgs.slice(0, -1) : msgs).map(function(m){ return { role:m.role, content:String(m.content) }; }),
+        instructions: asmR.system || undefined,
+        session_id: "cozy-" + convo.id
+      };
+      reqAt = Date.now(); firstAt = null; usage = null;
+      const cr = await fetch(base + "/runs", { method:"POST", headers:hh, signal:ctrl.signal, body: JSON.stringify(runBody) });
       if (!cr.ok){
         if (cr.status === 404 || cr.status === 405){
           const gone = new Error("no runs api"); gone.__runsFallback = true; throw gone;
@@ -3831,6 +4874,7 @@ async function send(userText, mode, forConvo){
         throw new Error(p.name + " said no (" + cr.status + ") to starting the run.\n\n" + (detail || "No details given."));
       }
       const rj = await cr.json();
+      sentReqs.push({ url: base + "/runs", transport:"runs", body: JSON.parse(JSON.stringify(runBody)), parts: runParts });
       run = { id: rj.run_id, base: base, key: p.apiKey };
       ctrl.run = run; ctrl.asstId = asst.id;
       // stopping the stream must also stop the agent, or it keeps working unseen
@@ -3844,14 +4888,12 @@ async function send(userText, mode, forConvo){
         }
         throw new Error(p.name + " said no (" + res.status + ") to the run stream.");
       }
-      const reader = res.body.getReader(), dec = new TextDecoder();
-      let buf = "", finished = false;
+      const reader = res.body.getReader(), dec = new TextDecoder(), sse = { buf:"" };
+      let finished = false;
       while (!finished){
         const chunk = await reader.read();
-        if (chunk.done) break;
-        buf += dec.decode(chunk.value, { stream:true });
-        const parts = buf.split("\n\n"); buf = parts.pop();
-        for (const part of parts){
+        const frames = sseFrames(sse, chunk.done ? dec.decode() : dec.decode(chunk.value, { stream:true }), chunk.done);
+        for (const part of frames){
           let evName = "";
           const dataLines = [];
           for (const line of part.split("\n")){
@@ -3863,8 +4905,8 @@ async function send(userText, mode, forConvo){
           if (!rawline || rawline === "[DONE]") continue;
           let d; try { d = JSON.parse(rawline); } catch(_) { continue; }
           const ev = d.event || evName;
-          if (ev === "message.delta"){ raw += d.delta || ""; }
-          else if (ev === "reasoning.available"){ asst.thinking += d.text || ""; }
+          if (ev === "message.delta"){ raw += d.delta || ""; mark(); }
+          else if (ev === "reasoning.available"){ asst.thinking += d.text || ""; mark(); }
           else if (ev === "tool.started"){
             asst.tools = asst.tools || [];
             asst.tools.push({ id:uid(), tool:d.tool || "", emoji:"", label:d.preview || d.tool || "tool", status:"running" });
@@ -3886,6 +4928,7 @@ async function send(userText, mode, forConvo){
           paint();
           if (finished) break;
         }
+        if (chunk.done) break;
       }
       ranViaRuns = true;
       convo.sentDocNames = docNamesSent;
@@ -3898,6 +4941,7 @@ async function send(userText, mode, forConvo){
       }
     }
     if (!ranViaRuns){
+    reqAt = Date.now(); firstAt = null; usage = null;
     let req = buildPayload({ search: wantSearch, mode: mode }, convo);
     let res = await fetch(req.url, { method:"POST", headers:req.headers, body:JSON.stringify(req.body), signal:ctrl.signal });
     if (!res.ok){
@@ -3940,6 +4984,8 @@ async function send(userText, mode, forConvo){
       if (!res.ok) throw new Error(p.name + " said no (" + res.status + ").\n\n" + (detail || "No details given."));
     }
     convo.sentDocNames = docNamesSent;   // the wire carried these — the next request diffs against them
+    const sentEntry = { url: req.url, transport:"chat", body: req.body, parts: req.parts, prefill: req.prefill };
+    sentReqs.push(sentEntry);
     /* The model continues from the prefill, so the prefill is the first part
        of the reply. Seeded exactly the way a continuation seeds it, because
        it is the same thing. */
@@ -3948,14 +4994,11 @@ async function send(userText, mode, forConvo){
       paint();
     }
 
-    const reader = res.body.getReader(), dec = new TextDecoder();
-    let buf = "";
+    const reader = res.body.getReader(), dec = new TextDecoder(), sse = { buf:"" };
     while (true){
       const chunk = await reader.read();
-      if (chunk.done) break;
-      buf += dec.decode(chunk.value, { stream:true });
-      const parts = buf.split("\n\n"); buf = parts.pop();
-      for (const part of parts){
+      const frames = sseFrames(sse, chunk.done ? dec.decode() : dec.decode(chunk.value, { stream:true }), chunk.done);
+      for (const part of frames){
         /* One SSE frame: an optional event name plus one or more data lines,
            which the spec joins with newlines into a single payload. Parsing
            each data line on its own would shred a payload the server split
@@ -3971,6 +5014,7 @@ async function send(userText, mode, forConvo){
         const rawline = dataLines.join("\n").trim();
         if (!rawline || rawline === "[DONE]") continue;
         let d; try { d = JSON.parse(rawline); } catch(_) { continue; }
+        noteUsage(d);
 
         if (evName === "hermes.tool.progress"){
           /* The agent narrates its tool use out of band, one running event
@@ -3995,13 +5039,13 @@ async function send(userText, mode, forConvo){
             for (const r of rs) if (r.url) sources.push({ title:r.title || r.url, url:r.url, snippet:"" });
           }
         } else if (d.type === "content_block_delta" && d.delta){
-          if (d.delta.type === "text_delta")     raw += d.delta.text || "";
-          if (d.delta.type === "thinking_delta") asst.thinking += d.delta.thinking || "";
+          if (d.delta.type === "text_delta"){     raw += d.delta.text || ""; mark(); }
+          if (d.delta.type === "thinking_delta"){ asst.thinking += d.delta.thinking || ""; mark(); }
         } else if (d.choices && d.choices[0]){
           const dl = d.choices[0].delta || {};
-          if (dl.content)           raw += dl.content;
-          if (dl.reasoning_content) asst.thinking += dl.reasoning_content;
-          if (dl.reasoning)         asst.thinking += dl.reasoning;
+          if (dl.content){           raw += dl.content; mark(); }
+          if (dl.reasoning_content){ asst.thinking += dl.reasoning_content; mark(); }
+          if (dl.reasoning){         asst.thinking += dl.reasoning; mark(); }
         } else if (d.type === "error"){
           throw new Error((d.error && d.error.message) || "Stream error");
         } else if (d.error){
@@ -4011,7 +5055,9 @@ async function send(userText, mode, forConvo){
         }
         paint();
       }
+      if (chunk.done) break;
     }
+    sentEntry.usage = usage;
     }
     if (continuing || searchRound >= AUTO_SEARCH_ROUNDS || !autoSearchTextOn()) break;
     const ask = parseSearchCall(splitReasoning(raw));
@@ -4073,7 +5119,12 @@ async function send(userText, mode, forConvo){
       if (asst.tools) for (const t of asst.tools) if (t.status === "running") t.status = "stopped";
       if (!asst.content && !asst.thinking) asst.content = "_(stopped)_";
     } else {
-      if (!continuing) convo.messages = convo.messages.filter(m => m.id !== asst.id);
+      failed = true;
+      if (swiping){
+        /* the new version never came: the reply goes back to the version it
+           was showing, with every version it has */
+        delete asst.pending; asst.vi = prevVi; syncVariant(asst); swipeFailed = true;
+      } else if (!continuing) convo.messages = convo.messages.filter(m => m.id !== asst.id);
       convo.messages.push({ id:uid(), role:"error", content:friendlyError(err,p), ts:Date.now() });
     }
   } finally {
@@ -4082,7 +5133,13 @@ async function send(userText, mode, forConvo){
     if (repaintHook === paint) repaintHook = null;
     if (asst) delete asst.pending;
     if (asst && asst.approvals) for (const a of asst.approvals) if (a.status === "pending") a.status = "expired";
-    if (asst && asst.role === "assistant"){
+    if (asst && asst.role === "assistant" && !failed && sentReqs.length){
+      const sid = "s" + uid();
+      const rec = sentRecord(convo, p, sentReqs, { ttftMs: firstAt != null ? firstAt - reqAt : null, durationMs: Date.now() - t0 });
+      asst.sent = { chat: convo.id, id: sid, tokens: rec.tokens, exact: rec.exact };
+      Sent.keep(convo.id, sid, rec);
+    }
+    if (asst && asst.role === "assistant" && !swipeFailed){
       asst.variants = asst.variants || [];
       const snap = variantSnap(asst);
       if (continuing && asst.variants.length) asst.variants[asst.vi] = snap;
@@ -4331,6 +5388,13 @@ function applyTheme(){
 }
 
 async function refreshStorage(){
+  if (DEVICE){
+    try {
+      const u = await (await fetch("api/store/usage", { cache:"no-store" })).json();
+      $("#storageInfo").textContent = convos.length + " conversation" + (convos.length===1?"":"s") + " · " + (u.bytes/1048576).toFixed(1) + " MB on this phone";
+    } catch(_) { $("#storageInfo").textContent = convos.length + " conversation" + (convos.length===1?"":"s") + " saved on this phone"; }
+    return;
+  }
   try {
     const est = await navigator.storage.estimate();
     $("#storageInfo").textContent = convos.length + " conversation" + (convos.length===1?"":"s") + " · about " + (est.usage/1048576).toFixed(1) + " MB used";
@@ -4347,7 +5411,8 @@ function download(name, text, type){
   setTimeout(function(){ URL.revokeObjectURL(u); }, 1500);
 }
 async function backup(){
-  const data = { app:"cozy-chat", version:VERSION, exportedAt:new Date().toISOString(), settings:S, conversations:await DB.all(), docs:await DB.docAll() };
+  const data = { app:"cozy-chat", version:VERSION, exportedAt:new Date().toISOString(), settings:S,
+                 conversations: DEVICE ? convos : await DB.all(), docs: DEVICE ? docs : await DB.docAll() };
   download("cozy-chat-backup-" + new Date().toISOString().slice(0,10) + ".json", JSON.stringify(data,null,2), "application/json");
   toast("Backup saved to Downloads");
 }
@@ -4356,6 +5421,14 @@ async function handleRestore(file){
     const data = JSON.parse(await file.text());
     if (!data.conversations) throw new Error("bad");
     if (!confirm("Restore " + data.conversations.length + " conversations? This replaces what's here now.")) return;
+    if (DEVICE){
+      /* the phone takes the file's contents; what they replace goes to its
+         trash first, and every open tab reloads from the phone */
+      const ok = await Device.replace({ settings: data.settings || null, conversations: data.conversations,
+                                        docs: Array.isArray(data.docs) ? data.docs : null });
+      toast(ok ? "Restored" : "Couldn't restore — Cozy's server on this phone didn't answer, so nothing was changed.");
+      return;
+    }
     await DB.clear();
     for (const c of data.conversations) await DB.put(c);
     // older backups predate files; only replace the store when the backup has them
@@ -4376,106 +5449,21 @@ async function handleRestore(file){
     applyTheme(); syncSettingsUI(); renderSidebar(); renderThread(); toast("Restored");
   } catch(_) { toast("That file didn't look like a Cozy Chat backup"); }
 }
-/* ---------- the vault: the phone keeps a copy ----------
-   Browser storage is a cache, not a home — one "clear site data" and it was
-   gone, which is how chats died. Served by its own Termux server, Cozy
-   mirrors everything to cozy-vault.json on disk: the same blob the Back up
-   button makes. A wiped browser is restored on open. On any other host the
-   probe finds nothing that looks like a vault and the app is exactly the
-   PWA it always was. */
-const vault = (() => {
-  let state = "probing", bootDone = false, busy = false, again = false, timer = null;
-
-  async function probe(){
-    try {
-      const res = await fetch("api/vault", { cache: "no-store" });
-      if (res.ok){
-        const j = await res.json().catch(() => null);
-        /* A static host can 200 or 404 anything — the answer only counts if
-           it is shaped like the vault the Termux server keeps. */
-        if (j && (j.app === "cozy-chat" || Array.isArray(j.conversations))) return { live:true, data:j };
-        return { live:false, data:null };
-      }
-      if (res.status === 404){
-        const j = await res.json().catch(() => null);
-        if (j && j.error) return { live:true, data:null };
-      }
-    } catch(_) {}
-    return { live:false, data:null };
+/* What the "Your data" panel says depends on where the data actually is. */
+function renderDataHint(){
+  const h = $("#dataHint"), st = $("#vaultStat");
+  if (!h || !st) return;
+  if (DEVICE){
+    h.textContent = "Your chats, files and settings are kept on this phone, not in the browser. Clearing the browser can't touch them, and every browser on this phone opens the same ones.";
+    st.textContent = Device.where() ? "They're in " + Device.where() + ". A deleted chat waits in its trash folder for 30 days." : "";
+  } else if (STORE_MODE === "stale"){
+    h.textContent = "Cozy was updated, but the server running on this phone is still the old one, so for now everything is kept in this browser. Run cozy in Termux once: it starts the new server and moves everything here onto the phone.";
+    st.textContent = "";
+  } else {
+    h.textContent = "Everything lives in this browser only. Clearing your browser's site data will erase it, so back up now and then.";
+    st.textContent = "";
   }
-
-  async function push(){
-    if (state !== "live" || !bootDone) return;
-    if (busy){ again = true; return; }
-    busy = true;
-    try {
-      const data = { app:"cozy-chat", kind:"vault", version:VERSION, savedAt:new Date().toISOString(),
-                     settings:S, conversations:await DB.all(), docs:await DB.docAll() };
-      /* The one write that must never happen: an empty app over a full
-         vault. An empty app whose settings survived is a user deleting
-         things by hand — that empties the vault too, on purpose. An empty
-         app with NO settings is a wiped browser, and there the vault is
-         the only copy left. */
-      if (!data.conversations.length && !data.docs.length && !localStorage.getItem("cozychat:settings")){
-        busy = false; return;
-      }
-      await fetch("api/vault", { method:"PUT", headers:{ "content-type":"application/json" }, body:JSON.stringify(data) });
-    } catch(_) {}
-    busy = false;
-    if (again){ again = false; touch(); }
-  }
-
-  function touch(){
-    if (state !== "live" || !bootDone) return;
-    clearTimeout(timer);
-    timer = setTimeout(push, 1200);
-  }
-
-  async function boot(){
-    const stat = $("#vaultStat");
-    /* The Termux server says what it is in the page it serves. No tag, no
-       probe: on github.io or any static host the app never makes a vault
-       request at all — it is exactly the PWA it always was. */
-    if (!document.querySelector('meta[name="cozy-vault"]')){
-      state = "off";
-      if (stat) stat.textContent = "No disk copy on this host — use Back up now and then.";
-      bootDone = true;
-      return;
-    }
-    const r = await probe();
-    state = r.live ? "live" : "off";
-    if (state !== "live"){
-      if (stat) stat.textContent = "No disk copy on this host — use Back up now and then.";
-      bootDone = true;
-      return;
-    }
-    if (stat) stat.textContent = "Everything is also mirrored to this device's disk (cozy-vault.json). Clearing the browser can't take your chats — they come back on open.";
-    const data = r.data;
-    if (data && COZY_CLEAN_SLATE && !convos.length && !docs.length
-        && Array.isArray(data.conversations) && (data.conversations.length || (data.docs || []).length)){
-      // a wiped browser meets its rescue copy: bring everything back
-      await DB.clear();
-      for (const c of data.conversations) await DB.put(c);
-      if (Array.isArray(data.docs)){ await DB.docClear(); for (const d of data.docs) await DB.docPut(d); }
-      if (data.settings){
-        /* through loadSettings, the one place every migration lives — the
-           same bargain the file Restore makes */
-        localStorage.setItem("cozychat:settings", JSON.stringify(data.settings));
-        S = loadSettings(); saveSettings();
-      }
-      await loadConvos(); await loadDocs();
-      current = convos.filter(function(c){ return !c.archived; })[0] || convos[0] || null;
-      applyTheme(); syncSettingsUI(); renderSidebar(); renderThread();
-      toast("Restored " + data.conversations.length + " chats and " + (data.docs || []).length + " files from this device's copy");
-    } else {
-      touch();   // bring the vault up to date with what is here
-    }
-    bootDone = true;
-    document.addEventListener("visibilitychange", function(){ if (document.visibilityState === "hidden") push(); });
-  }
-  return { boot: boot, touch: touch };
-})();
-function vaultTouch(){ vault.touch(); }
+}
 
 function exportMd(){
   if (!current || !current.messages.length){ toast("Nothing to save yet"); return; }
@@ -4490,13 +5478,17 @@ function setToggle(el, on){ el.classList.toggle("on", !!on); el.setAttribute("ar
    PF_STATUS against PF_REASON in both directions. */
 function pfStatusText(){
   if (!lastPrefill) return "Nothing has been sent yet in this session.";
-  const d = lastPrefill.detail || {};
+  return pfWords(lastPrefill) || PF_STATUS[PF_REASON.DISABLED];
+}
+function pfWords(pf){
+  if (!pf || pf.reason === PF_REASON.DISABLED) return "";
+  const d = pf.detail || {};
   const bits = [];
   if (d.appended) bits.push("added as the last turn");
   if (d.flagField) bits.push(d.flagField + ": true");
   if (d.reasoningField) bits.push(d.reasoningField + " (" + d.reasoningLength + " characters)");
   if (d.why) bits.push(d.why);
-  const text = PF_STATUS[lastPrefill.reason] || lastPrefill.reason;
+  const text = PF_STATUS[pf.reason] || pf.reason;
   return bits.length ? text + " \u2014 " + bits.join(", ") : text;
 }
 function renderPrefill(){
@@ -4567,7 +5559,7 @@ function syncSettingsUI(){
   if (sc) sc.textContent = current ? (current.title || "this chat") : "new chats";
   const sn = $("#scopeNote");
   if (sn) sn.hidden = !current;
-  $("#temp").value = chatTemp();
+  const tNow = chatTemp(); $("#temp").value = tNow == null ? "" : tNow;
   $("#maxTok").value = chatMaxTok();
   $("#thinkTags").value = S.thinkTags;
   $("#remindMode").value = PS().remind.mode;
@@ -4594,6 +5586,7 @@ function syncSettingsUI(){
   $("#sHint").textContent = SEARCH_HINTS[S.search.provider] || "";
   $("#sKeyField").hidden = S.search.provider === "native";
   $("#verInfo").textContent = "Cozy Chat v" + VERSION;
+  renderDataHint();
   syncSearchBtn();
 }
 
@@ -4699,7 +5692,9 @@ function threadTouchDone(e){
 on("#thread", "touchend", threadTouchDone, { passive:true });
 on("#thread", "touchcancel", threadTouchDone, { passive:true });
 on("#menuBtn", "click", openDrawer);
-on("#scrim", "click", function(){ closeDrawer(); closeSettings(); });
+on("#scrim", "click", function(){ closeDrawer(); closeSettings(); if ($("#sentModal").classList.contains("show")) closeSent(); });
+on("#closeSent", "click", closeSent);
+on("#sentTabs", "click", function(e){ const b = e.target.closest("[data-sentview]"); if (b) showSentView(b.dataset.sentview); });
 on("#settingsBtn", "click", openSettings);
 on("#closeSettings", "click", closeSettings);
 on("#newChatBtn", "click", function(){ newConvo(); });
@@ -4737,7 +5732,7 @@ on("#convoList", "click", async function(e){
     e.stopPropagation();
     if (!confirm("Delete this chat?")) return;
     if (streaming && streaming.convoId === del.dataset.del) streaming.abort();
-    await DB.del(del.dataset.del);
+    await DB.del(del.dataset.del); Sent.drop(del.dataset.del);
     convos = convos.filter(c => c.id !== del.dataset.del);
     if (current && current.id === del.dataset.del) current = convos[0] || null;
     renderSidebar(); renderThread(); return;
@@ -4748,6 +5743,12 @@ on("#convoList", "click", async function(e){
 
 on("#threadInner", "click", async function(e){
   if (e.target.closest("[data-open-settings]")){ openSettings(); return; }
+  const sv = e.target.closest("[data-sent]");
+  if (sv){
+    const m = current && current.messages.find(x => x.id === sv.dataset.sent);
+    if (m && m.sent) openSent(m);
+    return;
+  }
   const av = e.target.closest("[data-approve]");
   if (av){
     const parts = av.dataset.approve.split("|");
@@ -4793,6 +5794,7 @@ on("#threadInner", "click", async function(e){
   const sw = e.target.closest("[data-swipe]");
   if (sw){
     const m = current.messages.find(x=>x.id===sw.dataset.swipe);
+    if (!m || m.pending) return;
     const next = m.vi + Number(sw.dataset.dir);
     if (next >= 0 && next < m.variants.length){ saveVariant(m); m.vi = next; syncVariant(m); renderThread(); await persist(); }
     return;
@@ -4801,11 +5803,20 @@ on("#threadInner", "click", async function(e){
   if (cp){ navigator.clipboard.writeText(current.messages.find(x=>x.id===cp.dataset.copy).content).then(function(){ toast("Copied"); }); return; }
   const br = e.target.closest("[data-branch]");
   if (br){
-    const i = current.messages.findIndex(x=>x.id===br.dataset.branch);
-    const oldTitle = current.title;
-    const seed = JSON.parse(JSON.stringify(current.messages.slice(0,i+1))).map(function(m){ m.id = uid(); return m; });
-    const c = newConvo(seed);
-    c.title = oldTitle.slice(0,36) + " ↗";
+    const src = current;
+    const i = src.messages.findIndex(x=>x.id===br.dataset.branch);
+    const seed = JSON.parse(JSON.stringify(src.messages.slice(0,i+1).filter(m => !m.pending))).map(function(m){ m.id = uid(); return m; });
+    const c = newConvo(seed, src.projectId);
+    /* A branch is the same chat from that point on: its connection, model,
+       instruction set, sampling, project, extra system text and files come
+       with it. It used to start from the global defaults instead. */
+    c.cfg = JSON.parse(JSON.stringify(src.cfg || defaultCfg()));
+    if (src.sysExtra) c.sysExtra = src.sysExtra;
+    const ids = chatDocIds(src);
+    if (ids.length) c.docIds = ids.slice();
+    if (src.filesOn) c.filesOn = true;
+    if (Array.isArray(src.sentDocNames)) c.sentDocNames = src.sentDocNames.slice();
+    c.title = src.title.slice(0,36) + " \u2197";
     renderThread(); await persist(); toast("Branched into a new chat");
     return;
   }
@@ -4817,29 +5828,14 @@ on("#threadInner", "click", async function(e){
   if (rg){
     const convo = current;
     const i = convo.messages.findIndex(x=>x.id===rg.dataset.regen);
-    const m = convo.messages[i];
-    if (i === lastAssistantIdx()){
-      saveVariant(m); const kept = variantsOf(m).slice();
-      convo.messages = convo.messages.slice(0, i);
-      renderThread(); await persistConvo(convo); pinned = true;
-      await send(null, null, convo);
-      const nm = convo.messages[convo.messages.length-1];
-      if (nm && nm.role === "assistant"){
-        nm.variants = kept.concat(nm.variants || []);
-        nm.vi = nm.variants.length - 1; syncVariant(nm);
-      } else {
-        // the swipe failed — put the original reply back so its versions
-        // survive, with the error still visible after it
-        const at = convo.messages.length && convo.messages[convo.messages.length-1].role === "error"
-          ? convo.messages.length - 1 : convo.messages.length;
-        convo.messages.splice(at, 0, m);
-      }
-      if (convo === current) renderThread();
-      await persistConvo(convo);
-    } else {
-      convo.messages = convo.messages.slice(0, i);
-      renderThread(); await persistConvo(convo); pinned = true; send(null, null, convo);
-    }
+    if (i < 0) return;
+    if (i === lastAssistantIdx()){ pinned = true; send(null, "swipe", convo); return; }
+    /* an older reply has the rest of the chat after it, and retrying it means
+       losing that - so it is asked first, never done silently */
+    const after = convo.messages.length - i - 1;
+    if (after > 0 && !confirm("Retry this reply? The " + after + " message" + (after === 1 ? "" : "s") + " after it will be removed.")) return;
+    convo.messages = convo.messages.slice(0, i);
+    renderThread(); await persistConvo(convo); pinned = true; send(null, null, convo);
     return;
   }
   const ed = e.target.closest("[data-edit]");
@@ -4865,12 +5861,18 @@ function startEdit(id){
 
 on("#regenBtn", "click", async function(){
   if (!current || !current.messages.length) return;
+  if (streaming && streaming.convoId === current.id) return;
   const convo = current;
-  let i = convo.messages.length-1;
-  while (i>=0 && convo.messages[i].role!=="assistant" && convo.messages[i].role!=="error") i--;
-  if (i<0) return;
-  convo.messages = convo.messages.slice(0,i);
-  renderThread(); await persistConvo(convo); pinned = true; send(null, null, convo);
+  /* One meaning: a new version of the newest reply - the same as Swipe on
+     it. A failed send's error goes; the reply before it, and every version
+     it has, stays. With no reply yet, it answers the last message. It used
+     to delete the newest reply with all its versions. */
+  while (convo.messages.length && convo.messages[convo.messages.length-1].role === "error") convo.messages.pop();
+  const last = convo.messages[convo.messages.length-1];
+  if (!last) { renderThread(); await persistConvo(convo); return; }
+  pinned = true;
+  if (last.role === "assistant"){ renderThread(); send(null, "swipe", convo); return; }
+  renderThread(); await persistConvo(convo); send(null, null, convo);
 });
 on("#clearBtn", "click", async function(){
   if (!current || !confirm("Clear every message in this chat?")) return;
@@ -4952,7 +5954,10 @@ function renderRemindHint(){
 }
 on("#remindMode", "change", function(e){ PS().remind.mode = e.target.value; saveSettings(); updateEmber(); renderRemindHint(); });
 on("#remindDepth", "change", function(e){ PS().remind.depth = Math.max(0, Math.min(50, Number(e.target.value) || 0)); saveSettings(); updateEmber(); renderRemindHint(); });
-on("#temp", "change", function(e){ cfgSet("temperature", Number(e.target.value)); });
+on("#temp", "change", function(e){
+  const v = String(e.target.value).trim();
+  cfgSet("temperature", v === "" ? "none" : Number(v));
+});
 on("#maxTok", "change", function(e){ cfgSet("maxTokens", Number(e.target.value)); });
 on("#thinkTags", "change", function(e){ S.thinkTags = e.target.value; saveSettings(); renderThread(); });
 on("#tgThink", "click", function(e){ S.showThinking=!S.showThinking; setToggle(e.currentTarget,S.showThinking); saveSettings(); renderThread(); });
@@ -4982,7 +5987,8 @@ on("#themeGrid", "click", function(e){
 });
 on("#wipeBtn", "click", async function(){
   if (!confirm("Delete every conversation on this device? This cannot be undone.")) return;
-  await DB.clear(); convos = []; current = null;
+  if (streaming) streaming.abort();
+  await DB.clear(); Sent.dropAll(); convos = []; current = null;
   renderSidebar(); renderThread(); refreshStorage(); toast("All conversations deleted");
 });
 on("#threadInner", "touchstart", function(e){
@@ -6024,7 +7030,7 @@ async function loadDocs(){
 }
 async function saveDoc(d){
   d.updatedAt = Date.now();
-  await DB.docPut(JSON.parse(JSON.stringify(d)));
+  await DB.docPut(DEVICE ? d : JSON.parse(JSON.stringify(d)));
   docs.sort((a,b) => b.updatedAt - a.updatedAt);
 }
 function collapseDocBar(){ closeFilePop(); }
@@ -6745,7 +7751,8 @@ on("#archList", "click", async function(e){
   const del = e.target.closest("[data-archdel]");
   if (del){
     if (!confirm("Delete this chat?")) return;
-    await DB.del(del.dataset.archdel);
+    if (streaming && streaming.convoId === del.dataset.archdel) streaming.abort();
+    await DB.del(del.dataset.archdel); Sent.drop(del.dataset.archdel);
     convos = convos.filter(c => c.id !== del.dataset.archdel);
     if (current && current.id === del.dataset.archdel) current = convos.filter(c => !c.archived)[0] || null;
     renderArchList(); renderSidebar(); renderThread();
@@ -7167,6 +8174,7 @@ on("#chatTitle", "touchend", function(){ clearTimeout(titleHold); });
    BOOT
    ========================================================== */
 (async function init(){
+  if (DEVICE) await Device.boot();
   applyTheme();
   await loadConvos();
   await loadDocs();
@@ -7178,7 +8186,7 @@ on("#chatTitle", "touchend", function(){ clearTimeout(titleHold); });
   renderThread();
   renderAttachTray();
   autoGrow();
-  vault.boot();
+  if (DEVICE) Device.started();
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function(){});
 })();
 </script>

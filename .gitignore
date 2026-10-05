@@ -8,3 +8,4 @@ package-lock.json
 index.html.negbak
 # scratch verifiers written during a session, never part of the gate
 tests/_*.js
+__pycache__/

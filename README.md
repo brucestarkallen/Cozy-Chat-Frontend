@@ -1,7 +1,9 @@
 # Cozy Chat
 
-A private AI chat client. One HTML file, no build step, no server.
-Your keys and conversations stay on your device.
+A private AI chat client. One HTML file, no build step.
+Run it from Termux and your chats, files and settings live on the phone in
+`~/.cozychat` — not in the browser. Every browser on the phone opens the same
+ones, and clearing a browser can't touch them.
 
 ---
 
@@ -29,9 +31,10 @@ bash serve.sh
 Then open `http://localhost:8080` in Chrome. That's it — no build, no npm,
 no waiting. Edit `index.html` in Termux, refresh the tab, changes are live.
 
-**One thing to know:** the web version and the local version are treated as two
-different sites by Chrome, so they keep **separate** conversation histories.
-Pick one as your main, or move everything across with **Back up** / **Restore**.
+**One thing to know:** only the copy served from Termux keeps your data on the
+phone. The github.io version has no phone server to talk to, so it keeps
+everything in that browser. To move chats from the web version to the phone:
+**Back up** there, then **Restore** in the Termux copy.
 
 ---
 
@@ -50,9 +53,16 @@ Tap **Test** before saving.
 **Chat**
 - Several connections saved at once, switch anytime
 - Streaming replies with a stop button
-- **Swipe** — regenerate without losing the old answer; arrows move between versions
+- **Swipe** — regenerate without losing the old answer; arrows move between versions.
+  The new version streams into the reply itself, so its earlier versions never
+  leave the chat — close the tab mid-swipe and nothing is lost. **Retry** under
+  the message box means the same thing; after a failed send it clears the error
+  and tries again. A swipe that fails puts the reply back exactly as it was.
+- **Retry** on an older reply asks first: retrying it removes every message after it
 - **More** — make the model continue where it stopped instead of restarting
-- **Branch** — fork any point of a chat into a new conversation
+- **Branch** — fork any point of a chat into a new conversation. The branch keeps
+  the chat's connection, model, instruction set, temperature, project, "this chat
+  only" text and files
 - Edit any message and re-run from there
 - Copy, delete, retry per message
 - Markdown, tables, code blocks with copy buttons
@@ -218,6 +228,29 @@ Tap **Test** before saving.
 - Save any number of named sets and switch between them instantly
 - Each holds its own system prompt, its own blocks, **and their order**
 - **Copy** a set, **Export** one to a file, **Import** one back
+
+**What the model saw**
+
+Every reply has a line under it — **What the model saw · 12,345 tokens** — that
+opens exactly what went to the service for that reply:
+
+- **Normal** lists every part the request was built from, in order: the main
+  system prompt, each instruction block (and where it sat — before or after the
+  conversation, or in the chat at a depth), the never-forget copy, "this chat
+  only", the file-editing rules, each file, the conversation, the prefill. Each
+  part shows its size; tap it to read it, **Copy** takes it exactly.
+- **Raw** is the request as it went out: the settings (model, max tokens,
+  temperature, thinking) and every message by role, with **Copy all** for the
+  whole body. The API key is never in it.
+- The foot says how many tokens went in — **counted by the service** when it
+  reports a count (Claude, DeepSeek, OpenRouter and most others do), an estimate
+  when it doesn't — plus the time to the first word, the thinking level and
+  what the prefill did.
+
+Each version of a reply keeps its own record. Served from Termux the records
+live on the phone; a chat keeps them for its newest 200 replies, and the words
+every request repeats (the whole history, each time) are stored once, not once
+per reply.
 
 **Prompt order**
 Everything the model receives, shown as one list in the order it receives it.
@@ -527,6 +560,8 @@ Settings → App, or tap the moon icon to cycle.
 
 **Data**
 - Ember bar above the message box fills as the context window fills
+- **Temperature** sends what you set; empty sends nothing, so the service's own
+  default applies
 - Backup and restore everything — conversations, settings, and your files — to a JSON file
 - Save any conversation as Markdown
 
@@ -597,12 +632,12 @@ network-first, so a refresh always gets the newest version.
 | `send()` | Sends and reads the streaming reply |
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
-**Tests.** Everything in `tests/` — `v5261test.js` down to `v2test.js`, plus
+**Tests.** Everything in `tests/` — `v5270test.js` down to `v2test.js`, plus
 `searchtest.js`, `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`,
 `swtest.js`, `scrolltest.js`, `styletest.js`, `hiddentest.js`,
 `coherencetest.js` and `installtest.sh` — runs under Node with jsdom
 (`npm i jsdom fake-indexeddb`).
-1665 checks across the matching engine, JSON tolerance, prompt assembly,
+1783 checks (plus 40 in real Chromium) across the matching engine, JSON tolerance, prompt assembly,
 multi-block replies, proposal supersede, undo truth, button visibility,
 projects and their instruction blocks, per-connection effort ladders with
 self-healing levels, retrieval, streaming, SSE framing and Hermes tool activity,
@@ -610,6 +645,12 @@ stream/chat binding, touch reorder, reader-owned scrolling, backup
 round-trips, migration, prefill on every wire shape, model-decided search, and
 negative tests that deliberately reintroduce fixed bugs to prove the guards
 fire.
+
+`tests/device_e2e.py` runs the phone's storage in real Chromium against the
+real `serve.py`: two browsers in step, a wiped browser, a stale tab, the server
+killed mid-chat, a tab closed mid-swipe, a browser handing over its old chats,
+delete, restore and a page from an old server (`pip install playwright &&
+playwright install chromium`, then `python3 tests/device_e2e.py`).
 
 `tests/searchnegtest.js` is the same kind of harness for the search guards:
 it puts each of the 11 lookup bugs back and requires `tests/searchtest.js` to
@@ -645,8 +686,14 @@ That sets up a `cozy` command:
 | `cozy log` | recent server output |
 | `cozy path` | where the files live |
 
+| `cozy data` | where your chats live |
+
 `cozy` prints what it did — `Updated 4.0.2 -> 4.1.0` or `Already on 4.1.0` —
-so you never have to guess whether an update landed.
+so you never have to guess whether an update landed. It also asks the running
+server which code it runs, and relights it whenever that isn't the code on
+disk — including when an update rewrote the `cozy` command itself, and when
+the server was started some other way. `serve.py` relights itself too when an
+update replaces it.
 
 The local copy is served by `serve.py`, which forbids caching. Plain
 `python -m http.server` answers conditional requests with 304, which lets a
@@ -660,10 +707,13 @@ when that happens rather than failing quietly.
 `cozy` also updates itself: if a release ships a newer launcher, it reinstalls
 the command and carries on. You only ever run the install line once.
 
-**Your chats won't follow you here.** Browsers keep storage separate per
-address, so the local copy starts empty even if you have conversations on the
-github.io version. Open the old one, **Back up**, then open the local one and
-**Restore**.
+**Chats a browser kept before v5.27.0 move onto the phone by themselves** the
+first time that browser opens this version: every chat, file and setting it
+held is merged into the phone's (a chat the phone already has is replaced only
+by a newer copy), and once the phone holds every one of them the browser's
+copy is emptied. Each browser does this once — Opera and Chrome both bring
+theirs. The old `cozy-vault.json` is imported the same way and moved into
+`~/.cozychat/imported/`.
 
 ---
 
@@ -689,20 +739,36 @@ fade the top icon row until you reach for it.
 
 ## Your data
 
-Conversations and files live in IndexedDB, settings and keys in localStorage. Nothing is
-uploaded anywhere — requests go straight from your phone to whichever service
-you connected.
+**Served from Termux, nothing lives in the browser.** `serve.py` keeps your
+data on the phone in `~/.cozychat` (set `COZY_DATA_DIR` to move it):
 
-**Served from Termux, nothing can wipe you out.** The little server also keeps
-`cozy-vault.json` on disk — every change is mirrored there within a second or
-two, same shape as a backup file. Clear Chrome's site data, switch browsers,
-reinstall Chrome: open Cozy again and everything is simply back, restored from
-disk. An intentional delete-all empties the vault too (your choice is
-respected), while a wiped browser can never overwrite it (the app refuses to
-mirror an empty state that still has no settings). Updates never touch the
-file — that is covered by the install test, not by hope.
+| | |
+|---|---|
+| `chats/` | one file per chat |
+| `files/` | one file per file |
+| `settings.json` | settings, connections and keys |
+| `sent/` | what the model saw, per chat |
+| `trash/` | anything deleted or replaced, kept 30 days |
 
-Anywhere else (github.io, any static host), there is no server and no disk
-copy — the app makes no vault requests at all, and clearing Chrome's site
-data wipes everything, so use **Back up** now and then — one file carrying
-every chat, file, and setting, restorable anywhere.
+It lives outside the app folder, so updating or reinstalling never touches it,
+and outside every browser, so clearing one never touches it. Any browser on the
+phone that opens `http://127.0.0.1:8787/` reads and writes the same files.
+
+- **Every save goes straight to the phone**, one chat at a time — not the whole
+  library on every change.
+- **Open browsers stay in step.** A message sent in one appears in the other
+  within a moment, with no reload.
+- **A browser that fell behind cannot write over newer work.** Every record
+  carries a revision number; a write made from an old one is refused and merged
+  instead. If the other browser only carried the chat further, or only renamed
+  it, the two simply combine. If both wrote different messages into it, both are
+  kept — this browser's version appears beside it as "… (this browser's copy)".
+  Nothing is ever dropped.
+- **If Termux stops** (Android can kill it), a line under the top bar says so.
+  Changes made meanwhile wait in the browser and save by themselves the moment
+  the server is back — even if you closed the tab in between.
+- **Delete** and **Restore** move what they remove into `trash/` first.
+
+Anywhere else (github.io, any static host) there is no phone server, so the app
+makes no store requests at all and keeps everything in the browser — use
+**Back up** now and then there.

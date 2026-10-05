@@ -9,7 +9,7 @@
 # ============================================================
 set -euo pipefail
 
-LAUNCHER_V=2
+LAUNCHER_V=3
 REPO="${COZY_REPO:-https://github.com/brucestarkallen/Cozy-Chat-Frontend.git}"
 DIR="${COZY_DIR:-$HOME/cozy-chat}"
 PORT="${COZY_PORT:-8787}"
@@ -76,6 +76,45 @@ running() {
   return 0
 }
 
+# What the server on the port says it is: the stamp of the serve.py it runs,
+# or nothing (not running, or a server from before it could say).
+server_code() {
+  "\$PY" - "\$BIND" "\$PORT" <<'PYCODE' 2>/dev/null
+import json, sys, urllib.request
+try:
+    with urllib.request.urlopen("http://%s:%s/api/version" % (sys.argv[1], sys.argv[2]), timeout=2) as r:
+        print(json.loads(r.read().decode("utf-8")).get("code", ""))
+except Exception:
+    print("")
+PYCODE
+}
+
+# The stamp of the serve.py on disk - what a server started now would say.
+file_code() {
+  "\$PY" -c 'import hashlib,sys; print(hashlib.sha1(open(sys.argv[1],"rb").read()).hexdigest()[:12])' "\$DIR/serve.py" 2>/dev/null || true
+}
+
+# Is the thing on the port a Cozy Chat server (of any age)?
+cozy_on_port() {
+  "\$PY" - "\$BIND" "\$PORT" <<'PYCOZY' 2>/dev/null
+import sys, urllib.request
+try:
+    with urllib.request.urlopen("http://%s:%s/" % (sys.argv[1], sys.argv[2]), timeout=2) as r:
+        sys.exit(0 if b"COZY CHAT v" in r.read(262144) else 1)
+except Exception:
+    sys.exit(1)
+PYCOZY
+}
+
+# A Cozy server on our port that this launcher holds no pid for - started by
+# an older launcher or by hand - found by its command line and stopped.
+kill_orphan() {
+  for d in /proc/[0-9]*; do
+    c=\$(tr '\\0' ' ' < "\$d/cmdline" 2>/dev/null) || continue
+    case "\$c" in *"serve.py \$PORT "*|*"serve.py \$PORT") kill "\${d#/proc/}" 2>/dev/null || true ;; esac
+  done
+}
+
 # Something else may already hold the port — another copy started outside
 # cozy, or a different server entirely. Starting a second one just produces
 # a process that dies on bind, so check first and say so plainly.
@@ -92,6 +131,10 @@ PORTCHECK
 start() {
   running && return 0
   rm -f "\$PID"
+  if port_taken && cozy_on_port; then
+    kill_orphan
+    n=0; while port_taken && [ \$n -lt 30 ]; do sleep 0.1; n=\$((n+1)); done
+  fi
   if port_taken; then
     echo "Port \$PORT is already in use by something else."
     echo "Either stop that, or pick another port:  COZY_PORT=8788 cozy"
@@ -120,8 +163,16 @@ start() {
   exit 1
 }
 
+# Waits for the server to be gone: a start straight after a kill used to find
+# the dying server still answering, take it as running, and leave nothing up.
 stop() {
-  if running; then kill "\$(cat "\$PID")" 2>/dev/null || true; fi
+  if running; then
+    p=\$(cat "\$PID")
+    kill "\$p" 2>/dev/null || true
+    n=0
+    while kill -0 "\$p" 2>/dev/null && [ \$n -lt 30 ]; do sleep 0.1; n=\$((n+1)); done
+    kill -0 "\$p" 2>/dev/null && kill -9 "\$p" 2>/dev/null || true
+  fi
   rm -f "\$PID"
 }
 
@@ -152,18 +203,19 @@ relaunch_if_stale() {
 
 case "\${1:-run}" in
   run)
-    before=\$(ver)
+    # the version from before the update survives this command rewriting itself
+    before=\${COZY_BEFORE:-\$(ver)}
+    export COZY_BEFORE="\$before"
     update
     relaunch_if_stale run
     after=\$(ver)
-    if [ "\$before" != "\$after" ]; then
-      echo "Updated \$before -> \$after"
-      stop            # serve the new files, and drop any old server
-      start
-    else
-      echo "Already on \$after"
-      start
-    fi
+    if [ "\$before" != "\$after" ]; then echo "Updated \$before -> \$after"; else echo "Already on \$after"; fi
+    # A server still running older code than the files on disk is relit. The
+    # server itself is asked, not version numbers compared - an update that
+    # also rewrote this command compared two new numbers and left the old
+    # server serving.
+    if running && [ "\$(server_code)" != "\$(file_code)" ]; then stop; fi
+    start
     echo "Cozy Chat is at \$URL"
     open_url
     ;;
@@ -174,9 +226,11 @@ case "\${1:-run}" in
     if running; then echo "Running at \$URL  (pid \$(cat "\$PID"))"
     else echo "Not running."; fi
     echo "Files on disk: v\$(ver)"
+    echo "Your chats: \${COZY_DATA_DIR:-\$HOME/.cozychat}"
     ;;
   log)     tail -n 40 "\$LOG" 2>/dev/null || echo "No log yet."; ;;
   path)    echo "\$DIR"; ;;
+  data)    echo "\${COZY_DATA_DIR:-\$HOME/.cozychat}"; ;;
   *)
     echo "cozy            update, serve, and open"
     echo "cozy update     pull the latest without restarting"
@@ -184,7 +238,8 @@ case "\${1:-run}" in
     echo "cozy stop       stop the server"
     echo "cozy status     is it running, and which version"
     echo "cozy log        recent server output"
-    echo "cozy path       where the files live"
+    echo "cozy path       where the app's files live"
+    echo "cozy data       where your chats live"
     ;;
 esac
 LAUNCHER
@@ -201,8 +256,7 @@ case ":$PATH:" in
   *":$BIN:"*) ;;
   *) warn "Note: $BIN is not on your PATH. Run it as $BIN/cozy" ;;
 esac
-warn "Heads up: a browser keeps separate storage per address, so the local"
-warn "copy at http://127.0.0.1:$PORT/ starts empty even if you have chats on"
-warn "the github.io version. To bring them over: open the old one, Back up,"
-warn "then open the local one and Restore. From then on the disk copy"
-warn "(cozy-vault.json) keeps them — clearing the browser can't take them."
+say "Your chats live on this phone in ${COZY_DATA_DIR:-$HOME/.cozychat} - every browser"
+say "that opens http://127.0.0.1:$PORT/ shows the same ones, and clearing a"
+say "browser can't touch them. Chats a browser kept before this version move"
+say "onto the phone the first time it opens."

@@ -11,8 +11,9 @@ worker, `install.sh` the Termux installer, `tests/` the gate.
       node "$t" || exit 1
     done
     bash tests/installtest.sh
+    python3 tests/device_e2e.py       # real Chromium + the real serve.py
 
-1665 checks as of v5.26.1, measured from real output.
+1783 checks as of v5.27.0, plus 40 in `tests/device_e2e.py`, measured from real output.
 
 `tests/inerttest.js` is in the loop but prints SKIP without a second checkout
 to compare against. It answers the question a passing gate does not: whether a
@@ -66,6 +67,68 @@ code.
   checkout against uncommitted work restores HEAD and destroys the work.
 - **Fetch before push.** Unrecognized coherent changes in the tree are a
   concurrent instance's in-flight work: audit them, never revert them.
+
+## Where the data lives
+
+Served by `serve.py`, the phone is the only home: `~/.cozychat`
+(`COZY_DATA_DIR`). The page learns it from `<meta name="cozy-store">`, which
+only serve.py injects — no tag, no store request, and github.io keeps
+IndexedDB + localStorage exactly as before. A page carrying the old
+`cozy-vault` tag was served by an older server: it runs on browser storage,
+says so in Settings, and the next device-mode open imports what it kept.
+
+- **Every record has a revision.** A write names the one it was made from
+  (`X-Cozy-Base`); the phone answers 409 with what it holds when that is not
+  the current one, 410 when the record was deleted meanwhile. Never write
+  without a base and never force one — `settle()` is the only way past a 409.
+- **`settle()` never drops a side.** Settings merge three-way against the last
+  revision this tab saw (`settingsBase`), lists of things with ids thing by
+  thing. A chat combines when one side's messages are the other's carried
+  further (`mergeChat`); otherwise this tab's chat — the live object, renamed
+  and re-numbered — becomes "(this browser's copy)" and the phone's version
+  comes in beside it, so a reply still streaming lands in the copy with the
+  message it answers. A newer queued save of the old id is dropped at that
+  moment: it is the copy's now. (Leaving it queued wrote the stale tab's
+  messages over the phone's chat — caught by `device_e2e.py` §5.)
+- **Remote changes apply in place** (`applyChat`, `adoptInPlace`), so
+  `current` and a running `send()` keep their objects, and a `pending` message
+  is never overwritten or dropped by them.
+- **A write the phone cannot take** waits in the `cozychat-journal`
+  IndexedDB and is replayed at the next open through the same merge rules.
+  That journal is the only data a device-mode browser ever holds, and only
+  while the server is away.
+- **Legacy browser data** (IndexedDB `cozychat` + `cozychat:settings`) is
+  imported once per browser and erased only after the manifest shows every
+  record on the phone.
+- **Nothing on the phone is destroyed by a request.** Delete, clear and
+  restore move records to `trash/`, kept 30 days (dated by when they were
+  thrown away).
+- **`unstick()`** settles a reply saved mid-stream at open — never in a chat
+  touched in the last 30 minutes, because another tab may still be streaming
+  into it.
+- **The launcher asks the server which code it runs** (`/api/version`) and
+  relights it when that is not the `serve.py` on disk. Comparing version
+  numbers left the old server running whenever an update also rewrote the
+  launcher. `serve.py` re-execs itself when its own file changes.
+
+## What the model saw
+
+- `assembleMessages(kind, c, partsOut)` fills `partsOut` with every part,
+  recorded where that part is placed. It is an out-parameter on purpose: the
+  return value is the wire and nothing else — `v510test`/`v5260test` count
+  texts in it, and a parts list riding inside it doubled every count.
+- `send()` keeps every request that came back answered (`sentReqs`), with the
+  provider's own usage when it streams one, and `Sent.keep()` stores it.
+  `sent` is a VARIANT_FIELD, so each version of a reply keeps its own.
+- Records are piece-deduplicated (`Sent.encode`): strings of 512+ characters
+  are cut at paragraph breaks chosen by content hash and stored once per chat.
+  Device: `sent/<chat>.json`, pruned by serve.py to the newest 200 records
+  with unreferenced pieces dropped. Browser: the `cozychat-sent` IndexedDB,
+  same rules.
+- The API key travels in headers; a record holds `url` and `body` only.
+- An IndexedDB `get()` that finds nothing has `result === undefined` — resolve
+  with that, not with the request object (that bug lost every record in
+  browser mode before it shipped).
 
 ## Files on the wire
 
