@@ -23,6 +23,7 @@ Cozy Chat local server. Two jobs.
    reload. Nothing is deleted outright: a deleted or replaced record moves to
    trash/ first and stays there for 30 days.
 """
+import gzip
 import hashlib
 import json
 import os
@@ -44,6 +45,8 @@ MAX_BODY = 1024 * 1024 * 1024     # a record can carry pictures; a gigabyte is p
 SENT_KEEP = 200                   # the newest replies of each chat that keep what was sent
 TRASH_DAYS = 30
 HEAD_RE = re.compile(rb'^\{"rev":(\d+),"data":')
+BACKUP_KEEP = 14                  # daily copies of everything kept on the phone
+BACKUP_RE = re.compile(r"^cozy-\d{4}-\d{2}-\d{2}\.json\.gz$")
 MARKER = b'<meta name="cozy-store" content="2">'
 
 
@@ -484,6 +487,80 @@ class Store:
 STORE = None
 
 
+# ---------- a copy of everything, once a day ----------
+def _backup_dir():
+    d = os.path.join(STORE.root, "backups")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def make_backup(force=False):
+    """Today's copy of everything, in the same shape as the app's Back up file
+    (gzipped), so any copy can be brought back whole. The newest BACKUP_KEEP
+    stay. Nothing is written while there is nothing to keep."""
+    d = _backup_dir()
+    name = "cozy-%s.json.gz" % time.strftime("%Y-%m-%d")
+    path = os.path.join(d, name)
+    if os.path.exists(path) and not force:
+        return name
+    try:
+        a = json.loads(STORE.dump_all().decode("utf-8"))   # read under the lock as raw bytes, parsed outside it
+    except ValueError:
+        return None
+    if not a.get("chats") and not a.get("files") and not a.get("settings"):
+        return None
+    blob = {"app": "cozy-chat", "kind": "backup", "version": _app_version(),
+            "exportedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "settings": (a.get("settings") or {}).get("data"),
+            "conversations": [r["data"] for r in a.get("chats") or [] if isinstance(r, dict)],
+            "docs": [r["data"] for r in a.get("files") or [] if isinstance(r, dict)]}
+    _write_atomic(path, gzip.compress(_dump(blob), 6))
+    names = sorted(n for n in os.listdir(d) if BACKUP_RE.match(n))
+    for old in names[:-BACKUP_KEEP]:
+        try:
+            os.remove(os.path.join(d, old))
+        except OSError:
+            pass
+    return name
+
+
+def list_backups():
+    d = _backup_dir()
+    out = []
+    for n in sorted((n for n in os.listdir(d) if BACKUP_RE.match(n)), reverse=True):
+        try:
+            st = os.stat(os.path.join(d, n))
+        except OSError:
+            continue
+        out.append({"name": n, "bytes": st.st_size, "when": int(st.st_mtime * 1000)})
+    return {"keep": BACKUP_KEEP, "copies": out}
+
+
+def restore_backup(name, client):
+    if not BACKUP_RE.match(name or ""):
+        return False
+    try:
+        with open(os.path.join(_backup_dir(), name), "rb") as f:
+            blob = json.loads(gzip.decompress(f.read()).decode("utf-8"))
+    except (OSError, ValueError, EOFError):
+        return False
+    if not isinstance(blob, dict) or not isinstance(blob.get("conversations"), list):
+        return False
+    STORE.replace_all(blob, client)     # what it replaces goes to the trash first
+    return True
+
+
+def _daily_backups():
+    def loop():
+        while True:
+            try:
+                make_backup()
+            except Exception:
+                pass
+            time.sleep(3600)
+    threading.Thread(target=loop, daemon=True).start()
+
+
 class NoCacheHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=ROOT, **kwargs)
@@ -598,6 +675,8 @@ class NoCacheHandler(SimpleHTTPRequestHandler):
         path, parts = self._parts()
         if path in ("/", "/index.html"):
             return self._serve_index()
+        if path == "/api/backup/list":
+            return self._json(200, list_backups())
         if path == "/api/version":
             return self._json(200, {"app": "cozy-chat", "version": _app_version(), "code": CODE, "store": 2})
         if parts[:2] == ["api", "store"]:
@@ -672,6 +751,12 @@ class NoCacheHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         path, parts = self._parts()
+        if path == "/api/backup/now":
+            name = make_backup(force=True)
+            return self._json(200 if name else 409, {"name": name} if name else {"error": "nothing to keep yet"})
+        if parts[:3] == ["api", "backup", "restore"] and len(parts) == 4:
+            ok = restore_backup(parts[3], self._client())
+            return self._json(200 if ok else 404, {"ok": ok})
         if path in ("/api/store/import", "/api/store/replace"):
             raw, obj = self._json_body()
             if not isinstance(obj, dict):
@@ -745,6 +830,7 @@ def main():
     STORE = Store(DATA_DIR)
     STORE.tidy()
     _import_vault()
+    _daily_backups()
     srv = ThreadingHTTPServer((bind, port), NoCacheHandler)
     srv.daemon_threads = True
     _watch_self()

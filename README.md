@@ -67,6 +67,31 @@ Tap **Test** before saving.
 - Copy, delete, retry per message
 - Markdown, tables, code blocks with copy buttons
 
+**The sidebar is a library** (the way Cozy Tavern keeps its shelves)
+- **Projects fold.** Each one is a single line — its name and how many chats it
+  holds — until you tap it open, and it stays however you leave it. The pinned
+  chats and the loose ones (**Chats**) fold the same way. Tapping **+** on a
+  folded project opens it and starts a chat there.
+- **Order** at the top of the list: **Last used** (a project counts as used when
+  any of its chats was), **Name** (A to Z, any case, numbers in order), or
+  **Newest**. One choice for projects and chats alike.
+- **Put a project to rest** with ☾ when you pause it: it moves, with its chats,
+  into a folded "resting projects" corner at the foot of the list, and ↩ wakes
+  it. Nothing in it is touched.
+- The folds and the order are kept in the settings, so every browser shows the
+  sidebar the same way.
+
+**Quick switch** — the model name under the chat's title is a switch: tap it
+for every connection, A to Z, and pick one for this chat (the same as picking it
+in Settings, which now lists connections A to Z too). **Connections…** at the
+end opens Settings.
+
+**Updates take over by themselves.** An open tab notices when a newer version is
+on the phone (when the server comes back after `cozy`, or when you return to the
+tab) and switches to it on its own if nothing is in progress — no reply arriving,
+nothing typed, nothing open. Otherwise a line under the top bar says the new
+version is here; one tap takes it.
+
 **Finding things**
 - **Search every chat** — matches message contents, not just titles, with the hit highlighted
 - **Pin** a chat: long-press its title (or right-click it in the list)
@@ -632,12 +657,12 @@ network-first, so a refresh always gets the newest version.
 | `send()` | Sends and reads the streaming reply |
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
-**Tests.** Everything in `tests/` — `v5270test.js` down to `v2test.js`, plus
+**Tests.** Everything in `tests/` — `v5280test.js` down to `v2test.js`, plus
 `searchtest.js`, `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`,
 `swtest.js`, `scrolltest.js`, `styletest.js`, `hiddentest.js`,
 `coherencetest.js` and `installtest.sh` — runs under Node with jsdom
 (`npm i jsdom fake-indexeddb`).
-1783 checks (plus 40 in real Chromium) across the matching engine, JSON tolerance, prompt assembly,
+1820 checks (plus 49 in real Chromium) across the matching engine, JSON tolerance, prompt assembly,
 multi-block replies, proposal supersede, undo truth, button visibility,
 projects and their instruction blocks, per-connection effort ladders with
 self-healing levels, retrieval, streaming, SSE framing and Hermes tool activity,
@@ -749,6 +774,7 @@ data on the phone in `~/.cozychat` (set `COZY_DATA_DIR` to move it):
 | `settings.json` | settings, connections and keys |
 | `sent/` | what the model saw, per chat |
 | `trash/` | anything deleted or replaced, kept 30 days |
+| `backups/` | a copy of everything once a day, the newest 14 |
 
 It lives outside the app folder, so updating or reinstalling never touches it,
 and outside every browser, so clearing one never touches it. Any browser on the
@@ -768,6 +794,11 @@ phone that opens `http://127.0.0.1:8787/` reads and writes the same files.
   Changes made meanwhile wait in the browser and save by themselves the moment
   the server is back — even if you closed the tab in between.
 - **Delete** and **Restore** move what they remove into `trash/` first.
+- **A copy of everything, every day.** The phone keeps a daily copy in
+  `backups/` (the newest 14), in the same shape as a **Back up** file.
+  Settings → App → **Copies on this phone** lists them: **Bring this copy back**
+  restores one (what it replaces goes to the trash first), **Make a copy now**
+  takes one on the spot.
 
 Anywhere else (github.io, any static host) there is no phone server, so the app
 makes no store requests at all and keeps everything in the browser — use

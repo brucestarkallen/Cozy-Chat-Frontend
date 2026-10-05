@@ -201,7 +201,9 @@ console.log('=== 10. RE-SAVING THE CONNECTION TRIES IT AGAIN ===');
   const dom=await boot(base({providers:prov}));const w=dom.window,d=w.document;
   w.eval('newConvo()'); await sleep(120);
   ev(w,d.querySelector('#settingsBtn'),'click'); await sleep(120);
-  d.querySelector('[data-editprov]').dispatchEvent(new w.Event('click',{bubbles:true})); await sleep(120);
+  /* the connection carrying the cap, by its id: the list reads A to Z since v5.28.0, so the first card is
+     no longer the first connection stored */
+  d.querySelector('[data-editprov="p1"]').dispatchEvent(new w.Event('click',{bubbles:true})); await sleep(120);
   d.querySelector('#saveProvBtn').dispatchEvent(new w.Event('click',{bubbles:true})); await sleep(120);
   ck('the mark is gone with the rebuilt record', !w.eval('S.providers.find(x=>x.id==="p1").effortCap'));
   ck('and the full ladder is back on offer', Array.from(d.querySelectorAll('#effortSeg button')).map(b=>b.dataset.effort).join(',')==='off,low,medium,high,xhigh,max',

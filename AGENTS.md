@@ -13,7 +13,7 @@ worker, `install.sh` the Termux installer, `tests/` the gate.
     bash tests/installtest.sh
     python3 tests/device_e2e.py       # real Chromium + the real serve.py
 
-1783 checks as of v5.27.0, plus 40 in `tests/device_e2e.py`, measured from real output.
+1820 checks as of v5.28.0, plus 49 in `tests/device_e2e.py`, measured from real output.
 
 `tests/inerttest.js` is in the loop but prints SKIP without a second checkout
 to compare against. It answers the question a passing gate does not: whether a
@@ -110,6 +110,36 @@ says so in Settings, and the next device-mode open imports what it kept.
   relights it when that is not the `serve.py` on disk. Comparing version
   numbers left the old server running whenever an update also rewrote the
   launcher. `serve.py` re-execs itself when its own file changes.
+
+## The library, the switch, the updates, the copies (v5.28.0)
+
+Brought from Cozy Tavern (M16 shelves, M466 order and resting shelves, M301
+A-to-Z pickers, M510 Quick switch, M141 the new-coat nudge, the device copies).
+
+- **Folds and order live in `S.ui`** (`fold` keyed `p:<id>`, `pinned`,
+  `loose`, `resting`; `sort` = used | name | newest), so they sync like any
+  setting. Projects and the resting corner start folded; pinned and loose start
+  open. `.sec-head`'s text is the label alone — the caret is CSS — because
+  `v3test` reads it. "+" on a folded project unfolds it first.
+- **"Last used" for a project** is the newest `updatedAt` of its chats, floored
+  by when it was made (`createdAt`, or the time inside its uid), so a new empty
+  project stands at the top instead of the bottom.
+- **A resting project** is `archived: true` on the project; its chats keep
+  their `projectId` and show only inside the corner. Pinned chats stay pinned.
+- **The Quick switch** writes exactly what Settings' connection row writes
+  (`providerId`, and `model` back to the connection's own), so it is the same
+  act in a second place, as in Cozy Tavern.
+- **`lookForUpdate()`** reloads only when `quietNow()` (no stream, empty
+  composer, no modal, no message being edited, nothing waiting to be saved),
+  once per version per tab (`sessionStorage`), one look at a time. Device
+  mode asks `/api/version` on every event-stream (re)connect and on return to
+  the tab; the site is asked at most hourly. Tests stub `reloadPage()`; in
+  Playwright set the stub inside an arrow function, because a string that
+  evaluates to a function is called by `page.evaluate`.
+- **Copies** (`serve.py`): `make_backup()` runs at start and hourly, one per
+  day, `BACKUP_KEEP` newest; `/api/backup/now|list|restore/<name>`. A restore
+  is `replace_all()` — the trash first, then everything, then "reload" to every
+  tab; the tab that asked reloads itself (`Device.reload`).
 
 ## What the model saw
 
