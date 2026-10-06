@@ -13,7 +13,7 @@ worker, `install.sh` the Termux installer, `tests/` the gate.
     bash tests/installtest.sh
     python3 tests/device_e2e.py       # real Chromium + the real serve.py
 
-1831 checks as of v5.28.2, plus 51 in `tests/device_e2e.py` and 12 in `tests/hermesmodeltest.sh` (needs a Hermes install), measured from real output.
+1831 checks as of v5.28.3, plus 57 in `tests/device_e2e.py` and 12 in `tests/hermesmodeltest.sh` (needs a Hermes install), measured from real output.
 
 `tests/inerttest.js` is in the loop but prints SKIP without a second checkout
 to compare against. It answers the question a passing gate does not: whether a
@@ -167,6 +167,24 @@ after that same wrong rule. The test now asks Hermes for the name. Every change
 is proven with one tiny chat request before it is kept, and put back exactly
 as it was when the provider refuses the key or the model; the first line says
 when Hermes' current provider refuses its key.
+
+**Hermes' gateway key follows Hermes (v5.28.3).** LO's Cozy connection had an
+old key and Hermes a new strong one (newer Hermes refuses placeholder or
+short keys at startup), so every message was "Invalid gateway API key
+(API_SERVER_KEY)". `sync_hermes_key()` in serve.py collects candidate keys from
+Hermes' homes on the phone (`COZY_HERMES_HOME`, `HERMES_HOME`, `~/.hermes`,
+every proot rootfs `root/.hermes` and `home/*/.hermes`; their `.env` and
+`profiles/*/.env` `API_SERVER_KEY`, and `key:` values in `config.yaml`),
+probes each loopback Hermes-looking connection (`preset: hermes`, model
+`hermes-agent`, or an `API_SERVER_PORT`) with `GET /models`, and saves only a
+key that answers 200 — under the store lock, skipped if a tab wrote the
+settings meanwhile, announced `by: "server"` so every tab pulls it. It runs at
+start, every `COZY_HERMES_SYNC_SECONDS` (20), and on `POST /api/hermes/sync`,
+which the app calls when a Hermes connection is refused (the error then says
+the key was taken; Retry sends) and when Test is refused (the field takes the
+key and tests again). No endpoint ever returns a key. The provider editor's
+key field follows a phone-side change unless it was typed over
+(`dataset.loaded`).
 
 **Settings import keeps both keys.** `_merge_settings` used to keep the phone's
 connection and drop an incoming one with the same id, so a stale vault's dead

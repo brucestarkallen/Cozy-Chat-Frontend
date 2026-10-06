@@ -23,6 +23,7 @@ Cozy Chat local server. Two jobs.
    reload. Nothing is deleted outright: a deleted or replaced record moves to
    trash/ first and stays there for 30 days.
 """
+import glob
 import gzip
 import hashlib
 import json
@@ -32,6 +33,9 @@ import re
 import sys
 import threading
 import time
+import urllib.error
+import urllib.parse
+import urllib.request
 import uuid
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
@@ -570,6 +574,128 @@ def restore_backup(name, client):
     return True
 
 
+# ---------- Hermes' gateway key ----------
+# Cozy's Hermes connection holds a copy of Hermes' API_SERVER_KEY. When Hermes
+# gets a new key (a newer Hermes refuses short or placeholder keys and makes
+# you set a strong one), the copy goes stale and every message is refused
+# with 401. The real key is in Hermes' own files on this phone - in Termux, or
+# in a proot distro's root - so each candidate is tried against Hermes
+# itself, and only a key Hermes accepts is ever saved on the connection.
+ENV_LINE = re.compile(r'^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$')
+
+
+def _hermes_homes():
+    out = [h for h in (os.environ.get("COZY_HERMES_HOME"), os.environ.get("HERMES_HOME"), "~/.hermes") if h]
+    out = [os.path.abspath(os.path.expanduser(h)) for h in out]
+    rootfs = os.path.join(os.environ.get("PREFIX") or "/data/data/com.termux/files/usr",
+                          "var", "lib", "proot-distro", "installed-rootfs")
+    out += sorted(glob.glob(os.path.join(rootfs, "*", "root", ".hermes")))
+    out += sorted(glob.glob(os.path.join(rootfs, "*", "home", "*", ".hermes")))
+    seen = []
+    for h in out:
+        if h not in seen and os.path.isdir(h):
+            seen.append(h)
+    return seen
+
+
+def _env_values(path):
+    vals = {}
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                m = ENV_LINE.match(line)
+                if m:
+                    v = m.group(2)
+                    if len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'":
+                        v = v[1:-1]
+                    vals[m.group(1)] = v
+    except OSError:
+        pass
+    return vals
+
+
+def _hermes_keys():
+    keys, ports = [], {8642}
+    for h in _hermes_homes():
+        for e in [os.path.join(h, ".env")] + sorted(glob.glob(os.path.join(h, "profiles", "*", ".env"))):
+            v = _env_values(e)
+            if v.get("API_SERVER_KEY"):
+                keys.append(v["API_SERVER_KEY"])
+            if str(v.get("API_SERVER_PORT", "")).isdigit():
+                ports.add(int(v["API_SERVER_PORT"]))
+        try:
+            with open(os.path.join(h, "config.yaml"), encoding="utf-8", errors="replace") as f:
+                keys += re.findall(r'(?m)^\s*key:\s*["\']?([^\s"\'#]{16,})', f.read())
+        except OSError:
+            pass
+    out = []
+    for k in keys:
+        if k not in out:
+            out.append(k)
+    return out, ports
+
+
+def _probe(base, key):
+    req = urllib.request.Request(base.rstrip("/") + "/models", headers={"Authorization": "Bearer " + key})
+    try:
+        with urllib.request.urlopen(req, timeout=4) as r:
+            return r.status
+    except urllib.error.HTTPError as e:
+        return e.code
+    except Exception:
+        return None
+
+
+def sync_hermes_key():
+    keys, ports = _hermes_keys()
+    if not keys:
+        return {"found": False, "changed": False}
+    rev0 = STORE.revs["settings"].get("main", 0)
+    s = STORE.load("settings", "main")
+    if not isinstance(s, dict):
+        return {"found": True, "changed": False}
+    changed = False
+    for p in s.get("providers") or []:
+        if not isinstance(p, dict):
+            continue
+        u = urllib.parse.urlsplit(str(p.get("url") or ""))
+        try:
+            port = u.port or (443 if u.scheme == "https" else 80)
+        except ValueError:
+            continue
+        hermes_like = p.get("preset") == "hermes" or str(p.get("model") or "") == "hermes-agent" or port in ports
+        if u.hostname not in ("127.0.0.1", "localhost", "::1") or not hermes_like:
+            continue
+        base = str(p.get("url"))
+        if _probe(base, str(p.get("apiKey") or "")) in (200, None):
+            continue                        # already right, or Hermes is not up to ask
+        for k in keys:
+            if k != p.get("apiKey") and _probe(base, k) == 200:
+                p["apiKey"] = k
+                changed = True
+                break
+    if not changed:
+        return {"found": True, "changed": False}
+    with STORE.lock:
+        if STORE.revs["settings"].get("main", 0) != rev0:
+            return {"found": True, "changed": False}     # a tab wrote meanwhile: the next look settles it
+        STORE._write_new("settings", "main", s)
+        rev = STORE.revs["settings"]["main"]
+    STORE.announce({"kind": "settings", "id": "main", "rev": rev, "op": "put", "by": "server"})
+    return {"found": True, "changed": True}
+
+
+def _hermes_key_watch():
+    def loop():
+        while True:
+            try:
+                sync_hermes_key()
+            except Exception:
+                pass
+            time.sleep(float(os.environ.get("COZY_HERMES_SYNC_SECONDS") or 20))
+    threading.Thread(target=loop, daemon=True).start()
+
+
 def _daily_backups():
     def loop():
         while True:
@@ -771,6 +897,8 @@ class NoCacheHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         path, parts = self._parts()
+        if path == "/api/hermes/sync":
+            return self._json(200, sync_hermes_key())
         if path == "/api/backup/now":
             name = make_backup(force=True)
             return self._json(200 if name else 409, {"name": name} if name else {"error": "nothing to keep yet"})
@@ -851,6 +979,7 @@ def main():
     STORE.tidy()
     _import_vault()
     _daily_backups()
+    _hermes_key_watch()
     srv = ThreadingHTTPServer((bind, port), NoCacheHandler)
     srv.daemon_threads = True
     _watch_self()

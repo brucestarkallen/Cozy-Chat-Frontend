@@ -498,6 +498,16 @@ your next message. Cozy Chat's own **Model** box
 for Hermes stays `hermes-agent` — that is the agent's name, not the model.
 `cozy` installs `hermesmodel` and keeps it current.
 
+**Cozy takes Hermes' key by itself.** The API key on Cozy's Hermes connection is
+a copy of Hermes' `API_SERVER_KEY`. A newer Hermes refuses short or placeholder
+keys (like `pick-any-password`) and makes you set a strong one, which leaves
+Cozy's copy stale — every message comes back "Invalid gateway API key". Served
+from Termux, Cozy's server reads the key from Hermes' own files on the phone
+(in Termux, or inside the proot distro Hermes runs in), tries it against Hermes,
+and keeps only a key Hermes accepts: when the server starts, every 20 seconds,
+and at once when a message or the connection's **Test** is refused. The open
+tab picks it up without a reload, and a refused message says so — tap Retry.
+
 The CORS line matters: Cozy Chat calls Hermes straight
 from the browser, and the two run on different ports, so Hermes must allow
 Cozy's origin — `8787` is Cozy's default local port; whichever host the
@@ -686,7 +696,7 @@ network-first, so a refresh always gets the newest version.
 `swtest.js`, `scrolltest.js`, `styletest.js`, `hiddentest.js`,
 `coherencetest.js` and `installtest.sh` — runs under Node with jsdom
 (`npm i jsdom fake-indexeddb`).
-1831 checks (plus 51 in real Chromium) across the matching engine, JSON tolerance, prompt assembly,
+1831 checks (plus 57 in real Chromium) across the matching engine, JSON tolerance, prompt assembly,
 multi-block replies, proposal supersede, undo truth, button visibility,
 projects and their instruction blocks, per-connection effort ladders with
 self-healing levels, retrieval, streaming, SSE framing and Hermes tool activity,

@@ -34,7 +34,8 @@ inh() {   # run a command where Hermes lives
   case "$WHERE" in
     custom) bash -c "$HERMESMODEL_RUN $(q "$1")" ;;
     termux) bash -lc "$1" ;;
-    proot)  proot-distro login "$DISTRO" --bind "$BIND" -- bash -lc "$1" ;;
+    # the distro's login profile can complain about files it expects (~/.cargo/env); that noise is not Hermes'
+    proot)  proot-distro login "$DISTRO" --bind "$BIND" -- bash -lc "$1" 2> >(grep -v -e '\.cargo/env' -e '^bash: warning: setlocale' >&2) ;;
   esac
 }
 

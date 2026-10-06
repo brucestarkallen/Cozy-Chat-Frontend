@@ -8,6 +8,7 @@ from playwright.sync_api import sync_playwright
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = tempfile.mkdtemp(prefix="cozy-e2e-")
+HERMES_DIR = tempfile.mkdtemp(prefix="cozy-e2e-hermes-")      # stands in for ~/.hermes
 PORT = None
 SRV = None
 passed = failed = 0
@@ -28,7 +29,7 @@ def free_port():
 
 def start():
     global SRV
-    env = dict(os.environ, COZY_DATA_DIR=DATA)
+    env = dict(os.environ, COZY_DATA_DIR=DATA, COZY_HERMES_HOME=HERMES_DIR, COZY_HERMES_SYNC_SECONDS="3600")
     SRV = subprocess.Popen([sys.executable, os.path.join(ROOT, "serve.py"), str(PORT), "127.0.0.1"], env=env,
                            stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, start_new_session=True)
     for _ in range(50):
@@ -324,6 +325,63 @@ def main():
         a.evaluate("sessionStorage.removeItem('cozychat:reloadedFor'); window.__reloads = 0")
         a.evaluate("lookForUpdate(true)"); a.wait_for_timeout(300)
         ck("idle, it reloads into the new version by itself", a.evaluate("window.__reloads") == 1)
+        a.unroute("**/api/version")
+
+        print("=== 15. HERMES GOT A NEW KEY: COZY TAKES IT FROM HERMES ON THE PHONE ===")
+        import threading
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+        GK = {"key": "first-strong-key-0123456789"}
+        class G(BaseHTTPRequestHandler):
+            def log_message(self, *x): pass
+            def _cors(self):
+                self.send_header("Access-Control-Allow-Origin", "*"); self.send_header("Access-Control-Allow-Headers", "*")
+                self.send_header("Access-Control-Allow-Methods", "*")
+            def do_OPTIONS(self):
+                self.send_response(204); self._cors(); self.end_headers()
+            def _ok(self):
+                if self.headers.get("Authorization") == "Bearer " + GK["key"]: return True
+                self.send_response(401); self._cors(); self.send_header("Content-Type", "application/json"); self.end_headers()
+                self.wfile.write(b'{"error":{"message":"Invalid gateway API key (API_SERVER_KEY)"}}'); return False
+            def do_GET(self):
+                if not self._ok(): return
+                self.send_response(200); self._cors(); self.send_header("Content-Type", "application/json"); self.end_headers()
+                self.wfile.write(b'{"data":[{"id":"hermes-agent"}]}')
+            def do_POST(self):
+                self.rfile.read(int(self.headers.get("Content-Length") or 0))
+                if not self._ok(): return
+                self.send_response(200); self._cors(); self.send_header("Content-Type", "text/event-stream"); self.end_headers()
+                self.wfile.write(("data: " + json.dumps({"choices": [{"delta": {"content": "Hermes here"}}]}) + "\n\ndata: [DONE]\n\n").encode())
+        gport = free_port()
+        gsrv = ThreadingHTTPServer(("127.0.0.1", gport), G); threading.Thread(target=gsrv.serve_forever, daemon=True).start()
+        def hermes_env(k):
+            GK["key"] = k
+            with open(os.path.join(HERMES_DIR, ".env"), "w") as f:
+                f.write('API_SERVER_ENABLED=true\nAPI_SERVER_KEY="%s"\nAPI_SERVER_PORT=%d\n' % (k, gport))
+        hermes_env("first-strong-key-0123456789")
+        a.evaluate("""p => { S.providers.push({id:'phx', preset:'custom', kind:'openai', name:'Hermes Agent', url:'http://127.0.0.1:' + p + '/v1',
+                                               apiKey:'pick-any-password', model:'hermes-agent', ctx:200000}); saveSettings(); }""", gport)
+        a.wait_for_timeout(500)
+        stop(); start()                                           # the server looks when it starts
+        key_on_phone = lambda: [x for x in api("/api/store/settings/main")[1]["data"]["providers"] if x["id"] == "phx"][0]["apiKey"]
+        ck("the phone took the key Hermes accepts, by itself", key_on_phone() == "first-strong-key-0123456789", key_on_phone())
+        a.wait_for_function("() => (S.providers.find(x => x.id === 'phx') || {}).apiKey === 'first-strong-key-0123456789'", timeout=8000)
+        ck("and the open tab has it without a reload", True)
+        hermes_env("second-strong-key-9876543210")                 # Hermes gets a new key while the tab is open
+        a.evaluate("newConvo(); cfgSet('providerId', 'phx'); renderThread();")
+        a.fill("#input", "hello hermes"); a.click("#sendBtn")
+        a.wait_for_function("() => current.messages.some(m => m.role === 'error')", timeout=8000)
+        err = a.evaluate("current.messages.filter(m => m.role === 'error').pop().content")
+        ck("a refused message says Cozy took the new key", err.startswith("Hermes had a new key, so Cozy took it from Hermes on this phone"), err[:90])
+        ck("the phone holds the new key", key_on_phone() == "second-strong-key-9876543210")
+        a.click("#regenBtn")
+        a.wait_for_function("() => current.messages.some(m => m.role === 'assistant' && m.content === 'Hermes here')", timeout=8000)
+        ck("Retry goes through", True)
+        hermes_env("third-strong-key-5555555555")
+        a.evaluate("openSettings(); editProv('phx');"); a.wait_for_timeout(300)
+        a.evaluate("testProv()")
+        a.wait_for_function("() => /Works/.test(document.querySelector('#toast').textContent)", timeout=8000)
+        ck("the connection's Test takes the new key and passes", a.evaluate("document.querySelector('#pKey').value") == "third-strong-key-5555555555")
+        gsrv.shutdown()
         br.close()
     stop()
     shutil.rmtree(DATA, ignore_errors=True)
