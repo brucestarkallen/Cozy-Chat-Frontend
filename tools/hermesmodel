@@ -39,12 +39,16 @@ inh() {   # run a command where Hermes lives
 }
 
 # ---------- what Hermes knows, read by Hermes' own Python ----------
-# Prints tab-separated lines: NOW <provider> <model>, then PROV <name> <address>
-# for every provider set up in Hermes, then MODEL <id> for every model the
-# asked provider lists (asked from its /models with its key).
+# Prints tab-separated lines: NOW <provider> <model> <address>, PROV <name>
+# <address> for every provider set up in Hermes, then for the provider asked
+# about: KEY ok|bad|none, and MODEL <id> for each model it lists. The key is
+# the one Hermes itself would use (its own resolver), else the one Hermes'
+# setup saved for that address (HERMES_CUSTOM_<HOST>_<PORT>_API_KEY in .env).
+# With HERMESMODEL_CHECK=<model> it also sends that model one tiny message
+# and prints CHECK ok | CHECK fail <why>.
 facts() {
-  inh "PY=\"\$(head -1 \"\$(command -v hermes)\" | sed 's/^#!//')\"; HERMESMODEL_ASK=$(q "${1:-}") \"\$PY\" - <<'PYEOF'
-import json, os, re, sys, urllib.request
+  inh "PY=\"\$(head -1 \"\$(command -v hermes)\" | sed 's/^#!//')\"; HERMESMODEL_ASK=$(q "${1:-}") HERMESMODEL_CHECK=$(q "${2:-}") \"\$PY\" - <<'PYEOF'
+import json, os, re, sys, urllib.request, urllib.parse
 home = os.environ.get('HERMES_HOME') or os.path.expanduser('~/.hermes')
 try:
     from ruamel.yaml import YAML
@@ -58,8 +62,8 @@ except Exception:
 env = {}
 try:
     for line in open(os.path.join(home, '.env')):
-        m = re.match(r'\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$', line)
-        if m: env[m.group(1)] = m.group(2).strip().strip('\"').strip(\"'\")
+        m = re.match(r'\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$', line)
+        if m: env[m.group(1)] = m.group(2).strip('\"').strip(\"'\")
 except OSError:
     pass
 def expand(v):
@@ -69,28 +73,69 @@ now_p, now_m, now_url = str(model.get('provider') or ''), str(model.get('default
 provs = {}
 for e in cfg.get('custom_providers') or []:
     if isinstance(e, dict) and e.get('name'):
-        provs[str(e['name'])] = (str(e.get('base_url') or e.get('api') or ''), expand(e.get('api_key')) or env.get(str(e.get('key_env') or ''), ''))
+        provs[str(e['name'])] = (str(e.get('base_url') or e.get('api') or ''), e)
 for n, e in (cfg.get('providers') or {}).items():
     if isinstance(e, dict):
-        provs[str(n)] = (str(e.get('api') or e.get('base_url') or ''), expand(e.get('api_key')) or env.get(str(e.get('key_env') or ''), ''))
-print('NOW\t%s\t%s' % (now_p, now_m))
-for n, (u, k) in provs.items():
+        provs[str(n)] = (str(e.get('api') or e.get('base_url') or ''), e)
+print('NOW\t%s\t%s\t%s' % (now_p, now_m, now_url))
+for n, (u, e) in provs.items():
     print('PROV\t%s\t%s' % (n, u))
 ask = os.environ.get('HERMESMODEL_ASK') or now_p
-url, key = provs.get(ask, (now_url, ''))
+url, entry = provs.get(ask, (now_url, {}))
 if ask == now_p and not url: url = now_url
-if not key and url:
-    host = re.sub(r'^https?://', '', url).split('/')[0]
-    want = 'HERMES_CUSTOM_API_' + re.sub(r'[^A-Za-z0-9]', '_', host).upper() + '_API_KEY'
-    key = env.get(want) or env.get('OPENAI_API_KEY', '')
-if url:
+def slug(s): return re.sub(r'[^A-Z0-9]+', '_', str(s or '').upper()).strip('_')
+keys = []
+try:                                   # what Hermes itself would send
+    from hermes_cli.env_loader import load_hermes_dotenv
+    try: load_hermes_dotenv()
+    except TypeError: load_hermes_dotenv(None)
+    from hermes_cli.runtime_provider import resolve_runtime_provider
+    r = dict(resolve_runtime_provider(requested=ask) if ask else resolve_runtime_provider())
+    if r.get('base_url') and ask != now_p: url = url or str(r['base_url'])
+    if r.get('api_key'): keys.append(str(r['api_key']))
+except Exception:
+    pass
+for ref in (entry.get('api_key') if isinstance(entry, dict) else None, model.get('api_key') if ask == now_p else None):
+    if ref: keys.append(expand(ref))
+for name in ((entry or {}).get('key_env'), (entry or {}).get('api_key_env')):
+    if name: keys.append(env.get(str(name), ''))
+pu = urllib.parse.urlsplit(url)
+for ident in ((pu.hostname or '') + ('_%d' % pu.port if pu.port else ''), pu.hostname or '', re.sub(r'^api\.', '', pu.hostname or '')):
+    if ident: keys.append(env.get('HERMES_CUSTOM_' + slug(ident) + '_API_KEY', ''))
+keys.append(env.get('OPENAI_API_KEY', ''))
+seen, cands = set(), []
+for k in keys:
+    if k and k not in seen and k != 'no-key-required': seen.add(k); cands.append(k)
+good, why, ids = None, '', []
+for k in cands or ['']:
     try:
-        req = urllib.request.Request(url.rstrip('/') + '/models', headers={'Authorization': 'Bearer ' + key})
-        data = json.load(urllib.request.urlopen(req, timeout=20))
-        ids = sorted({str(m.get('id')) for m in (data.get('data') or []) if isinstance(m, dict) and m.get('id')})
-        for i in ids: print('MODEL\t' + i)
+        data = json.load(urllib.request.urlopen(urllib.request.Request(url.rstrip('/') + '/models', headers={'Authorization': 'Bearer ' + k}), timeout=20))
+        good = k; ids = sorted({str(m.get('id')) for m in (data.get('data') or []) if isinstance(m, dict) and m.get('id')}); break
+    except urllib.error.HTTPError as e:
+        why = 'it turned the key down (%d)' % e.code if e.code in (401, 403) else 'it answered %d' % e.code
     except Exception as e:
-        print('NOMODELS\t' + str(e)[:120])
+        why = 'it could not be reached: ' + str(e)[:80]
+if not url: print('KEY\tnone\tno address is set for it')
+elif good is None: print('KEY\tbad\t' + why)
+else: print('KEY\tok')
+for i in ids: print('MODEL\t' + i)
+want = os.environ.get('HERMESMODEL_CHECK')
+if want:
+    if good is None:
+        print('CHECK\tfail\t' + (why or 'no key works for it'))
+    else:
+        body = json.dumps({'model': want, 'messages': [{'role': 'user', 'content': 'Reply with: ok'}], 'max_tokens': 8}).encode()
+        try:
+            urllib.request.urlopen(urllib.request.Request(url.rstrip('/') + '/chat/completions', data=body,
+                headers={'Authorization': 'Bearer ' + good, 'Content-Type': 'application/json'}), timeout=60).read()
+            print('CHECK\tok')
+        except urllib.error.HTTPError as e:
+            detail = ''
+            try: detail = e.read().decode('utf-8', 'replace')[:160]
+            except Exception: pass
+            print('CHECK\tfail\t' + ('it turned the key down' if e.code in (401, 403) else 'it has no model called ' + want if e.code == 404 else 'it answered %d %s' % (e.code, detail)))
+        except Exception as e:
+            print('CHECK\tfail\tit could not be reached: ' + str(e)[:80])
 PYEOF"
 }
 
@@ -146,7 +191,15 @@ mapfile -t PNAMES < <(printf '%s\n' "$OUT" | awk -F'\t' '$1=="PROV"{print $2}')
 mapfile -t PURLS  < <(printf '%s\n' "$OUT" | awk -F'\t' '$1=="PROV"{print $3}')
 CHOSEN=""
 
+NOW_URL="$(printf '%s\n' "$OUT" | awk -F'\t' '$1=="NOW"{print $4}')"
+KEYSTATE="$(printf '%s\n' "$OUT" | awk -F'\t' '$1=="KEY"{print $2}')"
+KEYWHY="$(printf '%s\n' "$OUT" | awk -F'\t' '$1=="KEY"{print $3}')"
 say "Hermes uses ${NOW_MODEL:-no model yet}${NOW_PROV:+ from $NOW_PROV}."
+if [ "$KEYSTATE" = "bad" ]; then
+  say "!! ${NOW_PROV:-Its provider} isn't taking Hermes' key right now: $KEYWHY."
+  say "   That is what shows up in Cozy Chat as an invalid API key. Pick another provider with p,"
+  say "   or add this one again with a fresh key: p, then a."
+fi
 mapfile -t MODELS < <(printf '%s\n' "$OUT" | awk -F'\t' '$1=="MODEL"{print $2}')
 pick_model "${NOW_PROV:-}"
 if [ -z "$CHOSEN" ]; then
@@ -196,7 +249,19 @@ if [ -z "$CHOSEN" ]; then
   esac
 fi
 
-AFTER="$(facts "" | awk -F'\t' '$1=="NOW"{print $3" from "$2}')"
+# ---------- prove it before keeping it ----------
+SETM="$(facts "" | awk -F'\t' '$1=="NOW"{print $3}')"
+CHECKED="$(facts "" "$SETM")"
+NEWP="$(printf '%s\n' "$CHECKED" | awk -F'\t' '$1=="NOW"{print $2}')"
+NEWM="$(printf '%s\n' "$CHECKED" | awk -F'\t' '$1=="NOW"{print $3}')"
+VERDICT="$(printf '%s\n' "$CHECKED" | awk -F'\t' '$1=="CHECK"{print $2}')"
+REASON="$(printf '%s\n' "$CHECKED" | awk -F'\t' '$1=="CHECK"{print $3}')"
 say ""
-say "Hermes now uses $AFTER."
+if [ "$VERDICT" != "ok" ]; then
+  say "That didn't work: ${NEWP:-the provider} answered for $NEWM, but ${REASON:-gave no answer}."
+  inh "hermes config set model.provider $(q "$NOW_PROV") && hermes config set model.base_url $(q "$NOW_URL") && hermes config set model.default $(q "$NOW_MODEL")" >/dev/null 2>&1
+  say "Put back as it was: Hermes uses $NOW_MODEL${NOW_PROV:+ from $NOW_PROV}. Nothing else changed."
+  exit 1
+fi
+say "Hermes now uses $NEWM from $NEWP - it answered a test message."
 restart_hermes

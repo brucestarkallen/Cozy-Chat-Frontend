@@ -117,14 +117,29 @@ def _stamp(rec):
 def _merge_settings(cur, inc):
     """Settings from somewhere else meet the ones on the phone: every
     connection, instruction set, saved prompt and project the phone does not
-    have yet is added; everything the phone already has stays as it is."""
+    have yet is added. A connection the phone has, arriving with a different
+    address, key or model, comes in beside it as a copy named "(from this
+    browser)" - which of the two keys still works is not something to guess,
+    and dropping one silently left a dead key as the only one. (The whole
+    incoming document is kept in imported/ by the caller as well.)"""
     out = dict(cur)
     changed = False
     for key in ("providers", "presets", "prompts", "projects"):
         mine = out.get(key) if isinstance(out.get(key), list) else []
         theirs = inc.get(key) if isinstance(inc.get(key), list) else []
-        have = {x.get("id") for x in mine if isinstance(x, dict)}
-        add = [x for x in theirs if isinstance(x, dict) and x.get("id") and x.get("id") not in have]
+        have = {x.get("id"): x for x in mine if isinstance(x, dict)}
+        add = []
+        for x in theirs:
+            if not isinstance(x, dict) or not x.get("id"):
+                continue
+            there = have.get(x.get("id"))
+            if there is None:
+                add.append(x)
+            elif key == "providers" and any(str(x.get(f) or "") != str(there.get(f) or "") for f in ("url", "apiKey", "model")):
+                copy = dict(x)
+                copy["id"] = "%s-b%d" % (x["id"], _now_ms())
+                copy["name"] = "%s (from this browser)" % (x.get("name") or "Connection")
+                add.append(copy)
         if add:
             out[key] = mine + add
             changed = True
@@ -372,6 +387,11 @@ class Store:
                     else:
                         report[key]["kept"] += 1
             s = data.get("settings")
+            if isinstance(s, dict) and s and "main" in self.revs["settings"]:
+                # whatever the merge keeps, the settings that arrived are kept whole too
+                dst = os.path.join(self.root, "imported")
+                os.makedirs(dst, exist_ok=True)
+                _write_atomic(os.path.join(dst, "settings-%d.json" % _now_ms()), _dump(s))
             if isinstance(s, dict) and s:
                 if "main" not in self.revs["settings"]:
                     merged, changed, report["settings"] = s, True, "adopted"

@@ -231,7 +231,7 @@ def main():
           q.onsuccess = () => { const t = q.result.transaction(['convos','docs'], 'readwrite');
             t.objectStore('convos').put(%s); t.objectStore('docs').put(%s);
             t.oncomplete = () => { q.result.close(); document.title = 'seeded'; }; };
-        </script>""" % (json.dumps(dict(SETTINGS, providers=SETTINGS["providers"] + [{"id": "p9", "name": "Old Conn", "kind": "openai", "url": "https://x/v1", "apiKey": "z", "model": "q"}])),
+        </script>""" % (json.dumps(dict(SETTINGS, providers=[dict(SETTINGS["providers"][0], apiKey="old-browser-key")] + [{"id": "p9", "name": "Old Conn", "kind": "openai", "url": "https://x/v1", "apiKey": "z", "model": "q"}])),
                         json.dumps(legacy_chat), json.dumps(legacy_doc))))
         d.goto(base() + "/__seed"); d.wait_for_function("document.title === 'seeded'")
         d.goto(base() + "/"); d.wait_for_function("typeof Device === 'object' && Device.isReady()"); d.wait_for_timeout(600)
@@ -239,6 +239,11 @@ def main():
         ck("its file too", api("/api/store/file/legdoc1")[0] == 200)
         ck("its extra connection joined the phone's settings", any(p["id"] == "p9" for p in api("/api/store/settings/main")[1]["data"]["providers"]))
         ck("… while the phone's own settings stayed", api("/api/store/settings/main")[1]["data"]["providers"][0]["name"] == "Mock")
+        provs = api("/api/store/settings/main")[1]["data"]["providers"]
+        ck("a connection that arrived with another key comes in beside the phone's, not instead of it, nor lost",
+           [p["apiKey"] for p in provs if p["id"] == "p1"] == ["k"] and any(p["name"] == "Mock (from this browser)" and p["apiKey"] == "old-browser-key" for p in provs),
+           [(p["name"], p["apiKey"]) for p in provs])
+        ck("and the settings that arrived are kept whole on the phone", any(n.startswith("settings-") for n in os.listdir(os.path.join(DATA, "imported"))))
         ck("the browser keeps none of it any more", d.evaluate("localStorage.getItem('cozychat:settings')") is None
            and d.evaluate("IDB.all().then(l => l.length)") == 0 and d.evaluate("IDB.docAll().then(l => l.length)") == 0)
         ck("it says what it moved", "Moved 1 chat and 1 file" in d.inner_text("#toast"), d.inner_text("#toast"))

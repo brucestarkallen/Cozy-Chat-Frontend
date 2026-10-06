@@ -488,8 +488,13 @@ hermesmodel
 It shows the provider and model Hermes uses now, lists that provider's models
 (asked from the provider itself), and switches when you type a number and press
 Enter. `p` lists the other providers set up in Hermes and `a` adds a new one (a
-short name, its address, its key). If Hermes is running it restarts it, so Cozy
-Chat uses the new model from your next message. Cozy Chat's own **Model** box
+short name, its address, its key). Every change is tested before it is kept:
+the provider gets one tiny message with the key Hermes would use, and if it
+turns the key down or doesn't have the model, everything is put back as it was
+and the command says why. Its first line also says when Hermes' current provider
+isn't taking Hermes' key — which is what reaches Cozy Chat as an invalid API
+key. If Hermes is running it restarts it, so Cozy Chat uses the new model from
+your next message. Cozy Chat's own **Model** box
 for Hermes stays `hermes-agent` — that is the agent's name, not the model.
 `cozy` installs `hermesmodel` and keeps it current.
 
@@ -603,6 +608,9 @@ Settings → App, or tap the moon icon to cycle.
 - Ember bar above the message box fills as the context window fills
 - **Temperature** sends what you set; empty sends nothing, so the service's own
   default applies
+- **A turned-down key says where to fix it.** A 401/403 names the connection and
+  the place to paste the key; for a Hermes connection it says the key has to be
+  the same as `API_SERVER_KEY` in Hermes' `~/.hermes/.env`
 - Backup and restore everything — conversations, settings, and your files — to a JSON file
 - Save any conversation as Markdown
 
@@ -678,7 +686,7 @@ network-first, so a refresh always gets the newest version.
 `swtest.js`, `scrolltest.js`, `styletest.js`, `hiddentest.js`,
 `coherencetest.js` and `installtest.sh` — runs under Node with jsdom
 (`npm i jsdom fake-indexeddb`).
-1824 checks (plus 49 in real Chromium) across the matching engine, JSON tolerance, prompt assembly,
+1831 checks (plus 51 in real Chromium) across the matching engine, JSON tolerance, prompt assembly,
 multi-block replies, proposal supersede, undo truth, button visibility,
 projects and their instruction blocks, per-connection effort ladders with
 self-healing levels, retrieval, streaming, SSE framing and Hermes tool activity,
@@ -752,7 +760,10 @@ the command and carries on. You only ever run the install line once.
 first time that browser opens this version: every chat, file and setting it
 held is merged into the phone's (a chat the phone already has is replaced only
 by a newer copy), and once the phone holds every one of them the browser's
-copy is emptied. Each browser does this once — Opera and Chrome both bring
+copy is emptied. A connection the phone already has that arrives with a
+different key, address or model comes in beside it as "… (from this browser)"
+instead of being dropped, and the settings that arrived are kept whole in
+`~/.cozychat/imported/`. Each browser does this once — Opera and Chrome both bring
 theirs. The old `cozy-vault.json` is imported the same way and moved into
 `~/.cozychat/imported/`.
 

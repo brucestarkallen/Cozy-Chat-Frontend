@@ -13,7 +13,7 @@ worker, `install.sh` the Termux installer, `tests/` the gate.
     bash tests/installtest.sh
     python3 tests/device_e2e.py       # real Chromium + the real serve.py
 
-1824 checks as of v5.28.1, plus 49 in `tests/device_e2e.py` and 12 in `tests/hermesmodeltest.sh` (needs a Hermes install), measured from real output.
+1831 checks as of v5.28.2, plus 51 in `tests/device_e2e.py` and 12 in `tests/hermesmodeltest.sh` (needs a Hermes install), measured from real output.
 
 `tests/inerttest.js` is in the loop but prints SKIP without a second checkout
 to compare against. It answers the question a passing gate does not: whether a
@@ -156,6 +156,23 @@ model; `model.provider` + `model.base_url` + `model.default` for a provider;
 model <x>`: that replaces the whole mapping. If the gateway answers on 8642 it
 is restarted the way `cozyai` starts it. `HERMESMODEL_RUN` / `_PORT` exist for
 the test, which runs against a real hermes-agent with Hermes' own resolver.
+
+v5.28.2, after LO hit "invalid API key": the key is looked up the way Hermes
+does — its resolver first, then the name Hermes' setup gives a custom
+endpoint's key, `custom_endpoint_key_env(hostname + "_" + port)` →
+`HERMES_CUSTOM_API_NEURALWATT_COM_API_KEY` for api.neuralwatt.com. v5.28.1
+built `HERMES_CUSTOM_API_<host>` (an extra `API_`), so on his phone no model
+list ever came back; its test passed only because the test named its env var
+after that same wrong rule. The test now asks Hermes for the name. Every change
+is proven with one tiny chat request before it is kept, and put back exactly
+as it was when the provider refuses the key or the model; the first line says
+when Hermes' current provider refuses its key.
+
+**Settings import keeps both keys.** `_merge_settings` used to keep the phone's
+connection and drop an incoming one with the same id, so a stale vault's dead
+key could become the only key. A differing url/apiKey/model now arrives as a
+copy "(from this browser)", and the whole incoming settings document is saved
+to `imported/settings-<ms>.json`.
 
 ## What the model saw
 
