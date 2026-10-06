@@ -477,7 +477,23 @@ API_SERVER_KEY=pick-something
 API_SERVER_CORS_ORIGINS=http://localhost:8787,http://127.0.0.1:8787
 ```
 
-then `hermes gateway`. The CORS line matters: Cozy Chat calls Hermes straight
+then `hermes gateway`.
+
+**Changing the model Hermes uses** is one command at the Termux prompt:
+
+```bash
+hermesmodel
+```
+
+It shows the provider and model Hermes uses now, lists that provider's models
+(asked from the provider itself), and switches when you type a number and press
+Enter. `p` lists the other providers set up in Hermes and `a` adds a new one (a
+short name, its address, its key). If Hermes is running it restarts it, so Cozy
+Chat uses the new model from your next message. Cozy Chat's own **Model** box
+for Hermes stays `hermes-agent` — that is the agent's name, not the model.
+`cozy` installs `hermesmodel` and keeps it current.
+
+The CORS line matters: Cozy Chat calls Hermes straight
 from the browser, and the two run on different ports, so Hermes must allow
 Cozy's origin — `8787` is Cozy's default local port; whichever host the
 address bar shows is the one that counts, so list both spellings. Change the
@@ -662,7 +678,7 @@ network-first, so a refresh always gets the newest version.
 `swtest.js`, `scrolltest.js`, `styletest.js`, `hiddentest.js`,
 `coherencetest.js` and `installtest.sh` — runs under Node with jsdom
 (`npm i jsdom fake-indexeddb`).
-1820 checks (plus 49 in real Chromium) across the matching engine, JSON tolerance, prompt assembly,
+1824 checks (plus 49 in real Chromium) across the matching engine, JSON tolerance, prompt assembly,
 multi-block replies, proposal supersede, undo truth, button visibility,
 projects and their instruction blocks, per-connection effort ladders with
 self-healing levels, retrieval, streaming, SSE framing and Hermes tool activity,

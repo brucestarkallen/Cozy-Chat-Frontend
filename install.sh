@@ -9,7 +9,7 @@
 # ============================================================
 set -euo pipefail
 
-LAUNCHER_V=3
+LAUNCHER_V=4
 REPO="${COZY_REPO:-https://github.com/brucestarkallen/Cozy-Chat-Frontend.git}"
 DIR="${COZY_DIR:-$HOME/cozy-chat}"
 PORT="${COZY_PORT:-8787}"
@@ -180,6 +180,10 @@ update() {
   git -C "\$DIR" fetch --quiet origin
   git -C "\$DIR" reset --hard --quiet origin/HEAD 2>/dev/null \\
     || git -C "\$DIR" reset --hard --quiet origin/main
+  # the Hermes helper ships with the app and is refreshed with it
+  if [ -f "\$DIR/tools/hermesmodel" ] && [ -n "\${PREFIX:-}" ]; then
+    cp -f "\$DIR/tools/hermesmodel" "\$PREFIX/bin/hermesmodel" 2>/dev/null && chmod 755 "\$PREFIX/bin/hermesmodel" 2>/dev/null || true
+  fi
 }
 
 open_url() {
@@ -240,6 +244,7 @@ case "\${1:-run}" in
     echo "cozy log        recent server output"
     echo "cozy path       where the app's files live"
     echo "cozy data       where your chats live"
+    echo "hermesmodel     pick the provider and model Hermes uses"
     ;;
 esac
 LAUNCHER
@@ -256,6 +261,11 @@ case ":$PATH:" in
   *":$BIN:"*) ;;
   *) warn "Note: $BIN is not on your PATH. Run it as $BIN/cozy" ;;
 esac
+# the Hermes helper: one command to pick Hermes' provider and model
+if [ -f "$COZY_DIR/tools/hermesmodel" ]; then
+  cp -f "$COZY_DIR/tools/hermesmodel" "$BIN/hermesmodel" && chmod 755 "$BIN/hermesmodel"
+fi
+
 say "Your chats live on this phone in ${COZY_DATA_DIR:-$HOME/.cozychat} - every browser"
 say "that opens http://127.0.0.1:$PORT/ shows the same ones, and clearing a"
 say "browser can't touch them. Chats a browser kept before this version move"

@@ -1,0 +1,202 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# hermesmodel - pick the provider and model Hermes uses (type a number, press Enter)
+#
+# Run it at the Termux prompt (~ $). It finds Hermes wherever it lives - right
+# in Termux, or inside the proot Ubuntu that cozyai starts it from - shows
+# the provider and model Hermes uses now, lists the models that provider
+# offers (asked from the provider itself), and switches with one number. A
+# new provider is three answers: a name, its address, its key. If Hermes is
+# running, it is restarted, so Cozy Chat uses the new model from your next
+# message. Every change goes through Hermes' own `hermes config set`.
+set -u
+
+BIND="/data/data/com.termux/files/home:/termux"
+DISTRO="${HERMESMODEL_DISTRO:-ubuntu}"
+PORT="${HERMESMODEL_PORT:-8642}"
+LOG="$HOME/hermes-gateway.log"
+
+say()  { printf '%s\n' "$*"; }
+q()    { printf '%q' "$1"; }
+
+# ---------- where Hermes lives ----------
+if [ -n "${HERMESMODEL_RUN:-}" ]; then
+  WHERE="custom"                                   # tests, or anyone who says where
+elif command -v hermes >/dev/null 2>&1; then
+  WHERE="termux"
+elif command -v proot-distro >/dev/null 2>&1 && \
+     proot-distro login "$DISTRO" -- bash -lc 'command -v hermes' >/dev/null 2>&1; then
+  WHERE="proot"
+else
+  say "Hermes isn't installed here, so there is nothing to switch."
+  exit 1
+fi
+inh() {   # run a command where Hermes lives
+  case "$WHERE" in
+    custom) bash -c "$HERMESMODEL_RUN $(q "$1")" ;;
+    termux) bash -lc "$1" ;;
+    proot)  proot-distro login "$DISTRO" --bind "$BIND" -- bash -lc "$1" ;;
+  esac
+}
+
+# ---------- what Hermes knows, read by Hermes' own Python ----------
+# Prints tab-separated lines: NOW <provider> <model>, then PROV <name> <address>
+# for every provider set up in Hermes, then MODEL <id> for every model the
+# asked provider lists (asked from its /models with its key).
+facts() {
+  inh "PY=\"\$(head -1 \"\$(command -v hermes)\" | sed 's/^#!//')\"; HERMESMODEL_ASK=$(q "${1:-}") \"\$PY\" - <<'PYEOF'
+import json, os, re, sys, urllib.request
+home = os.environ.get('HERMES_HOME') or os.path.expanduser('~/.hermes')
+try:
+    from ruamel.yaml import YAML
+    cfg = YAML(typ='safe').load(open(os.path.join(home, 'config.yaml'))) or {}
+except Exception:
+    try:
+        import yaml
+        cfg = yaml.safe_load(open(os.path.join(home, 'config.yaml'))) or {}
+    except Exception:
+        cfg = {}
+env = {}
+try:
+    for line in open(os.path.join(home, '.env')):
+        m = re.match(r'\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$', line)
+        if m: env[m.group(1)] = m.group(2).strip().strip('\"').strip(\"'\")
+except OSError:
+    pass
+def expand(v):
+    return re.sub(r'\\$\\{([^}]+)\\}', lambda m: env.get(m.group(1), os.environ.get(m.group(1), '')), str(v or ''))
+model = cfg.get('model') if isinstance(cfg.get('model'), dict) else {}
+now_p, now_m, now_url = str(model.get('provider') or ''), str(model.get('default') or ''), str(model.get('base_url') or '')
+provs = {}
+for e in cfg.get('custom_providers') or []:
+    if isinstance(e, dict) and e.get('name'):
+        provs[str(e['name'])] = (str(e.get('base_url') or e.get('api') or ''), expand(e.get('api_key')) or env.get(str(e.get('key_env') or ''), ''))
+for n, e in (cfg.get('providers') or {}).items():
+    if isinstance(e, dict):
+        provs[str(n)] = (str(e.get('api') or e.get('base_url') or ''), expand(e.get('api_key')) or env.get(str(e.get('key_env') or ''), ''))
+print('NOW\t%s\t%s' % (now_p, now_m))
+for n, (u, k) in provs.items():
+    print('PROV\t%s\t%s' % (n, u))
+ask = os.environ.get('HERMESMODEL_ASK') or now_p
+url, key = provs.get(ask, (now_url, ''))
+if ask == now_p and not url: url = now_url
+if not key and url:
+    host = re.sub(r'^https?://', '', url).split('/')[0]
+    want = 'HERMES_CUSTOM_API_' + re.sub(r'[^A-Za-z0-9]', '_', host).upper() + '_API_KEY'
+    key = env.get(want) or env.get('OPENAI_API_KEY', '')
+if url:
+    try:
+        req = urllib.request.Request(url.rstrip('/') + '/models', headers={'Authorization': 'Bearer ' + key})
+        data = json.load(urllib.request.urlopen(req, timeout=20))
+        ids = sorted({str(m.get('id')) for m in (data.get('data') or []) if isinstance(m, dict) and m.get('id')})
+        for i in ids: print('MODEL\t' + i)
+    except Exception as e:
+        print('NOMODELS\t' + str(e)[:120])
+PYEOF"
+}
+
+hermes_up() { curl -sf -o /dev/null --max-time 3 "http://127.0.0.1:$PORT/health"; }
+
+restart_hermes() {
+  if ! hermes_up; then
+    say "Hermes isn't running now - it starts with this model the next time you run cozyai."
+    return
+  fi
+  say "Restarting Hermes so it uses the new model..."
+  pkill -f "hermes gateway" 2>/dev/null
+  for _ in $(seq 1 20); do hermes_up || break; sleep 0.5; done
+  case "$WHERE" in
+    proot)  nohup proot-distro login "$DISTRO" --bind "$BIND" -- bash -lc 'hermes gateway' > "$LOG" 2>&1 & ;;
+    termux) nohup bash -lc 'hermes gateway' > "$LOG" 2>&1 & ;;
+    custom) nohup bash -c "$HERMESMODEL_RUN 'hermes gateway'" > "$LOG" 2>&1 & ;;
+  esac
+  for _ in $(seq 1 90); do sleep 2; hermes_up && break; done
+  if hermes_up; then say "Hermes is back. Cozy Chat uses the new model from your next message."
+  else say "Hermes didn't come back up. See why with:  cat $LOG"; fi
+}
+
+set_model() {   # $1 = model id
+  inh "hermes config set model.default $(q "$1")" >/dev/null || { say "Hermes refused that change."; exit 1; }
+}
+
+pick_model() {   # $1 = provider name to list models for
+  local out list n i choice
+  out="$(facts "$1")"
+  mapfile -t list < <(printf '%s\n' "$out" | awk -F'\t' '$1=="MODEL"{print $2}')
+  n=${#list[@]}
+  if [ "$n" -eq 0 ]; then
+    say ""
+    say "$1 didn't list its models ($(printf '%s\n' "$out" | awk -F'\t' '$1=="NOMODELS"{print $2}'))."
+    read -r -p "Type the model name exactly as $1 writes it (or just Enter to stop): " choice
+    [ -z "$choice" ] && { say "Nothing changed."; exit 0; }
+    set_model "$choice"; CHOSEN="$choice"; return
+  fi
+  say ""
+  say "Models on $1:"
+  for i in $(seq 1 "$n"); do
+    if [ "${list[$((i-1))]}" = "$NOW_MODEL" ] && [ "$1" = "$NOW_PROV" ]; then printf '  %2d  %s   <- now\n' "$i" "${list[$((i-1))]}"
+    else printf '  %2d  %s\n' "$i" "${list[$((i-1))]}"; fi
+  done
+}
+
+# ---------- the menu ----------
+OUT="$(facts "")"
+NOW_PROV="$(printf '%s\n' "$OUT" | awk -F'\t' '$1=="NOW"{print $2}')"
+NOW_MODEL="$(printf '%s\n' "$OUT" | awk -F'\t' '$1=="NOW"{print $3}')"
+mapfile -t PNAMES < <(printf '%s\n' "$OUT" | awk -F'\t' '$1=="PROV"{print $2}')
+mapfile -t PURLS  < <(printf '%s\n' "$OUT" | awk -F'\t' '$1=="PROV"{print $3}')
+CHOSEN=""
+
+say "Hermes uses ${NOW_MODEL:-no model yet}${NOW_PROV:+ from $NOW_PROV}."
+mapfile -t MODELS < <(printf '%s\n' "$OUT" | awk -F'\t' '$1=="MODEL"{print $2}')
+pick_model "${NOW_PROV:-}"
+if [ -z "$CHOSEN" ]; then
+  say "   p  use another provider"
+  say "   0  keep it as it is"
+  read -r -p "Type a number (or p) and press Enter: " A
+  case "$A" in
+    0|"") say "Nothing changed."; exit 0 ;;
+    p|P)
+      say ""
+      say "Providers in Hermes:"
+      for i in $(seq 1 ${#PNAMES[@]}); do printf '  %2d  %s  (%s)\n' "$i" "${PNAMES[$((i-1))]}" "${PURLS[$((i-1))]}"; done
+      say "   a  add a new provider"
+      say "   0  keep it as it is"
+      read -r -p "Type a number (or a) and press Enter: " B
+      case "$B" in
+        0|"") say "Nothing changed."; exit 0 ;;
+        a|A)
+          read -r -p "A short name for it, one word (like wafer): " PN
+          PN="$(printf '%s' "$PN" | tr -cd 'A-Za-z0-9_-')"
+          [ -z "$PN" ] && { say "Nothing changed."; exit 0; }
+          read -r -p "Its address (like https://api.wafer.ai/v1): " PU
+          read -r -p "Its API key: " PK
+          [ -z "$PU" ] && { say "Nothing changed."; exit 0; }
+          inh "hermes config set providers.$PN.api $(q "$PU") && hermes config set providers.$PN.api_key $(q "$PK")" >/dev/null \
+            || { say "Hermes refused the new provider."; exit 1; }
+          PICKED="$PN"; PICKED_URL="$PU" ;;
+        *)
+          if [[ "$B" =~ ^[0-9]+$ ]] && [ "$B" -ge 1 ] && [ "$B" -le ${#PNAMES[@]} ]; then
+            PICKED="${PNAMES[$((B-1))]}"; PICKED_URL="${PURLS[$((B-1))]}"
+          else say "That isn't on the list. Nothing changed."; exit 1; fi ;;
+      esac
+      pick_model "$PICKED"
+      if [ -z "$CHOSEN" ]; then
+        read -r -p "Type a number and press Enter (0 keeps everything as it is): " C
+        mapfile -t LIST < <(facts "$PICKED" | awk -F'\t' '$1=="MODEL"{print $2}')
+        if [[ "$C" =~ ^[0-9]+$ ]] && [ "$C" -ge 1 ] && [ "$C" -le ${#LIST[@]} ]; then CHOSEN="${LIST[$((C-1))]}"
+        else say "Nothing changed."; exit 0; fi
+      fi
+      inh "hermes config set model.provider $(q "$PICKED") && hermes config set model.base_url $(q "$PICKED_URL") && hermes config set model.default $(q "$CHOSEN")" >/dev/null \
+        || { say "Hermes refused that change."; exit 1; }
+      ;;
+    *)
+      if [[ "$A" =~ ^[0-9]+$ ]] && [ "$A" -ge 1 ] && [ "$A" -le ${#MODELS[@]} ]; then
+        CHOSEN="${MODELS[$((A-1))]}"; set_model "$CHOSEN"
+      else say "That isn't on the list. Nothing changed."; exit 1; fi ;;
+  esac
+fi
+
+AFTER="$(facts "" | awk -F'\t' '$1=="NOW"{print $3" from "$2}')"
+say ""
+say "Hermes now uses $AFTER."
+restart_hermes

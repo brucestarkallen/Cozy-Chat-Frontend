@@ -9,6 +9,7 @@ cd origin && git init -q -b main . && git config user.email t@t && git config us
 cp "$SRC/serve.py" .
 echo '<!-- COZY CHAT v1.0.0 --><h1>old</h1>' > index.html
 cp "$SRC/install.sh" .
+mkdir -p tools && cp "$SRC/tools/hermesmodel" tools/
 git add -A && git commit -qm one && cd ..
 export COZY_REPO="file:///tmp/upd/origin" COZY_DIR=/tmp/upd/home/cozy-chat
 export PREFIX=/tmp/upd/prefix HOME=/tmp/upd/home COZY_PORT=8803
@@ -33,6 +34,16 @@ curl -s --max-time 3 http://127.0.0.1:8803/index.html | grep -q new && ok "the S
 code=$(curl -s -o /dev/null -w "%{http_code}" -H "If-Modified-Since: Wed, 01 Jan 2020 00:00:00 GMT" http://127.0.0.1:8803/index.html)
 [ "$code" = "200" ] && ok "no 304, so a browser cannot hold a stale copy" || bad "got $code"
 cozy status 2>/dev/null | grep -q "v2.0.0" && ok "status shows the version on disk" || bad "status wrong"
+
+echo "--- the Hermes helper ---"
+[ -x "$PREFIX/bin/hermesmodel" ] && ok "hermesmodel is installed as a command" || bad "no hermesmodel"
+bash -n "$PREFIX/bin/hermesmodel" && ok "and it is a valid script" || bad "hermesmodel has a syntax error"
+sed -n 2p "$PREFIX/bin/hermesmodel" | grep -q "^# hermesmodel - " && ok "its second line describes it (for the menu command)" || bad "no description line"
+
+echo "# helper release two" >> /tmp/upd/origin/tools/hermesmodel
+( cd /tmp/upd/origin && git add -A && git commit -qm "helper two" )
+cozy update >/dev/null 2>&1
+grep -q "helper release two" "$PREFIX/bin/hermesmodel" && ok "an update refreshes the helper too" || bad "the helper stayed old after an update"
 
 echo "--- the phone keeps the data ---"
 curl -s --max-time 3 http://127.0.0.1:8803/index.html | grep -q 'name="cozy-store"' && ok "the served page says the phone keeps the data" || bad "no store tag in the served page"
@@ -59,8 +70,8 @@ git -C "$SRC" show d79dfe9:serve.py > "$COZY_DIR/serve.py"
 cozy restart >/dev/null 2>&1; sleep 1
 code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://127.0.0.1:8803/api/version)
 [ "$code" = "404" ] && ok "an old server is running (it has no /api/version)" || bad "not the old server" "$code"
-sed -i 's/^LAUNCHER_V=3/LAUNCHER_V=4/' "$PREFIX/bin/cozy"      # pretend ours differs from the repo's
-sed -i 's/^LAUNCHER_V=3/LAUNCHER_V=9/' /tmp/upd/origin/install.sh
+sed -i 's/^LAUNCHER_V=4/LAUNCHER_V=5/' "$PREFIX/bin/cozy"      # pretend ours differs from the repo's
+sed -i 's/^LAUNCHER_V=4/LAUNCHER_V=9/' /tmp/upd/origin/install.sh
 echo "# release three" >> /tmp/upd/origin/serve.py
 cd origin && echo '<!-- COZY CHAT v3.0.0 --><h1>three</h1>' > index.html && git add -A && git commit -qm three && cd ..
 cozy >/tmp/upd/r3.log 2>&1; sleep 1

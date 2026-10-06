@@ -13,7 +13,7 @@ worker, `install.sh` the Termux installer, `tests/` the gate.
     bash tests/installtest.sh
     python3 tests/device_e2e.py       # real Chromium + the real serve.py
 
-1820 checks as of v5.28.0, plus 49 in `tests/device_e2e.py`, measured from real output.
+1824 checks as of v5.28.1, plus 49 in `tests/device_e2e.py` and 12 in `tests/hermesmodeltest.sh` (needs a Hermes install), measured from real output.
 
 `tests/inerttest.js` is in the loop but prints SKIP without a second checkout
 to compare against. It answers the question a passing gate does not: whether a
@@ -140,6 +140,22 @@ A-to-Z pickers, M510 Quick switch, M141 the new-coat nudge, the device copies).
   day, `BACKUP_KEEP` newest; `/api/backup/now|list|restore/<name>`. A restore
   is `replace_all()` — the trash first, then everything, then "reload" to every
   tab; the tab that asked reloads itself (`Device.reload`).
+
+## hermesmodel (v5.28.1)
+
+`tools/hermesmodel` is a Termux command the installer copies into
+`$PREFIX/bin` (and the launcher's `update()` refreshes on every `cozy`). It
+picks the provider and model Hermes Agent uses with typed numbers only — his
+Termux keyboard breaks arrow-key menus, so never add one. It finds Hermes in
+Termux or inside the proot Ubuntu `cozyai` uses, reads providers from
+Hermes' own `config.yaml` (legacy `custom_providers` list and the
+`providers:` dict), asks the provider's `/models` with the provider's own key,
+and changes everything through `hermes config set` — `model.default` for a
+model; `model.provider` + `model.base_url` + `model.default` for a provider;
+`providers.<name>.api` + `.api_key` to add one. Never `hermes config set
+model <x>`: that replaces the whole mapping. If the gateway answers on 8642 it
+is restarted the way `cozyai` starts it. `HERMESMODEL_RUN` / `_PORT` exist for
+the test, which runs against a real hermes-agent with Hermes' own resolver.
 
 ## What the model saw
 
