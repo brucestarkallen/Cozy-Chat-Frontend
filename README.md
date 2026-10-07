@@ -100,7 +100,16 @@ version is here; one tap takes it.
 **Attachments**
 - Tap the paperclip, or just paste an image straight into the message box
 - Images go to the model as images; text files are inlined as code blocks
-- 6 MB per file
+- A picture is made ready for a vision model as you attach it: turned upright,
+  at most 2048 px on its long side, the camera's GPS position and other
+  metadata gone. A photo becomes a JPEG; a screenshot or a sticker stays a
+  sharp, see-through PNG. Photos up to 40 MB open, 48 MP included
+- A picture on its own is a message: Send works with no words
+- Tap a picture in the chat to see it whole; tap again to close it
+- Every picture goes to the model again on every message, newest first, until
+  the pictures fill 6 MB; any older one is named in its message instead, so the
+  model knows it was there (Hermes refuses a request over 10 MB)
+- 6 MB per text file
 
 **Files the assistant can edit — and write**
 - Tap the file icon in the top bar → **Let the assistant write files**.
@@ -541,9 +550,10 @@ What you get in the chat:
   once**, **This chat**, **Always allow**, **Deny**. Tap one and the run
   carries on; no terminal. Stopping the stream also stops the agent
   server-side. A card left unanswered when its run ends is marked expired,
-  never left with live-looking buttons. One limit: a message carrying an
-  image falls back to the plain stream for that turn (runs don't take
-  images), so approvals resume on the next text message. Runs mode needs a
+  never left with live-looking buttons. A chat that holds a picture talks
+  to Hermes over the plain stream (the Runs API can't carry pictures), and
+  Hermes asks for approval there too: the same card appears, and your answer
+  goes to the run Hermes names. Runs mode needs a
   Hermes build with the Runs API. **If yours doesn't have it, or the browser
   can't reach it, the message is never lost:** Cozy falls back to the plain
   stream, tells you **once ever**, stops any run it had already started, and
@@ -691,12 +701,12 @@ network-first, so a refresh always gets the newest version.
 | `send()` | Sends and reads the streaming reply |
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
-**Tests.** Everything in `tests/` — `v5285test.js` down to `v2test.js`, plus
+**Tests.** Everything in `tests/` — `v5288test.js` down to `v2test.js`, plus
 `searchtest.js`, `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`,
 `swtest.js`, `scrolltest.js`, `styletest.js`, `hiddentest.js`,
 `coherencetest.js` and `installtest.sh` — runs under Node with jsdom
 (`npm i jsdom fake-indexeddb`).
-1892 checks (plus 81 in real Chromium) across the matching engine, JSON tolerance, prompt assembly,
+1911 checks (plus 107 in real Chromium) across the matching engine, JSON tolerance, prompt assembly,
 multi-block replies, proposal supersede, undo truth, button visibility,
 projects and their instruction blocks, per-connection effort ladders with
 self-healing levels, retrieval, streaming, SSE framing and Hermes tool activity,

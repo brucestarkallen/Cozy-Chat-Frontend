@@ -13,8 +13,9 @@ worker, `install.sh` the Termux installer, `tests/` the gate.
     bash tests/installtest.sh
     python3 tests/device_e2e.py       # real Chromium + the real serve.py
     python3 tests/thinking_e2e.py     # real Chromium + a real stream: the thinking box
+    python3 tests/pictures_e2e.py     # real Chromium: what a vision model receives (needs pillow)
 
-1892 checks as of v5.28.7, plus 57 in `tests/device_e2e.py`, 24 in `tests/thinking_e2e.py` and 12 in `tests/hermesmodeltest.sh` (needs a Hermes install), measured from real output: each file's own count line ("(N checks)" or "N passed", else its `ok` lines), plus `installtest.sh`'s `ok` lines.
+1911 checks as of v5.28.8, plus 57 in `tests/device_e2e.py`, 24 in `tests/thinking_e2e.py`, 26 in `tests/pictures_e2e.py` and 12 in `tests/hermesmodeltest.sh` (needs a Hermes install), measured from real output: each file's own count line ("(N checks)" or "N passed", else its `ok` lines), plus `installtest.sh`'s `ok` lines.
 
 `tests/inerttest.js` is in the loop but prints SKIP without a second checkout
 to compare against. It answers the question a passing gate does not: whether a
@@ -230,6 +231,43 @@ connection and drop an incoming one with the same id, so a stale vault's dead
 key could become the only key. A differing url/apiKey/model now arrives as a
 copy "(from this browser)", and the whole incoming settings document is saved
 to `imported/settings-<ms>.json`.
+
+## Pictures for a vision model (v5.28.8)
+
+A picture is prepared once, as it is attached (`prepareImage`): decoded with
+the camera's orientation applied, redrawn at most `IMG_EDGE` (2048) px on its
+long edge, metadata gone. A JPEG source stays JPEG (q 0.88); anything else is
+PNG while that is at most `IMG_PNG_MAX` (1.5 MB) - a screenshot stays sharp, a
+sticker stays see-through - and JPEG on white past that. A file Chrome cannot
+decode (HEIC) is refused by name; nothing undecodable is ever attached. Until
+v5.28.7 the camera's bytes went out as they were: 4000x3000 sideways pixels
+behind an orientation flag many services ignore, its GPS position, 3-5 MB
+each - three in one chat made every request 16 MB, past Hermes'
+`MAX_REQUEST_BYTES = 10_000_000`.
+
+On the wire (`picturesToSend`): every picture rides every request again. The
+newest user message's pictures always go; older ones go newest-first while
+they fit `IMG_WIRE_BUDGET` (6,000,000 base64 characters), and one past
+`IMG_ONE_MAX` (5,000,000, Claude's limit) never goes. One left out is named in
+its own message ("[a picture ("x.jpg") was attached here; it is not sent
+again...]"). A picture with no words is the whole message: no text part rides
+with it, because Claude refuses a text part that is only whitespace, and Send
+is ready with only a picture in the tray (`sendReady`). "Search every message"
+does not search for a picture sent without words.
+
+**Hermes and pictures** (read from its source): its chat completions keep
+`image_url` parts in every message, and for a model that cannot see it
+describes them itself. Its Runs API turns history into plain text
+(`str(entry["content"])`), so a chat holding a picture is sent over the plain
+stream (`useRuns` is false while any content is not a string). Hermes asks
+for approval on that stream too (`event: approval.request`, the completion id
+as `run_id`); Cozy shows the same card and answers
+`POST /v1/runs/{run_id}/approval`. Before v5.28.8 that frame was dropped, so
+the agent sat waiting with nothing on screen.
+
+`tests/pictures_e2e.py` builds the pictures with pillow (a sideways 12 MP
+photo with GPS, a 48 MP photo, a screenshot, a see-through sticker, an
+undecodable HEIC) and reads back what the model would receive.
 
 ## Writes come from the app (v5.28.4)
 
