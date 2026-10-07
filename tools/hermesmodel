@@ -165,14 +165,17 @@ set_model() {   # $1 = model id
 }
 
 pick_model() {   # $1 = provider name to list models for
-  local out list n i choice
+  local out list n i choice why
   out="$(facts "$1")"
   mapfile -t list < <(printf '%s\n' "$out" | awk -F'\t' '$1=="MODEL"{print $2}')
   n=${#list[@]}
   if [ "$n" -eq 0 ]; then
     say ""
-    say "$1 didn't list its models ($(printf '%s\n' "$out" | awk -F'\t' '$1=="NOMODELS"{print $2}'))."
-    read -r -p "Type the model name exactly as $1 writes it (or just Enter to stop): " choice
+    # the reason is on the KEY line (v5.28.2 retired the NOMODELS line this
+    # still read, so every miss printed empty brackets)
+    why="$(printf '%s\n' "$out" | awk -F'\t' '$1=="KEY" && $2!="ok"{print $3}')"
+    say "${1:-Its provider} didn't list its models (${why:-it sent back no models})."
+    read -r -p "Type the model name exactly as ${1:-it} writes it (or just Enter to stop): " choice
     [ -z "$choice" ] && { say "Nothing changed."; exit 0; }
     set_model "$choice"; CHOSEN="$choice"; return
   fi

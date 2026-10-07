@@ -14,7 +14,7 @@ worker, `install.sh` the Termux installer, `tests/` the gate.
     python3 tests/device_e2e.py       # real Chromium + the real serve.py
     python3 tests/thinking_e2e.py     # real Chromium + a real stream: the thinking box
 
-1874 checks as of v5.28.4, plus 57 in `tests/device_e2e.py`, 24 in `tests/thinking_e2e.py` and 12 in `tests/hermesmodeltest.sh` (needs a Hermes install), measured from real output: each file's own count line ("(N checks)" or "N passed", else its `ok` lines), plus `installtest.sh`'s `ok` lines.
+1886 checks as of v5.28.5, plus 57 in `tests/device_e2e.py`, 24 in `tests/thinking_e2e.py` and 12 in `tests/hermesmodeltest.sh` (needs a Hermes install), measured from real output: each file's own count line ("(N checks)" or "N passed", else its `ok` lines), plus `installtest.sh`'s `ok` lines.
 
 `tests/inerttest.js` is in the loop but prints SKIP without a second checkout
 to compare against. It answers the question a passing gate does not: whether a
@@ -58,6 +58,24 @@ own checkout (`git worktree add`), never in the tree another gate is reading.
 
 `tests/installtest.sh` exits 1 when a check fails. Before v5.28.4 it printed
 "FAILURES PRESENT" and exited 0, so the gate loop could never have stopped on it.
+It exports `COZY_DIR` for its sandbox, which hid that the README's one-line
+install (no `COZY_DIR`) died at the installer's last step under `set -u` -
+"COZY_DIR: unbound variable", hermesmodel never installed - from v5.28.1 until
+v5.28.5. It now also runs that install exactly as the README gives it. Inside
+`install.sh` the app folder is `$DIR`; `$COZY_DIR` is only an optional input.
+
+**A reader of a line must follow its writer.** v5.28.2 replaced hermesmodel's
+`NOMODELS <why>` line with `KEY ok|bad|none <why>` and left the menu reading
+`NOMODELS`, so every provider that listed no models said "didn't list its
+models ()" until v5.28.5. When a producer's output changes, grep for every
+consumer of the old shape. `installtest.sh` runs hermesmodel against a
+stand-in Hermes (a `hermes` whose shebang is python3, an empty HERMES_HOME).
+
+**A blank answer to "name it" is no answer** (v5.28.5): new instruction set,
+renamed set, saved prompt, renamed chat - each keeps what it had. A block or
+prompt that vanished since its list was drawn (another browser) redraws the
+list instead of throwing, and a block with no name gets `""`, never shows
+"undefined".
 
 Every file must exit 0. Measure check counts from real output — never predict
 them, never inherit them from docs. `README.md` states the current total; if

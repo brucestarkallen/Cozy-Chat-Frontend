@@ -39,6 +39,12 @@ echo "--- the Hermes helper ---"
 [ -x "$PREFIX/bin/hermesmodel" ] && ok "hermesmodel is installed as a command" || bad "no hermesmodel"
 bash -n "$PREFIX/bin/hermesmodel" && ok "and it is a valid script" || bad "hermesmodel has a syntax error"
 sed -n 2p "$PREFIX/bin/hermesmodel" | grep -q "^# hermesmodel - " && ok "its second line describes it (for the menu command)" || bad "no description line"
+# a stand-in Hermes with nothing set up: the reason a provider listed no models
+# is printed (it was always empty brackets from v5.28.2 to v5.28.4)
+mkdir -p /tmp/upd/fakeh/bin /tmp/upd/fakeh/home
+printf '#!%s\nimport sys\nsys.exit(0)\n' "$(command -v python3)" > /tmp/upd/fakeh/bin/hermes; chmod +x /tmp/upd/fakeh/bin/hermes
+hm=$(printf '\n' | PATH="/tmp/upd/fakeh/bin:$PATH" HERMES_HOME=/tmp/upd/fakeh/home HERMESMODEL_RUN="bash -c" bash "$PREFIX/bin/hermesmodel" 2>&1)
+printf '%s\n' "$hm" | grep -q "didn't list its models (no address is set for it)" && ok "hermesmodel says why no models were listed" || bad "no reason given" "$(printf '%s' "$hm" | grep "list its models")"
 
 echo "# helper release two" >> /tmp/upd/origin/tools/hermesmodel
 ( cd /tmp/upd/origin && git add -A && git commit -qm "helper two" )
@@ -103,5 +109,12 @@ got=$(curl -s --max-time 3 http://127.0.0.1:8803/api/version | python3 -c 'impor
 [ -f "$COZY_DIR/.server.pid" ] && kill -0 "$(cat "$COZY_DIR/.server.pid")" 2>/dev/null && ok "and its pid is on record again" || bad "no pid"
 
 pkill -f "serve.py 8803" >/dev/null 2>&1
+
+echo "--- the README's one-line install, with nothing set but where to fetch from ---"
+mkdir -p /tmp/upd/home2 /tmp/upd/prefix2/bin
+( unset COZY_DIR; HOME=/tmp/upd/home2 PREFIX=/tmp/upd/prefix2 bash "$SRC/install.sh" >/tmp/upd/fresh.log 2>&1 ); rc=$?
+[ "$rc" = "0" ] && ok "a fresh install with no COZY_DIR finishes" || bad "a fresh install with no COZY_DIR stopped" "$(tail -1 /tmp/upd/fresh.log)"
+[ -x /tmp/upd/prefix2/bin/hermesmodel ] && ok "and installs hermesmodel" || bad "no hermesmodel after a fresh install"
+grep -q "Your chats live on this phone" /tmp/upd/fresh.log && ok "and says where the chats live" || bad "the install never got to its last words"
 # the gate reads exit codes, so a failure has to be one
 [ "$FAILED" = "0" ] && echo "ALL PASS" || { echo "FAILURES PRESENT"; exit 1; }

@@ -262,8 +262,10 @@ case ":$PATH:" in
   *) warn "Note: $BIN is not on your PATH. Run it as $BIN/cozy" ;;
 esac
 # the Hermes helper: one command to pick Hermes' provider and model
-if [ -f "$COZY_DIR/tools/hermesmodel" ]; then
-  cp -f "$COZY_DIR/tools/hermesmodel" "$BIN/hermesmodel" && chmod 755 "$BIN/hermesmodel"
+# ($DIR, not $COZY_DIR: under set -u an unset COZY_DIR - the README's one-line
+# install - stopped the installer right here, before hermesmodel was installed)
+if [ -f "$DIR/tools/hermesmodel" ]; then
+  cp -f "$DIR/tools/hermesmodel" "$BIN/hermesmodel" && chmod 755 "$BIN/hermesmodel"
 fi
 
 say "Your chats live on this phone in ${COZY_DATA_DIR:-$HOME/.cozychat} - every browser"
