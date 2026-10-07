@@ -696,7 +696,7 @@ network-first, so a refresh always gets the newest version.
 `swtest.js`, `scrolltest.js`, `styletest.js`, `hiddentest.js`,
 `coherencetest.js` and `installtest.sh` — runs under Node with jsdom
 (`npm i jsdom fake-indexeddb`).
-1886 checks (plus 81 in real Chromium) across the matching engine, JSON tolerance, prompt assembly,
+1890 checks (plus 81 in real Chromium) across the matching engine, JSON tolerance, prompt assembly,
 multi-block replies, proposal supersede, undo truth, button visibility,
 projects and their instruction blocks, per-connection effort ladders with
 self-healing levels, retrieval, streaming, SSE framing and Hermes tool activity,

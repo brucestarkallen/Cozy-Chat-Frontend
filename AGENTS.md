@@ -14,7 +14,7 @@ worker, `install.sh` the Termux installer, `tests/` the gate.
     python3 tests/device_e2e.py       # real Chromium + the real serve.py
     python3 tests/thinking_e2e.py     # real Chromium + a real stream: the thinking box
 
-1886 checks as of v5.28.5, plus 57 in `tests/device_e2e.py`, 24 in `tests/thinking_e2e.py` and 12 in `tests/hermesmodeltest.sh` (needs a Hermes install), measured from real output: each file's own count line ("(N checks)" or "N passed", else its `ok` lines), plus `installtest.sh`'s `ok` lines.
+1890 checks as of v5.28.6, plus 57 in `tests/device_e2e.py`, 24 in `tests/thinking_e2e.py` and 12 in `tests/hermesmodeltest.sh` (needs a Hermes install), measured from real output: each file's own count line ("(N checks)" or "N passed", else its `ok` lines), plus `installtest.sh`'s `ok` lines.
 
 `tests/inerttest.js` is in the loop but prints SKIP without a second checkout
 to compare against. It answers the question a passing gate does not: whether a
@@ -76,6 +76,11 @@ renamed set, saved prompt, renamed chat - each keeps what it had. A block or
 prompt that vanished since its list was drawn (another browser) redraws the
 list instead of throwing, and a block with no name gets `""`, never shows
 "undefined".
+
+**Check reads a file as JSON by its name or by a start only JSON has** (a
+brace, or a bracket opening a value). v5.28.5 and earlier took any text
+starting with `[` for JSON, so a note opening with a markdown link was
+reported as broken JSON. A worldbook kept in a `.txt` file is still found.
 
 Every file must exit 0. Measure check counts from real output — never predict
 them, never inherit them from docs. `README.md` states the current total; if

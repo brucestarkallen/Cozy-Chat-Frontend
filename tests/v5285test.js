@@ -1,7 +1,9 @@
 // TEST FILE — run with: node tests/v5285test.js
 // Guards v5.28.5: a blank answer to "name it" is no answer anywhere a name is
 // asked (instruction sets, saved prompts), and a saved prompt that vanished
-// since its list was drawn cannot throw.
+// since its list was drawn cannot throw. And v5.28.6: Check does not call a
+// note that starts with a markdown link broken JSON, while a worldbook or a
+// broken JSON list kept in a .txt file is still read as JSON.
 const fs=require('fs');const {JSDOM}=require('jsdom');require('fake-indexeddb/auto');
 const html=fs.readFileSync(__dirname+'/../index.html','utf8');
 let pass=0,fail=0;
@@ -41,6 +43,16 @@ setTimeout(()=>{
   w.eval(`S.presets.push({id:'imp',name:'Imported',system:'',injections:[{id:'b1',text:'Be brief.',enabled:true}],order:['__main__','b1','__chat__']}); switchPreset('imp'); d=document; d.querySelector('#injList').setAttribute('data-open','b1'); renderInjections();`);
   const nm=d.querySelector('[data-injname="b1"]');
   ck('a nameless block\u2019s name field is empty, not "undefined"', !!nm && nm.value==='', nm && JSON.stringify(nm.value));
+  // Check on a note that starts with a markdown link
+  const lint=(n,x)=>w.eval('(n,x)=>lintDoc(n,x)')(n,x);
+  const md=lint('notes.md','[Chapter 1](ch1.md)\nThe fox and the crow.');
+  ck('a note starting with a link is not called broken JSON', !md.jsonBad && !md.issues.some(i=>/JSON/.test(i.msg)), JSON.stringify(md.issues.map(i=>i.msg)));
+  const wbTxt=lint('lore.txt',JSON.stringify({entries:{0:{key:['fox'],content:'A clever fox.'}}}));
+  ck('a worldbook kept in a .txt file is still found', !!wbTxt.wb, JSON.stringify(wbTxt.issues.map(i=>i.msg)));
+  const arr=lint('list.txt','[ {"a":1}, ');
+  ck('a broken JSON list in a .txt file is still reported', arr.jsonBad===true);
+  const named=lint('x.json','[Chapter');
+  ck('and anything named .json is always checked as JSON', named.jsonBad===true);
   console.log('\n'+(fail?'FAILED '+fail:'ALL PASS')+'  ('+(pass+fail)+' checks)');
   process.exit(fail?1:0);
 },800);
