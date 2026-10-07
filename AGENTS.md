@@ -14,7 +14,7 @@ worker, `install.sh` the Termux installer, `tests/` the gate.
     python3 tests/device_e2e.py       # real Chromium + the real serve.py
     python3 tests/thinking_e2e.py     # real Chromium + a real stream: the thinking box
 
-1890 checks as of v5.28.6, plus 57 in `tests/device_e2e.py`, 24 in `tests/thinking_e2e.py` and 12 in `tests/hermesmodeltest.sh` (needs a Hermes install), measured from real output: each file's own count line ("(N checks)" or "N passed", else its `ok` lines), plus `installtest.sh`'s `ok` lines.
+1892 checks as of v5.28.7, plus 57 in `tests/device_e2e.py`, 24 in `tests/thinking_e2e.py` and 12 in `tests/hermesmodeltest.sh` (needs a Hermes install), measured from real output: each file's own count line ("(N checks)" or "N passed", else its `ok` lines), plus `installtest.sh`'s `ok` lines.
 
 `tests/inerttest.js` is in the loop but prints SKIP without a second checkout
 to compare against. It answers the question a passing gate does not: whether a
@@ -63,6 +63,11 @@ install (no `COZY_DIR`) died at the installer's last step under `set -u` -
 "COZY_DIR: unbound variable", hermesmodel never installed - from v5.28.1 until
 v5.28.5. It now also runs that install exactly as the README gives it. Inside
 `install.sh` the app folder is `$DIR`; `$COZY_DIR` is only an optional input.
+
+**`serve.sh` runs `serve.py`** (v5.28.7). It ran `python -m http.server`, so
+the README's "Locally from Termux" steps kept every chat in the browser and let
+it keep stale copies of the app - the two things `serve.py` exists to stop.
+`installtest.sh` starts it and checks the phone store answers.
 
 **A reader of a line must follow its writer.** v5.28.2 replaced hermesmodel's
 `NOMODELS <why>` line with `KEY ok|bad|none <why>` and left the menu reading

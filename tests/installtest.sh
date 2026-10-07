@@ -110,6 +110,14 @@ got=$(curl -s --max-time 3 http://127.0.0.1:8803/api/version | python3 -c 'impor
 
 pkill -f "serve.py 8803" >/dev/null 2>&1
 
+echo "--- bash serve.sh, the README's other way to run it from Termux ---"
+mkdir -p /tmp/upd/ss-data
+( COZY_DATA_DIR=/tmp/upd/ss-data nohup bash "$SRC/serve.sh" 8805 >/tmp/upd/ss.log 2>&1 </dev/null & echo $! > /tmp/upd/ss.pid )
+n=0; while ! curl -s --max-time 1 -o /dev/null http://127.0.0.1:8805/ && [ $n -lt 40 ]; do sleep 0.1; n=$((n+1)); done
+curl -s --max-time 3 http://127.0.0.1:8805/api/store/hello | grep -q '"dataDir": "/tmp/upd/ss-data"' && ok "serve.sh keeps the chats on the phone" || bad "serve.sh is not the phone store" "$(head -c 120 /tmp/upd/ss.log)"
+curl -s --max-time 3 http://127.0.0.1:8805/index.html | grep -q 'name="cozy-store"' && ok "and the page it serves knows it" || bad "no store tag from serve.sh"
+kill "$(cat /tmp/upd/ss.pid)" 2>/dev/null; sleep 0.3
+
 echo "--- the README's one-line install, with nothing set but where to fetch from ---"
 mkdir -p /tmp/upd/home2 /tmp/upd/prefix2/bin
 ( unset COZY_DIR; HOME=/tmp/upd/home2 PREFIX=/tmp/upd/prefix2 bash "$SRC/install.sh" >/tmp/upd/fresh.log 2>&1 ); rc=$?

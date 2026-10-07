@@ -9,4 +9,9 @@ echo "  Cozy Chat is running."
 echo "  Open this in Chrome:  http://localhost:$PORT"
 echo "  Stop it with Ctrl+C."
 echo ""
-python -m http.server "$PORT" --bind 127.0.0.1
+# serve.py, not a plain file server: it keeps the chats on this phone in
+# ~/.cozychat and never lets a browser keep an old copy of the app. A plain
+# `python -m http.server` here left every chat in the browser - the opposite
+# of what the README promises for the copy served from Termux.
+PY=$(command -v python3 || command -v python)
+exec "$PY" serve.py "$PORT" 127.0.0.1
