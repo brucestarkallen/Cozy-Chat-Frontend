@@ -49,14 +49,22 @@ echo "--- the phone keeps the data ---"
 curl -s --max-time 3 http://127.0.0.1:8803/index.html | grep -q 'name="cozy-store"' && ok "the served page says the phone keeps the data" || bad "no store tag in the served page"
 grep -q 'name="cozy-store"' "$COZY_DIR/index.html" && bad "the tag leaked into the file on disk" || ok "the file on disk stays clean"
 curl -s --max-time 3 http://127.0.0.1:8803/api/store/hello | grep -q "\"dataDir\": \"$HOME/.cozychat\"" && ok "the data lives in ~/.cozychat, outside the app" || bad "wrong data dir" "$(curl -s http://127.0.0.1:8803/api/store/hello)"
-code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 -X PUT -H "X-Cozy-Base: 0" --data '{"id":"t1","title":"kept"}' http://127.0.0.1:8803/api/store/chat/t1)
+code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 -X PUT -H "X-Cozy-Client: installtest" -H "X-Cozy-Base: 0" --data '{"id":"t1","title":"kept"}' http://127.0.0.1:8803/api/store/chat/t1)
 [ "$code" = "200" ] && ok "a chat is written" || bad "write got $code"
 [ -f "$HOME/.cozychat/chats/t1.json" ] && ok "as a file on the phone" || bad "no chat file"
-code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 -X PUT -H "X-Cozy-Base: 0" --data '{"id":"t1","title":"stale"}' http://127.0.0.1:8803/api/store/chat/t1)
+code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 -X PUT -H "X-Cozy-Client: installtest" -H "X-Cozy-Base: 0" --data '{"id":"t1","title":"stale"}' http://127.0.0.1:8803/api/store/chat/t1)
 [ "$code" = "409" ] && ok "a write from an old revision is refused" || bad "stale write got $code"
-code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 -X PUT -H "X-Cozy-Base: 1" --data 'this is not json' http://127.0.0.1:8803/api/store/chat/t1)
+code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 -X PUT -H "X-Cozy-Client: installtest" -H "X-Cozy-Base: 1" --data 'this is not json' http://127.0.0.1:8803/api/store/chat/t1)
 [ "$code" = "400" ] && ok "garbage is refused" || bad "garbage got $code"
-curl -s --max-time 3 http://127.0.0.1:8803/api/store/chat/t1 | grep -q '"title":"kept"' && ok "the good copy survived both" || bad "a bad write overwrote it"
+# a write that does not come from the app - any other web page open in the
+# phone's browser - cannot touch the chats: it cannot send X-Cozy-Client
+code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 -X POST http://127.0.0.1:8803/api/store/clear/chat)
+[ "$code" = "403" ] && ok "another page cannot clear the chats" || bad "a write without X-Cozy-Client cleared: $code"
+code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 -X DELETE http://127.0.0.1:8803/api/store/chat/t1)
+[ "$code" = "403" ] && ok "nor delete one" || bad "a delete without X-Cozy-Client got $code"
+code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 -X PUT -H "X-Cozy-Base: 1" --data '{"id":"t1","title":"hijacked"}' http://127.0.0.1:8803/api/store/chat/t1)
+[ "$code" = "403" ] && ok "nor overwrite one" || bad "a write without X-Cozy-Client got $code"
+curl -s --max-time 3 http://127.0.0.1:8803/api/store/chat/t1 | grep -q '"title":"kept"' && ok "the good copy survived all of it" || bad "a bad write overwrote it"
 cozy update >/dev/null 2>&1
 [ -f "$HOME/.cozychat/chats/t1.json" ] && ok "the chats survive an app update (reset --hard)" || bad "an update ate the chats"
 code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 http://127.0.0.1:8803/.server.pid)
@@ -95,4 +103,5 @@ got=$(curl -s --max-time 3 http://127.0.0.1:8803/api/version | python3 -c 'impor
 [ -f "$COZY_DIR/.server.pid" ] && kill -0 "$(cat "$COZY_DIR/.server.pid")" 2>/dev/null && ok "and its pid is on record again" || bad "no pid"
 
 pkill -f "serve.py 8803" >/dev/null 2>&1
-[ "$FAILED" = "0" ] && echo "ALL PASS" || echo "FAILURES PRESENT"
+# the gate reads exit codes, so a failure has to be one
+[ "$FAILED" = "0" ] && echo "ALL PASS" || { echo "FAILURES PRESENT"; exit 1; }

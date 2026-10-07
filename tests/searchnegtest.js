@@ -95,8 +95,8 @@ const MUTATIONS=[
    '    if (continuing || !autoSearchTextOn()) break;'],
 
   ['the protocol never reaches the system prompt',
-   '  if (autoSearchTextOn()) sysParts.push(searchProtocol());',
-   '  if (false) sysParts.push(searchProtocol());'],
+   '  if (autoSearchTextOn()) addSys("Looking things up", searchProtocol());',
+   '  if (false) addSys("Looking things up", searchProtocol());'],
 
   ["the text protocol goes out beside Claude's own tool",
    '  return !!(S.search.on && S.search.model !== false\n    && S.search.provider !== "native" && S.search.key);',

@@ -766,6 +766,18 @@ class NoCacheHandler(SimpleHTTPRequestHandler):
     def _client(self):
         return (self.headers.get("X-Cozy-Client") or "")[:64]
 
+    def _from_app(self):
+        """A write has to come from the app, which names itself in
+        X-Cozy-Client. No other web page can put that header on a request to
+        this server: a custom header needs a preflight, and this server grants
+        none. Without the check, any site open in the phone's browser could
+        clear or replace every chat with one fetch() whose answer it never
+        even needs to read."""
+        if self._client():
+            return True
+        self._json(403, {"error": "a write needs the X-Cozy-Client header"})
+        return False
+
     @staticmethod
     def _ok(kind, rid):
         if kind == "settings":
@@ -861,6 +873,8 @@ class NoCacheHandler(SimpleHTTPRequestHandler):
         super().do_HEAD()
 
     def do_PUT(self):
+        if not self._from_app():
+            return
         path, parts = self._parts()
         if parts[:2] == ["api", "store"] and len(parts) == 4 and self._ok(parts[2], parts[3]):
             raw, obj = self._json_body()
@@ -889,6 +903,8 @@ class NoCacheHandler(SimpleHTTPRequestHandler):
         self._json(404, {"error": "not found"})
 
     def do_DELETE(self):
+        if not self._from_app():
+            return
         path, parts = self._parts()
         if parts[:2] == ["api", "store"] and len(parts) == 4 and self._ok(parts[2], parts[3]) and parts[2] != "settings":
             had = STORE.delete(parts[2], parts[3], self._client())
@@ -896,6 +912,8 @@ class NoCacheHandler(SimpleHTTPRequestHandler):
         self._json(404, {"error": "not found"})
 
     def do_POST(self):
+        if not self._from_app():
+            return
         path, parts = self._parts()
         if path == "/api/hermes/sync":
             return self._json(200, sync_hermes_key())

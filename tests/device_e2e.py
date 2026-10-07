@@ -363,6 +363,12 @@ def main():
         a.wait_for_timeout(500)
         stop(); start()                                           # the server looks when it starts
         key_on_phone = lambda: [x for x in api("/api/store/settings/main")[1]["data"]["providers"] if x["id"] == "phx"][0]["apiKey"]
+        # The first look runs beside the server, not before it: /hello answers
+        # while that look is still asking Hermes, so the phone is read until it
+        # has settled (the tab check below waits the same way).
+        t_end = time.time() + 8
+        while key_on_phone() != "first-strong-key-0123456789" and time.time() < t_end:
+            time.sleep(0.1)
         ck("the phone took the key Hermes accepts, by itself", key_on_phone() == "first-strong-key-0123456789", key_on_phone())
         a.wait_for_function("() => (S.providers.find(x => x.id === 'phx') || {}).apiKey === 'first-strong-key-0123456789'", timeout=8000)
         ck("and the open tab has it without a reload", True)

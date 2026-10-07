@@ -138,8 +138,8 @@ const MUTATIONS=[
   ['the test sends the real chat, so what comes after C is a matter of opinion',
    `  const asm = opts.probe
     ? { messages: [{ role:"user", content: PF_PROBE_ASK }], system: "" }
-    : assembleMessages(p.kind, c);`,
-   '  const asm = assembleMessages(p.kind, c);', 'test'],
+    : assembleMessages(p.kind, c, asmParts);`,
+   '  const asm = assembleMessages(p.kind, c, asmParts);', 'test'],
 
   ['a test overwrites the panel report on the last message the user sent',
    '  if (!opts.probe) lastPrefill = pf;',

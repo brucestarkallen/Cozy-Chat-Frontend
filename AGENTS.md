@@ -12,8 +12,9 @@ worker, `install.sh` the Termux installer, `tests/` the gate.
     done
     bash tests/installtest.sh
     python3 tests/device_e2e.py       # real Chromium + the real serve.py
+    python3 tests/thinking_e2e.py     # real Chromium + a real stream: the thinking box
 
-1831 checks as of v5.28.3, plus 57 in `tests/device_e2e.py` and 12 in `tests/hermesmodeltest.sh` (needs a Hermes install), measured from real output.
+1874 checks as of v5.28.4, plus 57 in `tests/device_e2e.py`, 24 in `tests/thinking_e2e.py` and 12 in `tests/hermesmodeltest.sh` (needs a Hermes install), measured from real output: each file's own count line ("(N checks)" or "N passed", else its `ok` lines), plus `installtest.sh`'s `ok` lines.
 
 `tests/inerttest.js` is in the loop but prints SKIP without a second checkout
 to compare against. It answers the question a passing gate does not: whether a
@@ -47,6 +48,16 @@ It edits `index.html` in place. A `.negbak` is written before the first
 mutation and restored at startup if a previous run was killed — without that,
 an interrupted run leaves the bug in the tree looking like code somebody
 wrote, and the next gate failure reads as a real defect.
+
+Each mutation finds its line by exact text, so an edit to a line one of these
+gates names silently retires that mutation (it reports "anchor appears 0
+times"). Being held out of the loop, nobody saw two go stale in v5.27.0 (one
+per gate) until v5.28.4; v5.28.4 itself broke two more and fixed all four.
+After changing a line, grep both negtests for it — or run them, each on its
+own checkout (`git worktree add`), never in the tree another gate is reading.
+
+`tests/installtest.sh` exits 1 when a check fails. Before v5.28.4 it printed
+"FAILURES PRESENT" and exited 0, so the gate loop could never have stopped on it.
 
 Every file must exit 0. Measure check counts from real output — never predict
 them, never inherit them from docs. `README.md` states the current total; if
@@ -191,6 +202,76 @@ connection and drop an incoming one with the same id, so a stale vault's dead
 key could become the only key. A differing url/apiKey/model now arrives as a
 copy "(from this browser)", and the whole incoming settings document is saved
 to `imported/settings-<ms>.json`.
+
+## Writes come from the app (v5.28.4)
+
+`serve.py` refuses a PUT, POST or DELETE without `X-Cozy-Client` (403). The
+page names itself on every write; no other web page can put that header on a
+request to 127.0.0.1 (a custom header needs a preflight the server never
+grants). Before, any site open in the phone's browser could clear or replace
+every chat with one `fetch()` it never needed to read the answer of —
+`installtest.sh` proves the clear, the delete and the overwrite are refused. A
+new write endpoint, or a new caller of one, has to send the header.
+
+**The file editor keeps what was typed.** Closing it, attaching from it, or the
+page going to the background saves the typing first (`keepDocEdit`, one undo
+frame, the same as Save); a file deleted here or elsewhere just closes
+(`hideDocEdit`). Closing used to drop every unsaved change, and Attach
+attached the old text.
+
+## The thinking box (v5.28.4)
+
+It follows its own end while the reader is at that end, and **only the
+reader's own scrolling of the box decides whether they are** (`thinkScrolled`,
+caught by a capturing scroll listener on `#thread`, since a box's scroll does
+not bubble). v5.28.3 decided it from where the box stood *after* the new text
+landed (`stickScroll`), so any paint that grew it past the 40px margin at
+once (the backlog that lands when a finger lifts, since painting is suspended
+while one is down; a burst; a paragraph on a slow frame) read as "scrolled
+away", and it never followed again. Its test ran the helper on a fake box with fixed
+numbers and passed the whole time; it is gone, and `thinking_e2e.py` measures
+the real thing (13 of its 24 checks fail on v5.28.3).
+
+- Cozy's own scrolls go through `thinkPut`, which records the position in
+  `thinkSeen`; a scroll event at that position is Cozy's echo and changes
+  nothing.
+- Out of reach of the end = reading (`thinkAway[mid]`); coming *down* into
+  the end = following again. Moving *up* inside the margin changes nothing
+  (a lifting finger twitches); an upward wheel marks reading on its own, so a
+  touchpad's small steps are not pulled back one by one.
+- `thinkOpen[mid]` is the reader's fold choice; absent means open while the
+  reply arrives and folded once it is done. A `toggle` that only matches how
+  Cozy drew the block is the drawing, not a choice. The live message is
+  `streaming.asstId` (set in every mode; More never sets `pending`, and must
+  not - `assembleMessages()` drops pending turns from the wire).
+- The live box grows by `appendData`, never a rewrite: a rewrite each frame
+  wiped any selection the reader made in it.
+- `renderThread()` keeps each box's place, and `readerState()` keeps what the
+  reader scrolled or opened elsewhere in a message (code blocks, tables, the
+  image strip, an approval's command, a diff, the tool drawer, the sources
+  list); the streaming paint keeps tables as it kept code blocks. A block the
+  reader is up in when the reply finishes stays open where they are.
+
+## Replies that never came (v5.28.4)
+
+`_(stopped)_`, `_(empty reply)_` and the two lookup notes (`REPLY_NOTES`) are
+Cozy's sentences stored as a reply's content. On the wire they go as an
+`appNote()`, never as the model's words; and a reply that was all reasoning
+(content `""`) goes as one too, because Claude refuses an empty turn anywhere
+but last, so every later message in that chat used to fail. The final turn (the
+one More carries on) is the exception: a placeholder there goes as `""`, and
+More on such a reply starts it instead of carrying on from Cozy's line, which
+comes back if nothing arrives. The lines that write the placeholders are
+unchanged on purpose: `searchnegtest.js` mutates one of them verbatim.
+
+**The Runs API is remembered as missing only when that is what happened.** A
+404/405 is an answer. A failed fetch is also what a stopped Hermes looks like,
+so it is remembered only after the plain stream proves the server answers;
+v5.28.3 switched approvals off for good every time Hermes was not running.
+
+**An error body is read once** (`errDetail`): as text, then as JSON when it
+is JSON. Reading it as JSON first spent it, so a plain-text or HTML error
+always said "No details given."
 
 ## What the model saw
 

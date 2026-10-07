@@ -691,12 +691,12 @@ network-first, so a refresh always gets the newest version.
 | `send()` | Sends and reads the streaming reply |
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
-**Tests.** Everything in `tests/` — `v5280test.js` down to `v2test.js`, plus
+**Tests.** Everything in `tests/` — `v5284test.js` down to `v2test.js`, plus
 `searchtest.js`, `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`,
 `swtest.js`, `scrolltest.js`, `styletest.js`, `hiddentest.js`,
 `coherencetest.js` and `installtest.sh` — runs under Node with jsdom
 (`npm i jsdom fake-indexeddb`).
-1831 checks (plus 57 in real Chromium) across the matching engine, JSON tolerance, prompt assembly,
+1874 checks (plus 81 in real Chromium) across the matching engine, JSON tolerance, prompt assembly,
 multi-block replies, proposal supersede, undo truth, button visibility,
 projects and their instruction blocks, per-connection effort ladders with
 self-healing levels, retrieval, streaming, SSE framing and Hermes tool activity,
@@ -710,6 +710,11 @@ real `serve.py`: two browsers in step, a wiped browser, a stale tab, the server
 killed mid-chat, a tab closed mid-swipe, a browser handing over its old chats,
 delete, restore and a page from an old server (`pip install playwright &&
 playwright install chromium`, then `python3 tests/device_e2e.py`).
+
+`tests/thinking_e2e.py` streams a real reply into real Chromium on a phone-sized
+screen and drags the thinking box with real touch events: it follows its end
+while you are at the end, stays where you leave it otherwise, and keeps your
+place and its fold through a redraw.
 
 `tests/searchnegtest.js` is the same kind of harness for the search guards:
 it puts each of the 11 lookup bugs back and requires `tests/searchtest.js` to

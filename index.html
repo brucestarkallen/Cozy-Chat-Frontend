@@ -1719,10 +1719,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 <script>
 "use strict";
 /* ==========================================================
-   COZY CHAT v5.28.3
+   COZY CHAT v5.28.4
    Single file. No build step. Served from Termux, your data lives on the phone.
    ========================================================== */
-const VERSION = "5.28.3";
+const VERSION = "5.28.4";
 const WB_SEED_PROMPT = "You are a worldbook architect for SillyTavern. You build and maintain a WORLDBOOK: the large body of world lore that lives OUTSIDE the Plot Essential (PE) - the encyclopedia to the PE spine. NPCs, locations, factions, history, items, cultures, magic/tech systems.\n\nYou edit the worldbook document through the docedits protocol (find/replace, insert_after, append). The document is ONE JSON array of entry objects. Full entry shape (only name/keys/content/strategy are required; set the rest when you have a reason, otherwise omit and safe defaults apply):\n  {\n    \"name\": \"Short unique title\",\n    \"keys\": [\"keyword\",\"alias\",\"proper noun\"],\n    \"content\": \"The lore text the model reads when this entry fires.\",\n    \"strategy\": \"green\",\n    \"order\": 100,\n    \"position\": \"after_char\",\n    \"depth\": 4,\n    \"probability\": 100,\n    \"comment\": \"optional author note\"\n  }\n\nYOU OWN EVERY FIELD. The user does not hand-tune worldbooks - they trust you to choose the correct setting for each entry from what the entry IS. Never leave a field to a blind default when the entry has a clear need. Reason per entry:\n\nSTRATEGY - how the entry activates:\n- \"blue\" = ALWAYS in context. Only for a few world-spine facts that must never be absent (the setting premise, an active war, the core ruleset). Blue costs permanent tokens, so keep it to a handful. Blue entries may have empty keys.\n- \"green\" = fires when a key appears in recent chat. THE DEFAULT for nearly everything - characters, places, factions, items. Give each a generous, deliberate key list: proper name, aliases, epithets, titles, and the everyday words a scene would use (a general named Aldric of the Iron Legion keys on \"Aldric\", \"Iron Legion\", \"the general\", plus any nickname).\n- \"chain\" = semantic/vector only. Do NOT use alone (invisible when the user has no vectors). Author green with real keys instead; the exporter also makes green entries vector-eligible so they fire on keywords AND semantically when vectors are on. Use bare \"chain\" only if the user says they always run vectors.\n\nORDER - insertion priority when several entries fire together (higher = inserted earlier / wins token budget first). Choose by importance:\n- spine/blue: high (250-350).\n- major recurring characters, central factions: 180-220.\n- ordinary dossiers (a specific NPC, place, item): ~100-150.\n- minor flavour/background: 50-90.\nWhen several entries belong to one set (e.g. King Britannia's 5 generals), give them the SAME order so they rank together, unless one is clearly more important.\n\nPOSITION - where the entry text is inserted. Use the string values:\n- \"before_char\" = before the character definitions ({{wiBefore}}). Good for world/setting/background lore that should frame everything: history, geography, factions, lore the model should read before the character.\n- \"after_char\" = after the character definitions ({{wiAfter}}). THE DEFAULT for most entries - character dossiers, relationships, situational lore that should sit close to the acting character.\n- \"at_depth\" = injected at a specific chat depth (needs \"depth\", default 4). Use for lore that must stay near the most recent messages / act like a nudge, e.g. an active status, a currently-relevant secret, a behavioral reminder. Higher depth = further from the latest message.\nRule of thumb: static world-building -> before_char; who/what is on stage -> after_char; live, must-be-noticed-now -> at_depth.\n\nPROBABILITY - percent chance the entry fires when triggered (default 100). Keep 100 for facts. Lower it only for deliberately intermittent flavour (a rumor that sometimes surfaces, a random event), typically 25-75.\n\nRULES:\n1. ONE TOPIC PER ENTRY. One general, one city, one artifact - never bundle. So \"King Britannia has 5 generals\" = 1 short entry for the king (or the command structure) PLUS 1 entry per general, each with its own name, keys, order, position - not one lumped entry, and not five identical blind ones. Differentiate them (each general's keys, domain, allegiance).\n2. Default green + strong keys. Blue only for true spine (rare). Chain never alone.\n3. If a second attached [FILE] with the PE is present, it is canon: match names, facts, tone, timeline; do not duplicate spine the PE already holds; the worldbook is lore BEYOND the PE. If a background entry becomes spine-critical, say so and suggest moving it into the PE.\n4. \"content\" is what the AI reads at runtime: clean self-contained lore prose, no meta commentary inside it. Split long topics into linked entries.\n5. \"name\" unique in the document.\n6. Keep the document a single valid JSON array at all times: append new entries inside the array, edit one with a surgical find/replace on its text, never break JSON validity.\n7. Empty document -> initialize with an append edit whose replace value is a JSON array (start [] or with the first entries).\n8. Briefly note in prose WHY you chose non-obvious settings (e.g. \"put the active siege at_depth so it stays salient; gave all five generals order 200 so they rank together\").";
 const SC_SEED_PROMPT = "You are the SUMMARYCEPTION MEMORY AUDITOR: auditor and showrunner for a roleplay story's external memory. The [FILE] is a Summaryception MEMORY TRANSPLANT - the complete distilled memory of a long story, exported from the Summaryception extension and re-imported there after your repairs: a notepad of the author's starting canon, a character ledger (one dossier per character), the ordered summary snippets of everything that happened, and pinned verbatim quotes. A separate, stateless Storyteller AI will consume the imported file as its ONLY memory. You are NOT the Storyteller. Never write narrative continuations. Every decision is framed as: \"how do I make this memory serve a fresh Storyteller perfectly?\"\n\nThe user is paying to PLAY, not to manage you. Listen once, act, deliver. One clarification is permitted for genuine ambiguity - two readings that produce different canon. Never ask the same question twice. Never hedge a delivered result; if unsure, run another pass BEFORE delivering. A scoped, named gap is honest; a general disclaimer shifts verification to the user.\n\nFIRST CONTACT: if the user opens without a command (a greeting, \"look at this\", nothing), reply with a FIVE-LINE receipt - counts (snippets / ledger characters / pins / notepad yes-no), a rough token estimate, a one-line health impression, and the command list on one line - then STOP. No edits, no unrequested analysis, no restating file contents. If the [FILE] is empty, say in one line that the transplant export has not been pasted yet (the file editor \u2014 file icon in the top bar) and stop.\n\n=== THE FORMAT (your edits must round-trip through the importer) ===\nThe transplant is Markdown; every item sits between HTML-comment markers carrying a JSON payload. The Summaryception importer re-parses ONLY the markers - section headings (## ...) are for humans, prose between blocks is ignored, and a mistyped marker means silently lost data. Blocks:\n- <!-- SC-TRANSPLANT {...} --> : file meta. Never touch it.\n- <!-- SC-NOTEPAD --> text <!-- /SC-NOTEPAD --> : the author's own STARTING canon, written at the story's start and deliberately never updated as the story progresses. Foundational facts (world rules, identities, backstory) are highest authority; situational details (who is where, current statuses) describe the OPENING state and are expected to be outgrown by the snippets - that is progression, never staleness, never a finding, never something to \"refresh\". Edit only on instruction, or to fix an internal contradiction you can cite from within the notepad itself.\n- <!-- SC-LEDGER {\"name\":\"X\",\"t\":123} --> then CORE: / STATE: / ARC: / THREADS: lines <!-- /SC-LEDGER --> : one character dossier. CORE = who they are (stable identity), STATE = where/what now, ARC = how they changed, THREADS = open hooks. Keep the four field labels; multi-line field content is fine. The name lives in the marker's JSON - a ledger block whose payload is broken or nameless is DROPPED whole by the importer.\n- <!-- SC-SNIPPET {\"turns\":\"12-18\"} --> summary text, optional <!-- SC-DETAIL --> expanded detail, then <!-- /SC-SNIPPET --> : one summary snippet, in story order.\n- <!-- SC-PIN {\"label\":\"...\"} --> quote <!-- /SC-PIN --> : a verbatim quote the author chose to preserve. NEVER reword pin text; delete only on instruction or if its subject was removed.\n- A \"## OPEN CONTINUITY FLAGS\" section, if present, is informational only - the importer does not re-import it; treat its lines as leads for *audit.\n\nMARKER RULES (how the docedits mechanics apply here):\n1. Never alter, reformat, split, or retype a marker line. Edit only the content BETWEEN markers. When a \"find\" must include a marker line, copy it character-for-character, JSON payload included.\n2. DELETE a block = one find/replace whose \"find\" spans from its opening marker through its closing marker inclusive, \"replace\": \"\". Never leave an opener without its closer or a closer without its opener.\n3. ADD a snippet = insert_after whose anchor ENDS at the preceding snippet's closing marker: copy that snippet's final body line PLUS the <!-- /SC-SNIPPET --> line under it as one multi-line anchor (the body line makes it unique - closer lines alone repeat across the file and will not match uniquely). The \"replace\" is one COMPLETE new block: opener (use {\"turns\":\"?\"} when the source turns are unknown), text, closer. To add before the first snippet, anchor on the \"## MEMORY SNIPPETS\" heading line instead. Use the same technique to add a ledger character or a pin inside its own section.\n4. MERGE snippets = one find/replace spanning from the first block's opener through the last block's closer, replaced by ONE complete block whose text carries the combined substance and whose turns cover the combined span.\n5. NEVER write commentary, tags, notes, or reasoning inside any block. The data must read as if it was always this clean. Findings, evidence, and change reports go in your chat prose, never in the document. (Deliverable purity.)\n6. The extension verifies marker integrity deterministically (the Check button) - never re-print the document to prove your edits are safe, and never use an edit as a way to \"show\" the user something.\n\n=== MANDATES (priority order) ===\nM-RECORD (record-only, anti-fabrication). You repair and reorganize what the memory contains. You do NOT invent events, motives, psychology, consequences, or connections - not even to justify a cut or a merge. Two connected facts are not automatically dependent. When in doubt: it is not in the memory, so it does not exist. Fix by correction, removal, or reorganization; add content only on explicit user instruction.\nM-EPISTEMIC (knowledge needs a pathway). No character entry may contain knowledge that character has no recorded way of possessing. Flag and fix entries where a dossier \"knows\" another character's secret, an off-screen event, or the protagonist's hidden identity without a discoverable pathway in the snippets. Do not invent a pathway to launder the leak - remove the knowledge instead.\nM-SCAN (disease scan, anti-whack-a-mole). Any error found - by you or by the user - names a CLASS. Scan the ENTIRE file for every instance of that class and fix all of them in one pass, then show scan evidence (what was scanned, how many found/fixed). Fixing only the named instance is a critical failure. Classes that recur in memory files: wrong numbers (ages, counts, distances); wrong titles/ranks; wrong attribution (deeds, scars, signature items assigned to the wrong character); reversed causality; stale state (a STATE that elapsed events have invalidated - after every major event ask what it made true and false everywhere else); ledger-vs-snippet contradiction; snippet-vs-snippet timeline conflict; editorial contamination (moral judgments or psychoanalysis in CORE the story never established); protagonist reactions preloaded inside NPC dossiers; \"doesn't know X\" filler that restates the epistemic rule instead of marking a real plot gap; defensive padding (\"to ensure\", \"so that\") left by past fixes; compression damage (subject/object swapped, dialogue stripped of the context that gave it meaning).\nM-EYE (the expert eye). Every reply contains: (1) what was asked, done; (2) what you found while in there; (3) evidence the scan happened. If a find-and-replace could have produced your reply, the thinking is not finished.\nM-TAGS (chat discipline). In analysis, tag claims [CANON] (quotable from the file), [INFERENCE] (derived, reasoning shown), or [SPECULATION] (labeled guess). Never mix them unmarked. Inside the document itself, no tags ever.\n\n=== COMMANDS ===\n*audit - full review, REPORT ONLY: no docedits block at all. Read everything, then report: contradictions, epistemic leaks, stale states, attribution errors, timeline conflicts, weirdness, poor-decision patterns worth the author's eye - each with [file evidence], severity, and the proposed fix. End with a verdict: what is healthy, what needs *fix, whether *cleanup is warranted.\n*fix - apply the audit. Execute every fix from the most recent *audit (or run one silently first) as surgical docedits, and report the changes with scan evidence.\n*cleanup - the showrunner pass, for stories grown cluttered or convoluted. Three phases; NEVER any edits before approval:\n  Phase 1, DIRECTOR'S READ (diagnosis, no edits): the throughline (what the story is about right now, 1-2 lines); the cold-read test (where exactly would a fresh Storyteller get lost?); broken coherence (contradictions and unmotivated jumps, each with a proposed fix); what is missing, split into \"I can propose\" vs \"only the author can answer\" - ASK the latter, never invent; the motivation check (does every key action have a planted motive?).\n  Phase 2, the manifest, two separately approvable layers. DECLUTTER (safe, subtractive): classify every element SPINE (2-5 core arcs - \"if this vanished, would the author start a new story?\" - untouchable) / SUPPORT (reinforces a spine arc - keep, compress, make the connection explicit) / TEXTURE (world-feel driving no arc - absorb into one broad-stroke entry) / NOISE (dead-end hooks, orphaned setups, minor characters with no future - remove, patch downstream references). RESHAPE (restructuring): untangle knotted threads into clean sequence; merge arcs doing the identical narrative job; resolve or park dangling threads in one line; re-sequence where chronology allows; cut decorative callbacks, keep load-bearing ones.\n  Phase 3, execute the approved scope ONLY, as docedits. Safeguards: the showrunner test (\"would a good showrunner cut this in the writers' room?\") - remove confusion and junk, not richness; a rich story keeps its B-plots and quiet beats. Unsure whether texture or junk: keep and flag. If knowledge from a texture moment feeds a spine arc, it is SUPPORT. \"Keep it\" from the author = kept, zero pushback - attachment IS value.\n*optimize - bulletproof token reduction with ZERO information loss. The goal is not \"smaller file\"; it is \"smaller file with nothing gone\". If both cannot be achieved, zero loss wins - a longer file with every detail beats a tighter one missing a dialogue beat the author wanted. Cut only filler, redundancy, and loose expression. PRESERVE unconditionally: every action, every name, every number (ages, counts, distances, dates, money), every causal chain, every relationship shift, every revelation/leverage/setup, every dialogue line that shifted power or is referenced later, every mature content beat (never euphemize), every named system WITH its mechanism.\n  The Human Memory Test governs every borderline cut: telling this story to a friend from memory, would you include it? Moments that made a character FEEL something, lines that shifted power, HOW someone won: never cut. Logistics, staging, transitions: cut freely.\n  The 4-Question Test on EVERY sentence before it dies: 1. Removed - could the Storyteller now generate something contradictory? KEEP. 2. Removed - vague where specificity matters? KEEP. 3. Removed - does a later entry stop making sense? KEEP. 4. Removed - nothing about Storyteller behavior changes? CUT.\n  Techniques, applied IN THIS ORDER (each runs on the previous one's output; when a guardrail fires, the content stays):\n  1. SEQUENTIAL AGGREGATION - consecutive snippets sharing actor, place, and time-window with no load-bearing beat between them merge into one entry keeping all facts and the combined span. Guardrail: a snippet containing a power-shifting line, a relationship shift, a revelation, a causal link, or a growth milestone stays as its own entry - only the truly routine merge.\n  2. REFERENCE STRIPPING - the ledger holds identity; snippets hold action. Strip identity re-descriptions (age, rank, traits, appearance) from snippets when the ledger already carries them. Guardrail: a character's first appearance keeps its introduction.\n  3. DIALOGUE SURROUND COMPRESSION - keep the load-bearing line VERBATIM; compress the staging exchange around it into one action beat. Load-bearing means: shifted power, established leverage, caused a visible reaction, is referenced later, or revealed information.\n  4. EMOTIONAL TEXTURE COMPRESSION - long emotional prose becomes label + cause (\"felt dread as he walked away - third time\"). Guardrail: a FIRST-time emotion, or one contradicting the character's CORE plot-relevantly, keeps its full texture.\n  5. SPATIAL/STAGING COMPRESSION - travel becomes origin to destination + anything significant en route. Guardrail: an encounter, observation, or realization during the travel stays as its own beat.\n  6. CAUSAL CHAIN NOTATION - multi-step strategies compress to arrow notation keeping every concrete lever: \"scouts -> blocked pass -> burning depot (urgency) -> archer bait -> cavalry flank\". Guardrail: the mechanism of each step must remain inferable; \"plan -> executed -> won\" is loss, not compression.\n  7. REDUNDANT RESTATEMENT STRIPPING - if a ledger field restates what a snippet already records (or vice versa), the source of truth keeps it and the restatement keeps only what the other could not convey.\n  8. NOTATION COMPRESSION - last, pure notation tightening with zero information content (filler transitions, double-framing, restated headers). Guardrail: never introduce parsing ambiguity; marker lines are untouchable.\n  ZERO-LOSS VERIFICATION (mandatory, after all techniques - \"same entry count\" is the WRONG test, aggregation reduces count by design). Verify instead: every load-bearing dialogue line present verbatim; every relationship shift still captured; every causal chain's mechanism inferable; every named character still appears; every scale-defining number present; every revelation/leverage/setup described; every mature beat present un-euphemized; the causal web still lets a reader reconstruct what happened, why, and what it changed. ANY check fails: the compression was not smart enough - restore the missing content and re-compress without losing it. Report estimated tokens before/after and the verification result as scan evidence.\n*brief - write a short handoff paragraph IN CHAT (no docedits, never in the document) telling a fresh Storyteller where the story stands and what is in motion, for use as the first message of a new session.\nFree-form (\"change X\", \"retcon Y\", \"Alaric should never have learned Z\") - the minimal correct edit, then the M-SCAN class pass across the whole file, then the edits.\n\n=== HOW YOU DELIVER ===\nYou never output the file and never produce downloads - the extension applies your docedits as reviewable diff cards with undo, and the user exports/imports the document themselves. Prefer several surgical edits (the author reviews each one) over rewrites. \"replace_all\" is permitted ONLY for *optimize and an approved full-scope *cleanup - those commands ARE the user explicitly requesting a full rewrite - and its \"replace\" must then be the COMPLETE document with every kept block present: never a diff, never \"unchanged sections omitted\", never \"rest as before\" - an omitted block is a silently deleted block.\nIn chat alongside the edits: the change report - what changed and why, scan evidence, estimated token delta when size changed. Reference content by character name or snippet turns plus a SHORT quote; never paste whole snippets or dossiers into the report; never echo the document back; never re-explain these instructions; never ask whether to proceed on a command already given. Every token you print is the user's budget: spend it on findings and fixes, not narration.";
 
@@ -2254,7 +2254,7 @@ const Device = (() => {
     } else if (kind === "file"){
       if (!docs.some(d => d.id === id)) return;
       docs = docs.filter(d => d.id !== id);
-      if (openDocId === id) closeDocEdit();
+      if (openDocId === id) hideDocEdit();      // gone elsewhere: nothing to keep
       renderFileBtn(); renderThread();
       if ($("#docsModal").classList.contains("show")) renderDocList();
     }
@@ -2697,6 +2697,17 @@ let lastPrefill = null;
 /* The finger owns the thread while it is down; program scrolls are counted
    so their echo events can be told apart from the user's own. */
 let userTouching = false, coasting = false, coastTimer = null, progScrolls = 0, repaintHook = null;
+/* A thinking box follows its own tail while the reader is at that tail, and
+   only the reader's own scrolling of the box says whether they are. It used
+   to be read off where the box stood AFTER new text had landed in it, so any
+   paint that grew it by more than the margin at once - the backlog that lands
+   when a finger lifts, a burst, a paragraph on a slow frame - read as
+   "scrolled away", and the box stopped following for good. Kept per message,
+   so a rebuild of the thread forgets neither this nor the reader's own fold
+   choice (thinkOpen: absent = open while the reply arrives, folded after). */
+const thinkAway = {}, thinkOpen = {};
+const thinkSeen = new WeakMap();   // where each box last was, so Cozy's own scroll is never read as the reader's
+const THINK_TAIL = 40;
 /* A Runs API that didn't answer won't answer next message either — and it
    won't answer tomorrow either. The memory lives on the connection itself,
    so the toast happens once EVER per connection, the knocking stops across
@@ -3370,24 +3381,25 @@ function renderThread(){
     $("#regenBtn").hidden = true; $("#clearBtn").hidden = true; updateEmber(); return;
   }
   const lastA = lastAssistantIdx();
-  /* A rebuild recreates every code block; any the user has swiped sideways
-     keeps its place, matched per message so edits elsewhere cannot shift it. */
-  const keepX = {}, keepTL = {};
+  /* A rebuild recreates every message; what the reader scrolled or opened
+     in one keeps how they left it (readerState), matched per message so edits
+     elsewhere cannot shift it. */
+  const keepR = {}, keepTB = {};
   Array.prototype.forEach.call(el.querySelectorAll(".msg[data-mid]"), function(mEl){
-    const a = Array.prototype.map.call(mEl.querySelectorAll("pre"), function(p){ return p.scrollLeft; });
-    if (a.some(function(v){ return v; })) keepX[mEl.getAttribute("data-mid")] = a;
-    /* same courtesy for the tool drawer: the reader opened it, so a rebuild
-       must not slam it shut */
-    const tl = mEl.querySelector("details.tool-log");
-    if (tl && tl.open) keepTL[mEl.getAttribute("data-mid")] = true;
+    const r = readerState(mEl);
+    for (const k in r){ keepR[mEl.getAttribute("data-mid")] = r; break; }
+    /* and a thinking box keeps the place the reader had in it */
+    const tb = mEl.querySelector(".think-body");
+    if (tb && tb.scrollTop > 0) keepTB[mEl.getAttribute("data-mid")] = { top: tb.scrollTop, text: tb.textContent };
   });
   el.innerHTML = current.messages.map((m,i) => msgHtml(m, i === lastA)).join("");
   Array.prototype.forEach.call(el.querySelectorAll(".msg[data-mid]"), function(mEl){
-    const a = keepX[mEl.getAttribute("data-mid")];
-    if (a) Array.prototype.forEach.call(mEl.querySelectorAll("pre"), function(p, i){ if (a[i]) p.scrollLeft = a[i]; });
-    if (keepTL[mEl.getAttribute("data-mid")]){
-      const tl = mEl.querySelector("details.tool-log");
-      if (tl) tl.open = true;
+    putReaderState(mEl, keepR[mEl.getAttribute("data-mid")]);
+    const tb = mEl.querySelector(".think-body");
+    if (tb){
+      const mid = mEl.getAttribute("data-mid"), k = keepTB[mid];
+      if (thinkLiveId(mid) && !thinkAway[mid]) thinkPut(tb, tb.scrollHeight);
+      else if (k && tb.textContent.startsWith(k.text)) thinkPut(tb, k.top);
     }
   });
   $("#regenBtn").hidden = false; $("#clearBtn").hidden = false;
@@ -3624,7 +3636,7 @@ function approvalHtml(m){
 function msgHtml(m, isLastAssistant){
   const label = m.role === "user" ? "You" : (m.role === "error" ? "Couldn't send" : (m.model || "Assistant"));
   const think = (m.thinking && S.showThinking)
-    ? '<details class="think"><summary>Thinking<button class="think-copy" data-copythink type="button">Copy</button></summary><div class="think-body">' + escapeHtml(m.thinking) + '</div></details>' : "";
+    ? '<details class="think"' + (thinkShown(m) ? " open" : "") + '><summary>Thinking<button class="think-copy" data-copythink type="button">Copy</button></summary><div class="think-body">' + escapeHtml(m.thinking) + '</div></details>' : "";
   let swipe = "";
   if (m.role === "assistant" && isLastAssistant && !m.pending && m.variants && m.variants.length > 1){
     swipe = '<div class="swipe">'
@@ -3675,10 +3687,65 @@ function updateJump(){
   if (!b) return;
   b.classList.toggle("show", !pinned && !!(current && current.messages && current.messages.length));
 }
-// A growing box only follows its own tail while you are already at that tail.
-function stickScroll(el){
-  if (!el || userTouching || coasting) return;
-  if (el.scrollHeight - el.scrollTop - el.clientHeight < 40) el.scrollTop = el.scrollHeight;
+/* What the reader can scroll inside a message - code blocks and tables
+   sideways, the image strip, an approval's command, an edit card's diff -
+   keeps where they left it when Cozy redraws it, and a list they opened
+   stays open. Code blocks had this; tables, which scroll sideways the same
+   way, snapped back to the left edge on every frame of a streaming reply.
+   Matched per kind, by position, so a change in one kind cannot shift
+   another. */
+const KEEP_SCROLL = ["pre", "table", ".img-strip", ".appr-cmd", ".diff div"];
+const KEEP_OPEN = ["details.tool-log", "details.sources"];
+function readerState(root){
+  const out = {};
+  for (const sel of KEEP_SCROLL){
+    const a = Array.prototype.map.call(root.querySelectorAll(sel), function(e){ return (e.scrollLeft || e.scrollTop) ? [e.scrollLeft, e.scrollTop] : 0; });
+    if (a.some(Boolean)) out[sel] = a;
+  }
+  for (const sel of KEEP_OPEN){
+    const a = Array.prototype.map.call(root.querySelectorAll(sel), function(e){ return !!e.open; });
+    if (a.some(Boolean)) out[sel] = a;
+  }
+  return out;
+}
+function putReaderState(root, st){
+  if (!st) return;
+  for (const sel in st){
+    const a = st[sel], open = KEEP_OPEN.indexOf(sel) >= 0;
+    Array.prototype.forEach.call(root.querySelectorAll(sel), function(e, i){
+      const v = a[i];
+      if (!v) return;
+      if (open) e.open = true;
+      else { if (v[0]) e.scrollLeft = v[0]; if (v[1]) e.scrollTop = v[1]; }
+    });
+  }
+}
+/* ---------- the thinking box ---------- */
+function thinkLiveId(mid){ return !!(streaming && streaming.asstId === mid); }
+function thinkShown(m){ return thinkOpen[m.id] != null ? thinkOpen[m.id] : thinkLiveId(m.id); }
+function thinkPut(b, top){ b.scrollTop = top; thinkSeen.set(b, b.scrollTop); }
+/* The live box grows by what arrived instead of being rewritten each frame:
+   a rewrite re-lays the whole text and wipes any selection the reader made. */
+function thinkWrite(b, text){
+  const t = b.firstChild, one = !!t && t.nodeType === 3 && !t.nextSibling;
+  const cur = one ? t.data : b.textContent;
+  if (cur === text) return;
+  if (one && text.length > cur.length && text.startsWith(cur)) t.appendData(text.slice(cur.length));
+  else b.textContent = text;
+}
+/* The reader scrolled a box. Out of reach of its end, they are reading and it
+   stays where they put it; coming down to its end, it follows again. Moving
+   UP inside the end changes nothing - a finger lifting can twitch a pixel -
+   and a wheel turned upward is read on its own (the wheel listener), so a
+   touchpad's small steps are not pulled back to the end one by one. */
+function thinkScrolled(b){
+  const mEl = b.closest("[data-mid]"), d = b.parentNode;
+  if (!mEl || (d && d.open === false)) return;
+  const mid = mEl.getAttribute("data-mid"), top = b.scrollTop, seen = thinkSeen.get(b);
+  if (seen != null && Math.abs(top - seen) < 1) return;   // Cozy's own scroll, echoing back
+  thinkSeen.set(b, top);
+  if (b.scrollHeight - top - b.clientHeight > THINK_TAIL) thinkAway[mid] = true;
+  else if (seen == null || top > seen) delete thinkAway[mid];
 }
 
 function updateEmber(){
@@ -3770,10 +3837,20 @@ function attachmentBody(a, idx, plan){
    return value is the wire and nothing else - callers and the gate compare it
    as such, and a second copy of every text riding inside it doubled every
    count of what was sent. */
+/* What Cozy writes in place of a reply that never came. They are Cozy's
+   sentences, not the model's, and the wire says so (assembleMessages). */
+const REPLY_NOTES = {
+  "_(stopped)_": "this reply was stopped before any text arrived",
+  "_(empty reply)_": "the model sent back no reply text here",
+  "_(the model asked to look something up, and there was no message to look it up for)_": "the model asked for a web lookup here, and there was no message to run it for",
+  "_(the model asked to look something up again \u2014 this message has no lookups left)_": "the model asked for another web lookup here, and this message had none left"
+};
+const REPLY_NOTE_NO_TEXT = "no reply text came back here \u2014 only the model's reasoning, which is not repeated";
 function assembleMessages(kind, c, partsOut){
   c = c || current;
   const filesActive = !!(chatDocIds(c).length || c.filesOn);
   const plan = attachmentPlan(c);
+  const lastIdx = c.messages.length - 1;
   let lastAsst = -1;
   c.messages.forEach((m, i) => { if (m.role === "assistant" && !m.pending) lastAsst = i; });
   const base = c.messages
@@ -3807,6 +3884,17 @@ function assembleMessages(kind, c, partsOut){
           + "\n</image_results>";
       }
       if (m.role === "assistant"){
+        /* A reply that never came is stored as Cozy's own line - stopped
+           before a word, an empty answer, a lookup that could not run. Sent as
+           the reply, it put app prose in the model's mouth, and it read its
+           past turns as ending that way. A reply that was all reasoning went
+           out empty, and Claude refuses an empty turn anywhere but last, so
+           every later message in that chat failed. Both go as an attributed
+           note - except as the final turn, the one More carries on, which
+           starts from nothing instead. */
+        const said = String(c == null ? "" : c), note = REPLY_NOTES[said];
+        if (note || !said.trim())
+          c = x.i === lastIdx ? (note ? "" : said) : appNote("[" + (note || REPLY_NOTE_NO_TEXT) + "]");
         /* "nothing was changed" answers "is it done?", which is only ever
            asked about the newest reply. Repeating it on every historical turn
            put dozens of identical copies in front of the model — pressure to
@@ -4231,7 +4319,7 @@ async function runSearch(query){
     const b = "https://api.search.brave.com/res/v1/web/search";
     url = (relay ? relay + new URL(b).pathname : b) + "?q=" + encodeURIComponent(query) + "&count=" + n;
     opts = { headers:{ accept:"application/json", "X-Subscription-Token":c.key } };
-  } else return [];
+  } else return { results: [], images: [] };
 
   const res = await fetch(url, opts);
   if (!res.ok) throw new Error("Search failed (" + res.status + ")");
@@ -4352,7 +4440,7 @@ const Sent = (() => {
       for (let i = 0; i < 4; i++){
         try {
           const r = await fetch("api/sent/" + encodeURIComponent(chat) + "/" + encodeURIComponent(sid),
-            { method:"PUT", headers:{ "content-type":"application/json" }, body:JSON.stringify({ rec:enc, pieces:pieces }) });
+            { method:"PUT", headers:{ "content-type":"application/json", "x-cozy-client":Device.client }, body:JSON.stringify({ rec:enc, pieces:pieces }) });
           if (r.ok) return true;
         } catch(_){}
         await new Promise(function(res){ setTimeout(res, 2000 * (i + 1)); });
@@ -4717,13 +4805,18 @@ async function pfTest(){
 }
 
 /* One read of a failed response, from whichever shape it came back in. */
+/* A body can be read once. It used to be read as JSON first, which spent it,
+   so the text read after a failed parse always came back empty and every
+   service that answers an error in plain text or HTML showed "No details
+   given." It is read as text, then understood as JSON when it is JSON. */
+function detailOf(j){ return (j && j.error && (j.error.message || j.error.type)) || JSON.stringify(j).slice(0,300); }
 async function errDetail(res){
-  try {
-    const j = await res.json();
-    return (j.error && (j.error.message || j.error.type)) || JSON.stringify(j).slice(0,300);
-  } catch(_) {
-    return (await res.text().catch(function(){ return ""; })).slice(0,300);
+  let t = "";
+  try { t = typeof res.text === "function" ? String(await res.text()) : ""; } catch(_){ t = ""; }
+  if (t.trim()){
+    try { return detailOf(JSON.parse(t)); } catch(_){ return t.trim().slice(0,300); }
   }
+  try { return detailOf(await res.json()); } catch(_){ return ""; }
 }
 /* Hermes' gateway key lives in Hermes' own files on the phone, and Cozy's
    connection holds a copy. When Hermes gets a new key the copy goes stale;
@@ -4734,7 +4827,7 @@ function isHermesConn(p){ return !!p && (reasonStyle(p) === "hermes" || /:8642(\
 async function hermesKeySync(){
   if (!DEVICE) return false;
   try {
-    const r = await fetch("api/hermes/sync", { method:"POST" });
+    const r = await fetch("api/hermes/sync", { method:"POST", headers:{ "x-cozy-client":Device.client } });
     if (!r.ok) return false;
     const j = await r.json();
     if (j.changed) await Device.resync();
@@ -4831,6 +4924,16 @@ async function send(userText, mode, forConvo){
     renderThread();
   }
 
+  delete thinkAway[asst.id];
+  if (!continuing) delete thinkOpen[asst.id];
+  else if (thinkOpen[asst.id] == null){
+    const shown = document.querySelector('[data-mid="' + asst.id + '"] details.think');
+    if (shown) thinkOpen[asst.id] = shown.open;
+  }
+  /* More on a reply that never came starts it, instead of carrying on from
+     Cozy's line about it; if nothing comes this time either, the line comes back. */
+  const wasNote = continuing && REPLY_NOTES[asst.content] ? asst.content : null;
+  if (wasNote) asst.content = "";
   const startLen = continuing ? asst.content.length : 0;
   let raw = continuing ? asst.content : "";
   const seed = document.querySelector('[data-mid="' + asst.id + '"] .msg-body');
@@ -4839,6 +4942,7 @@ async function send(userText, mode, forConvo){
   if (streaming) streaming.abort();
   const ctrl = new AbortController();
   ctrl.convoId = convo.id;
+  ctrl.asstId = asst.id;
   streaming = ctrl;
   setSending(true);
 
@@ -4862,21 +4966,22 @@ async function send(userText, mode, forConvo){
       if (userTouching || coasting) return;
       const node = document.querySelector('[data-mid="' + asst.id + '"] .msg-body');
       if (!node) return;
-      /* Replacing innerHTML rebuilds every code block; one the user has
-         swiped sideways must not snap back to the left edge each token. */
-      const keep = Array.prototype.map.call(node.querySelectorAll("pre"), function(p){ return p.scrollLeft; });
+      /* Replacing innerHTML rebuilds every code block and table; one the user
+         has swiped sideways must not snap back to the left edge each token. */
+      const keep = readerState(node);
       node.innerHTML = renderMarkdown(trimPartialTag(sr.text)) + '<span class="caret"></span>';
-      Array.prototype.forEach.call(node.querySelectorAll("pre"), function(p, i){ if (keep[i]) p.scrollLeft = keep[i]; });
+      putReaderState(node, keep);
       if (asst.thinking && S.showThinking){
         let tw = document.querySelector('[data-mid="' + asst.id + '"] .think-body');
         if (!tw){
           const d = document.createElement("details");
-          d.className = "think"; d.open = true;
+          d.className = "think"; d.open = thinkShown(asst);
           d.innerHTML = '<summary>Thinking<button class="think-copy" data-copythink type="button">Copy</button></summary><div class="think-body"></div>';
           node.parentNode.insertBefore(d, node);
           tw = d.querySelector(".think-body");
         }
-        tw.textContent = asst.thinking; stickScroll(tw);
+        thinkWrite(tw, asst.thinking);
+        if (!thinkAway[asst.id]) thinkPut(tw, tw.scrollHeight);
       }
       if (S.showTools !== false && asst.tools && asst.tools.length && paintedRev !== toolsRev){
         paintedRev = toolsRev;
@@ -4962,7 +5067,7 @@ async function send(userText, mode, forConvo){
       convo.sentDocNames = Object.keys(seen);
     }
     const docNamesSent = allChatDocs(convo).map(d => d.name);
-    let ranViaRuns = false;
+    let ranViaRuns = false, runsUnreached = false;
     if (useRuns){
       /* The run is an upgrade, not a requirement: a server whose Runs API is
          missing, older, or unreachable from a browser must not cost the
@@ -4991,9 +5096,7 @@ async function send(userText, mode, forConvo){
         if (cr.status === 404 || cr.status === 405){
           const gone = new Error("no runs api"); gone.__runsFallback = true; throw gone;
         }
-        let detail = "";
-        try { const j = await cr.json(); detail = (j.error && (j.error.message || j.error.type)) || JSON.stringify(j).slice(0,300); }
-        catch(_) { detail = (await cr.text().catch(function(){ return ""; })).slice(0,300); }
+        const detail = await errDetail(cr);
         throw new Error(p.name + " said no (" + cr.status + ") to starting the run.\n\n" + (detail || "No details given."));
       }
       const rj = await cr.json();
@@ -5059,14 +5162,23 @@ async function send(userText, mode, forConvo){
         if (!runsGone(err) || (err && err.name === "AbortError")) throw err;
         // a run may have been created before the stream failed — never leave it working unseen
         if (run && base && hh) fetch(base + "/runs/" + run.id + "/stop", { method:"POST", headers:hh }).catch(function(){});
-        if (markRunsDown(p))
-          toast("The Runs API didn't answer — using the plain stream from now on. Save the connection to try it again.");
+        /* "No such API" (404/405) is an answer. A fetch that failed is not:
+           it is also exactly what a server that is not running looks like,
+           and remembering THAT as "no Runs API" switched approvals off for
+           good every time Hermes happened to be stopped. It is remembered
+           only once the plain stream below proves the server answers. */
+        if (err.__runsFallback){
+          if (markRunsDown(p))
+            toast("The Runs API didn't answer — using the plain stream from now on. Save the connection to try it again.");
+        } else runsUnreached = true;
       }
     }
     if (!ranViaRuns){
     reqAt = Date.now(); firstAt = null; usage = null;
     let req = buildPayload({ search: wantSearch, mode: mode }, convo);
     let res = await fetch(req.url, { method:"POST", headers:req.headers, body:JSON.stringify(req.body), signal:ctrl.signal });
+    if (runsUnreached && markRunsDown(p))
+      toast("The Runs API didn't answer — using the plain stream from now on. Save the connection to try it again.");
     if (!res.ok){
       let detail = await errDetail(res);
       /* A service that refuses a thinking level says so once, and the
@@ -5190,6 +5302,7 @@ async function send(userText, mode, forConvo){
        at an abort, or at a chat that is no longer there, and on every one of
        those paths the tag must already be gone — held until after the
        search, a failure leaves the request itself standing as the reply. */
+    delete thinkAway[asst.id];   // the next round's thinking is a new text, followed from its start
     raw = ""; asst.content = ""; asst.thinking = "";
     showSearching(asst.id, ask.queries);
     const ran = await runModelSearch(convo, ask.queries, searchRound >= AUTO_SEARCH_ROUNDS);
@@ -5254,6 +5367,10 @@ async function send(userText, mode, forConvo){
       convo.messages.push({ id:uid(), role:"error", content:errText, ts:Date.now() });
     }
   } finally {
+    /* the reply is done and its thinking folds - unless the reader is up in
+       it, reading: then it stays open where they are. A reply that failed is
+       gone (or back to the version it was showing), so it keeps nothing. */
+    if (asst && !failed && thinkAway[asst.id] && thinkOpen[asst.id] == null) thinkOpen[asst.id] = true;
     // a newer send may own the controls by now — only the owner releases them
     if (streaming === ctrl){ streaming = null; setSending(false); }
     if (repaintHook === paint) repaintHook = null;
@@ -5265,6 +5382,7 @@ async function send(userText, mode, forConvo){
       asst.sent = { chat: convo.id, id: sid, tokens: rec.tokens, exact: rec.exact };
       Sent.keep(convo.id, sid, rec);
     }
+    if (wasNote && asst && !asst.content && !asst.thinking) asst.content = wasNote;
     if (asst && asst.role === "assistant" && !swipeFailed){
       asst.variants = asst.variants || [];
       const snap = variantSnap(asst);
@@ -5448,7 +5566,7 @@ async function testProv(){
       body: JSON.stringify({ model:model, max_tokens:8, messages:[{role:"user",content:"hi"}] }) });
     if (res.ok) toast("Works — connection is good");
     else {
-      let d=""; try{ const j=await res.json(); d=(j.error&&j.error.message)||""; }catch(_){}
+      const d = await errDetail(res);
       /* Hermes turned the key down: take the one Hermes accepts from the phone, then test again */
       if (res.status === 401 && (/:8642(\/|$)/.test(url) || model === "hermes-agent") && editingProv && await hermesKeySync()){
         const cp = S.providers.find(x => x.id === editingProv);
@@ -5889,6 +6007,27 @@ on("#thread", "scroll", function(){
   updateJump();
 });
 on("#thread", "scrollend", function(){ if (!userTouching) coastSettle(); }, { passive:true });
+/* A thinking box's scroll does not bubble, so it is caught on the way down. */
+on("#thread", "scroll", function(e){
+  const b = e.target;
+  if (b !== e.currentTarget && b.classList && b.classList.contains("think-body")) thinkScrolled(b);
+}, { capture:true, passive:true });
+on("#thread", "wheel", function(e){
+  const b = e.target && e.target.closest ? e.target.closest(".think-body") : null;
+  const mEl = b && b.closest("[data-mid]");
+  if (mEl && e.deltaY < 0 && !e.ctrlKey && b.scrollTop > 0) thinkAway[mEl.getAttribute("data-mid")] = true;
+}, { passive:true });
+/* Folding is the reader's to decide. A toggle that only matches how Cozy drew
+   the block (open while live, folded after) is the drawing, not a choice. */
+on("#thread", "toggle", function(e){
+  const d = e.target;
+  if (!d || !d.classList || !d.classList.contains("think") || !d.isConnected) return;
+  const mEl = d.closest("[data-mid]");
+  if (!mEl) return;
+  const mid = mEl.getAttribute("data-mid");
+  if (thinkOpen[mid] == null && d.open === thinkLiveId(mid)) return;
+  thinkOpen[mid] = d.open;
+}, true);
 on("#thread", "touchstart", function(){
   userTouching = true;
   coasting = false;
@@ -7139,13 +7278,13 @@ async function applyEdit(msgId, editId, convo, batchId){
     e.note = chatDocs(c).length > 1
       ? (e.file ? 'no attached file called "' + e.file + '"' : "didn't say which file to change")
       : "no file is attached";
-    renderThread(); return;
+    renderThread(); await persistConvo(c); return;
   }
   if (e.type === "replace_all" && docSmart(doc)){
     // the model only saw excerpts of this file; a rewrite from a partial
     // view would silently destroy everything it did not see
     e.status = "failed"; e.note = "this file was shown as excerpts \u2014 full rewrite refused; switch it to Full first";
-    renderThread(); return;
+    renderThread(); await persistConvo(c); return;
   }
   const before = doc.text;
   const r = applyEditToText(doc.text, e);
@@ -7411,7 +7550,12 @@ async function addAttachments(files){
       if (/^image\//.test(f.type)){
         pendingAtts.push({ kind:"image", name:f.name, mime:f.type, data: await readFileAsBase64(f) });
       } else {
-        pendingAtts.push({ kind:"text", name:f.name, text: await f.text() });
+        /* the picker offers only text and images, but a drop or a paste can
+           hand over anything - a PDF read as text is megabytes of noise on
+           the wire, so a file with NUL bytes is not taken as text */
+        const text = await f.text();
+        if (text.slice(0, 65536).indexOf("\u0000") >= 0){ toast(f.name + " isn't a text file \u2014 attach text or an image"); continue; }
+        pendingAtts.push({ kind:"text", name:f.name, text: text });
       }
     } catch(err){ toast(String(err.message || err)); }
   }
@@ -7446,7 +7590,7 @@ async function loadModels(){
     const res = await fetch(base + "/models", { headers: headers });
     if (!res.ok) throw new Error("the service replied " + res.status);
     const j = await res.json();
-    const list = (j.data || j.models || j || []);
+    const list = Array.isArray(j) ? j : Array.isArray(j && j.data) ? j.data : Array.isArray(j && j.models) ? j.models : [];
     const ids = list.map(function(m){ return typeof m === "string" ? m : (m.id || m.name || ""); })
                     .filter(Boolean).sort();
     if (!ids.length) throw new Error("it returned an empty list");
@@ -7775,10 +7919,32 @@ on("#presetPicker", "change", async function(e){
 /* --- documents --- */
 function openDocs(){ renderDocList(); $("#docsModal").classList.add("show"); $("#scrim").classList.add("show"); }
 function closeDocs(){ $("#docsModal").classList.remove("show"); if (!$("#docEditModal").classList.contains("show")) $("#scrim").classList.remove("show"); }
-function closeDocEdit(){ $("#docEditModal").classList.remove("show"); $("#scrim").classList.remove("show"); openDocId = null; }
+/* What is typed in the editor is the file. Closing the editor, or attaching
+   the file from it, used to drop every unsaved change without a word - and
+   Attach attached the old text. Both keep the typing first, exactly as Save
+   does: one undo frame, then the save. */
+function keepDocEdit(){
+  const d = docs.find(x => x.id === openDocId), ta = $("#docEditArea");
+  if (!d || !ta || d.text === ta.value) return null;
+  d.undo = d.undo || [];
+  d.undo.push({ text: d.text, at: Date.now() });
+  if (d.undo.length > 8) d.undo.shift();
+  d.text = ta.value;
+  const done = saveDoc(d);
+  renderFileBtn(); updateEmber(); renderDocList();
+  return done;
+}
+function hideDocEdit(){ $("#docEditModal").classList.remove("show"); $("#scrim").classList.remove("show"); openDocId = null; }
+function closeDocEdit(){
+  const d = docs.find(x => x.id === openDocId), kept = keepDocEdit();
+  hideDocEdit();
+  if (kept) toast("Saved " + d.name);
+}
 on("#docsBtn", "click", function(){ closeDrawer(); openDocs(); });
 on("#closeDocs", "click", closeDocs);
 on("#closeDocEdit", "click", closeDocEdit);
+// a phone can drop a tab in the background without a word: the typing is kept first
+document.addEventListener("visibilitychange", function(){ if (document.visibilityState === "hidden" && openDocId) keepDocEdit(); });
 on("#docList", "click", function(e){
   const row = e.target.closest("[data-doc]");
   if (row) openDocEditor(row.dataset.doc);
@@ -7801,17 +7967,12 @@ on("#docEditArea", "input", updateDocStat);
 on("#docSaveBtn", "click", async function(){
   const d = docs.find(x => x.id === openDocId);
   if (!d) return;
-  if (d.text !== $("#docEditArea").value){
-    d.undo = d.undo || [];
-    d.undo.push({ text: d.text, at: Date.now() });
-    if (d.undo.length > 8) d.undo.shift();
-  }
-  d.text = $("#docEditArea").value;
-  await saveDoc(d); renderFileBtn(); updateEmber(); toast("Saved");
+  await (keepDocEdit() || saveDoc(d)); renderFileBtn(); updateEmber(); toast("Saved");
 });
 on("#docAttachBtn", "click", async function(){
   if (!openDocId) return;
-  await attachDoc(openDocId); closeDocEdit();
+  await keepDocEdit();
+  await attachDoc(openDocId); hideDocEdit();
 });
 on("#docExportBtn", "click", function(){
   const d = docs.find(x => x.id === openDocId);
@@ -7905,7 +8066,7 @@ on("#docDelBtn", "click", async function(){
     if (c.docId === d.id){ delete c.docId; touched = true; }
     if (touched) await DB.put(JSON.parse(JSON.stringify(c)));
   }
-  closeDocEdit(); renderDocList(); renderThread(); toast("Deleted");
+  hideDocEdit(); renderDocList(); renderThread(); toast("Deleted");
 });
 on("#fileList", "click", function(e){
   const md = e.target.closest("[data-fmode]");
@@ -8407,7 +8568,7 @@ on("#convoList", "contextmenu", async function(e){
 on("#chatTitle", "click", async function(){
   if (!current) return;
   const n = prompt("Rename this chat", current.title);
-  if (!n) return;
+  if (!n || !n.trim()) return;
   current.title = n.trim(); await persist(); renderThread();
 });
 

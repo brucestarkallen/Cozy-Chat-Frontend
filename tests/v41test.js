@@ -185,15 +185,11 @@ console.log('\n=== 4d. A REPLY NEVER YANKS YOU BACK DOWN ===');
   w.eval('pinned=true;updateJump()');
   ck('the button hides again at the bottom', !d.querySelector('#jumpBtn').classList.contains('show'));
 
-  // the thinking box follows its own tail only while you are at that tail
-  const st=w.eval('stickScroll');
-  const fake={scrollHeight:1000,clientHeight:200,scrollTop:790};
-  st(fake); ck('thinking box follows along when you are at its end', fake.scrollTop===1000, String(fake.scrollTop));
-  const fake2={scrollHeight:1000,clientHeight:200,scrollTop:100};
-  st(fake2); ck('but leaves you alone when you have scrolled up in it', fake2.scrollTop===100, String(fake2.scrollTop));
-  const js=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]).join('\n');
-  ck('nothing forces the thinking box to its bottom any more',
-     !/tw\.scrollTop = tw\.scrollHeight/.test(js));
+  // The thinking box's own following is measured where it can be: in real
+  // Chromium against a real stream (tests/thinking_e2e.py). The checks that
+  // stood here ran a helper on a fake box with fixed numbers and read the
+  // source, so they passed while the box stopped following for good after
+  // any paint that grew it past the margin.
 }
 
 console.log('\n=== 5. REGRESSIONS ===');
