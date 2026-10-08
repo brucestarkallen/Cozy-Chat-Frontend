@@ -2,7 +2,9 @@
 # Pictures for a vision model, measured in real Chromium (jsdom cannot decode
 # a picture or draw one): what reaches the model from a sideways phone photo
 # with GPS in it, a 48 MP photo, a screenshot, a see-through sticker, a picture
-# sent on its own (OpenAI and Claude wires), and a chat full of pictures.
+# sent on its own (OpenAI and Claude wires), a chat full of pictures and what
+# it costs to draw, pictures stored by older versions, and a Claude request of
+# more than 20 pictures.
 # Needs: pip install playwright pillow && playwright install chromium.
 import base64, io, json, os, shutil, socket, sys, tempfile, threading, http.server
 from PIL import Image, ImageDraw
@@ -49,6 +51,13 @@ ImageDraw.Draw(st).ellipse([56, 56, 456, 456], fill=(255, 200, 0, 255))
 st.save(os.path.join(D, "sticker.png"), "PNG")
 with open(os.path.join(D, "notapicture.heic"), "wb") as f:
     f.write(b"\x00\x00\x00\x18ftypheic" + os.urandom(4000))
+# v5.28.8 prepared a photo to 2048 px on its long edge, upright, clean
+photo_like(1536, 2048, 40).save(os.path.join(D, "v5288.jpg"), "JPEG", quality=88)
+# wide flat pictures: prepared to 2000 x 667, a few KB each, so many fit a request
+for i in range(22):
+    im = Image.new("RGB", (3000, 1000), (20 + i * 9, 120, 200 - i * 7))
+    ImageDraw.Draw(im).rectangle([100 + i * 50, 100, 400 + i * 50, 600], fill=(250, 250, 250))
+    im.save(os.path.join(D, "wide%02d.png" % i), "PNG")
 PHOTO_BYTES = os.path.getsize(os.path.join(D, "photo.jpg"))
 
 # ---------- a service that keeps every request ----------
@@ -155,12 +164,17 @@ with sync_playwright() as pw:
     w, h = im.size
     ck("it reaches the model upright (the red band is on top)", im.convert("RGB").getpixel((w // 2, int(h * 0.03))) == (220, 20, 20) and h > w,
        "size %s, top-middle %s" % (im.size, im.convert("RGB").getpixel((w // 2, int(h * 0.03)))))
-    ck("at most 2048 px on its long edge", max(w, h) == 2048, im.size)
+    ck("at most 2000 px on its long edge", max(w, h) == 2000, im.size)
     ck("as a JPEG", mime == "image/jpeg" and im.format == "JPEG", mime)
     ck("with no orientation flag left to misread", ex.get(0x0112) in (None, 1), ex.get(0x0112))
     ck("and without the place it was taken", not ex.get_ifd(0x8825), dict(ex.get_ifd(0x8825)))
     ck("several times smaller than the camera's file", len(base64.b64decode(data)) * 3 < PHOTO_BYTES,
        "%d bytes, the camera's %d" % (len(base64.b64decode(data)), PHOTO_BYTES))
+    att = pg.evaluate("(() => { const a = current.messages[0].attachments[0]; return {w:a.w, h:a.h, thumb:(a.thumb||'').slice(0, 23), thumbLen:(a.thumb||'').length}; })()")
+    ck("the chat keeps its size", att["w"] == w and att["h"] == h, att)
+    th = pg.evaluate("(() => { const i = document.querySelector('.msg.user .msg-atts img'); return i ? {w:i.naturalWidth, h:i.naturalHeight, src:i.getAttribute('src').slice(0, 23)} : null; })()")
+    ck("and the thread draws a small copy of it, not the picture", th and th["src"] == "data:image/webp;base64," and max(th["w"], th["h"]) == 480,
+       th)
 
     print("=== 2. THREE PHOTOS IN ONE CHAT STAY UNDER HERMES' 10 MB ===")
     attach(pg, "photo.jpg"); send(pg, "And this one?")
@@ -175,10 +189,15 @@ with sync_playwright() as pw:
     (m1, d1), (m2, d2) = pictures(rq["body"])[-2:]
     i1, _ = opened(m1, d1); i2, _ = opened(m2, d2)
     ck("the screenshot stays a sharp PNG", m1 == "image/png" and i1.format == "PNG", m1)
-    ck("scaled to 2048 px tall with its shape kept", i1.size == (922, 2048), i1.size)
+    ck("scaled to 2000 px tall with its shape kept", i1.size == (900, 2000), i1.size)
     ck("the sticker stays PNG", m2 == "image/png", m2)
     ck("and stays see-through", i2.convert("RGBA").getpixel((2, 2))[3] == 0 and i2.convert("RGBA").getpixel((256, 256))[3] == 255,
        (i2.convert("RGBA").getpixel((2, 2)), i2.convert("RGBA").getpixel((256, 256))))
+    corner = pg.evaluate("""(async () => { const a = current.messages[current.messages.length - 2].attachments[1];
+      if (!a.thumb) return null;
+      const im = new Image(); im.src = a.thumb; await im.decode(); const cv = document.createElement('canvas'); cv.width = im.width; cv.height = im.height;
+      const x = cv.getContext('2d'); x.drawImage(im, 0, 0); return Array.from(x.getImageData(1, 1, 1, 1).data); })()""")
+    ck("its small copy in the thread is see-through too", bool(corner) and corner[3] == 0, corner)
 
     print("=== 4. A 48 MP PHOTO AND A FILE CHROME CANNOT OPEN ===")
     attach(pg, "big.jpg")
@@ -223,16 +242,92 @@ with sync_playwright() as pw:
     ck("each older one left out is named in its message instead", len(sent) + notes == 9, "%d sent, %d named" % (len(sent), notes))
     users = [m for m in rq["body"]["messages"] if m["role"] == "user"]
     ck("the newest photo message keeps its picture", isinstance(users[-2]["content"], list), type(users[-2]["content"]).__name__)
+    # drawing it: the thread carries small copies, not nine whole photos
+    html_len = pg.evaluate("document.querySelector('#threadInner').innerHTML.length")
+    ck("the drawn thread holds small copies, not the photos", html_len < 600_000, "%d characters of HTML" % html_len)
+    cdp = pg.context.new_cdp_session(pg)
+    cdp.send("Emulation.setCPUThrottlingRate", {"rate": 4})            # a phone's CPU
+    ms = pg.evaluate("""(async () => { const frame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const pics = current, t = []; for (let k = 0; k < 5; k++){ const s = performance.now(); renderThread(); document.body.offsetHeight; await frame(); t.push(performance.now() - s); }
+      t.sort((a, b) => a - b); return t[2]; })()""")
+    cdp.send("Emulation.setCPUThrottlingRate", {"rate": 1})
+    ck("and redraws on a phone-speed CPU in well under half a second", ms < 400, "%.0f ms" % ms)
 
     print("=== 7. A PICTURE IN THE CHAT OPENS WHOLE ===")
-    pg.tap(".msg.user .msg-atts img >> nth=0")
+    pg.tap(".msg.user .msg-atts img >> nth=1")                       # the first photo of the nine
     pg.wait_for_timeout(200)
-    v = pg.evaluate("(() => { const v = document.querySelector('#imgView'); if (!v) return {shown:false}; const r = v.getBoundingClientRect(); return {shown: !v.hidden, w: r.width, h: r.height, src: (v.querySelector('img').getAttribute('src')||'').slice(0, 22)}; })()")
+    # the picture's real size, read from its own bytes
+    whole = pg.evaluate("""(async () => { const i = document.querySelectorAll('.msg.user .msg-atts img')[1];
+      const m = current.messages.find(x => x.id === i.closest('[data-mid]').getAttribute('data-mid'));
+      const a = m.attachments.filter(x => x.kind === 'image')[0], im = new Image();
+      im.src = 'data:' + a.mime + ';base64,' + a.data; await im.decode();
+      return [im.naturalWidth, im.naturalHeight, i.naturalWidth, i.naturalHeight]; })()""")
+    v = pg.evaluate("""(async () => { const v = document.querySelector('#imgView'); if (!v) return {shown:false}; const r = v.getBoundingClientRect(); const i = v.querySelector('img');
+      try { await i.decode(); } catch(_){} return {shown: !v.hidden, w: r.width, h: r.height, src: (i.getAttribute('src')||'').slice(0, 22), nw: i.naturalWidth, nh: i.naturalHeight}; })()""")
     ck("a tap opens it over everything", v["shown"] and v.get("w") == 412 and v.get("src", "").startswith("data:image/"), v)
+    ck("as the whole picture, not the small copy the thread drew", (v.get("nw"), v.get("nh")) == (whole[0], whole[1]) and whole[2] < whole[0],
+       "viewer %sx%s, picture %sx%s, thread copy %sx%s" % (v.get("nw"), v.get("nh"), whole[0], whole[1], whole[2], whole[3]))
     if v["shown"]:
         pg.tap("#imgView")
         pg.wait_for_timeout(150)
     ck("and a tap closes it", v["shown"] and pg.evaluate("document.querySelector('#imgView').hidden"))
+    ctx.close()
+
+    print("=== 8. PICTURES STORED BY OLDER VERSIONS ARE MADE READY ===")
+    ctx, pg = page_for("anthropic")
+    b64 = lambda n: base64.b64encode(open(os.path.join(D, n), "rb").read()).decode()
+    pg.evaluate("""([raw, v5288, heic]) => { newConvo(); current.messages.push(
+        {id:'u0', role:'user', content:'from v5.28.7', attachments:[{kind:'image', name:'camera.jpg', mime:'image/jpeg', data:raw}]},
+        {id:'a0', role:'assistant', content:'a red band'},
+        {id:'u1', role:'user', content:'from v5.28.8', attachments:[{kind:'image', name:'v5288.jpg', mime:'image/jpeg', data:v5288}]},
+        {id:'a1', role:'assistant', content:'a gradient'},
+        {id:'u2', role:'user', content:'from an iPhone', attachments:[{kind:'image', name:'iphone.heic', mime:'image/heic', data:heic}]},
+        {id:'a2', role:'assistant', content:'?'}); renderThread(); }""", [b64("photo.jpg"), b64("v5288.jpg"), b64("notapicture.heic")])
+    _, rq = send(pg, "What do all of these show?")
+    sent = pictures(rq["body"])
+    ims = []
+    for m, d in sent:
+        try:
+            ims.append(opened(m, d))
+        except Exception:
+            ims.append((Image.new("RGB", (1, 1)), Image.Exif()))      # bytes no picture reader can open
+    ck("the camera's photo and the v5.28.8 one both go", len(sent) == 2, len(sent))
+    ck("the camera's photo now goes upright, 2000 px, without its GPS position",
+       len(ims) == 2 and ims[0][0].size == (1500, 2000) and ims[0][0].convert("RGB").getpixel((750, 60)) == (220, 20, 20) and not ims[0][1].get_ifd(0x8825),
+       ims and (ims[0][0].size, ims[0][0].convert("RGB").getpixel((750, 60)), dict(ims[0][1].get_ifd(0x8825))))
+    ck("the v5.28.8 one is brought to 2000 px", len(ims) == 2 and max(ims[1][0].size) == 2000, ims and ims[1][0].size)
+    heic = [m for m in rq["body"]["messages"] if m["role"] == "user" and "iphone.heic" in json.dumps(m["content"])]
+    ck("the one Chrome cannot open is named, not sent to Claude (it takes JPEG, PNG, GIF, WebP)",
+       heic and "JPEG, PNG, GIF and WebP" in json.dumps(heic[0]["content"]) and not isinstance(heic[0]["content"], list),
+       heic and json.dumps(heic[0]["content"])[:160])
+    kept = pg.evaluate("current.messages.filter(m => m.attachments).map(m => { const a = m.attachments[0]; return {w:a.w||0, h:a.h||0, thumb:!!a.thumb, raw:!!a.raw, chars:a.data.length}; })")
+    ck("the chat keeps the ready pictures, with small copies", kept[0]["w"] == 1500 and kept[0]["thumb"] and kept[1]["w"] == 1500 and kept[1]["thumb"], kept)
+    ck("and marks the one it could not open, so it is not tried again", kept[2]["raw"] and not kept[2]["thumb"], kept[2])
+    ck("it said what it was doing", pg.evaluate("window.__toasts.some(t => /Getting 3 older pictures ready/.test(t))"), pg.evaluate("window.__toasts.slice(-3)"))
+    n_toasts = pg.evaluate("window.__toasts.filter(t => /older picture/.test(t)).length")
+    send(pg, "And now?")
+    ck("the next message does not do it again", pg.evaluate("window.__toasts.filter(t => /older picture/.test(t)).length") == n_toasts)
+    ctx.close()
+    # OpenAI and OpenRouter take the same four kinds, and refuse a request over any other
+    ctx, pg = page_for("openai")
+    pg.evaluate("""([heic]) => { newConvo(); current.messages.push(
+        {id:'u0', role:'user', content:'from an iPhone', attachments:[{kind:'image', name:'iphone.heic', mime:'image/heic', data:heic}]},
+        {id:'a0', role:'assistant', content:'?'}); renderThread(); }""", [b64("notapicture.heic")])
+    _, rq = send(pg, "And this?")
+    ck("an OpenAI-compatible service is not sent it either, and is told of it",
+       rq and not pictures(rq["body"]) and "iphone.heic" in json.dumps(rq["body"]["messages"]) and "JPEG, PNG, GIF and WebP" in json.dumps(rq["body"]["messages"]),
+       rq and [m for m, d in pictures(rq["body"])])
+    ctx.close()
+
+    print("=== 9. MORE THAN 20 PICTURES IN ONE CLAUDE REQUEST ===")
+    # Claude refuses any picture past 2000 px on a side in a request of more than 20
+    ctx, pg = page_for("anthropic")
+    names = ["wide%02d.png" % i for i in range(22)]
+    attach(pg, *names)
+    _, rq = send(pg, "Compare all of these")
+    sizes = [opened(m, d)[0].size for m, d in pictures(rq["body"])]
+    ck("all 22 go in one request", len(sizes) == 22, len(sizes))
+    ck("and every one is at most 2000 px on each side", sizes and all(max(sz) <= 2000 for sz in sizes), sorted(set(sizes)))
     ctx.close()
     br.close()
 

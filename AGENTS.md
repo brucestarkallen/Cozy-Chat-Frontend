@@ -15,7 +15,7 @@ worker, `install.sh` the Termux installer, `tests/` the gate.
     python3 tests/thinking_e2e.py     # real Chromium + a real stream: the thinking box
     python3 tests/pictures_e2e.py     # real Chromium: what a vision model receives (needs pillow)
 
-1911 checks as of v5.28.8, plus 57 in `tests/device_e2e.py`, 24 in `tests/thinking_e2e.py`, 26 in `tests/pictures_e2e.py` and 12 in `tests/hermesmodeltest.sh` (needs a Hermes install), measured from real output: each file's own count line ("(N checks)" or "N passed", else its `ok` lines), plus `installtest.sh`'s `ok` lines.
+1978 checks as of v5.28.9, plus 57 in `tests/device_e2e.py`, 24 in `tests/thinking_e2e.py`, 43 in `tests/pictures_e2e.py` and 12 in `tests/hermesmodeltest.sh` (needs a Hermes install), measured from real output: each file's own count line ("(N checks)" or "N passed", else its `ok` lines), plus `installtest.sh`'s `ok` lines.
 
 `tests/inerttest.js` is in the loop but prints SKIP without a second checkout
 to compare against. It answers the question a passing gate does not: whether a
@@ -232,11 +232,14 @@ key could become the only key. A differing url/apiKey/model now arrives as a
 copy "(from this browser)", and the whole incoming settings document is saved
 to `imported/settings-<ms>.json`.
 
-## Pictures for a vision model (v5.28.8)
+## Pictures for a vision model (v5.28.8, v5.28.9)
 
 A picture is prepared once, as it is attached (`prepareImage`): decoded with
-the camera's orientation applied, redrawn at most `IMG_EDGE` (2048) px on its
-long edge, metadata gone. A JPEG source stays JPEG (q 0.88); anything else is
+the camera's orientation applied, redrawn at most `IMG_EDGE` (2000) px on its
+long edge, metadata gone. 2000, not v5.28.8's 2048: Claude refuses a picture
+past 2000 px on a side in any request carrying more than 20 pictures (its
+vision docs, "many-image requests"), and 22 wide screenshots fit the byte
+budget easily. `prepareImage` never throws; it returns null. A JPEG source stays JPEG (q 0.88); anything else is
 PNG while that is at most `IMG_PNG_MAX` (1.5 MB) - a screenshot stays sharp, a
 sticker stays see-through - and JPEG on white past that. A file Chrome cannot
 decode (HEIC) is refused by name; nothing undecodable is ever attached. Until
@@ -245,12 +248,40 @@ behind an orientation flag many services ignore, its GPS position, 3-5 MB
 each - three in one chat made every request 16 MB, past Hermes'
 `MAX_REQUEST_BYTES = 10_000_000`.
 
-On the wire (`picturesToSend`): every picture rides every request again. The
-newest user message's pictures always go; older ones go newest-first while
-they fit `IMG_WIRE_BUDGET` (6,000,000 base64 characters), and one past
-`IMG_ONE_MAX` (5,000,000, Claude's limit) never goes. One left out is named in
-its own message ("[a picture ("x.jpg") was attached here; it is not sent
-again...]"). A picture with no words is the whole message: no text part rides
+A picture keeps `w`, `h` and `thumb` (a `THUMB_EDGE` 480 px WebP data URL,
+see-through kept). **The thread draws the thumb**, never the picture: v5.28.8
+put each whole picture's data URL through `renderThread()`'s innerHTML and the
+browser decoded it again on every redraw - 7.9 MB of HTML and 0.77-0.99 s per
+redraw for nine photos on a 4x-slowed CPU, at the end of every reply and on
+every switch to the chat; with thumbs it is 33 KB and 71 ms. A picture with no
+thumb (v5.28.8 or older, until made ready) is drawn from a `blob:` link made
+once per picture (`picShownSrc`, `picLinks`). The viewer shows the whole
+picture (`picWholeSrc`, set as a property, never through HTML). Every value a
+stored record puts into the thread is checked first - `PIC_MIME_RE`,
+`THUMB_RE`, `B64_RE` - because a restored backup is a stored record: a mime
+of `image/png" onerror="...` used to land inside the `<img>` tag.
+
+**Pictures from before v5.28.9 are made ready once** (`readyPictures`), in
+`send()` before any request is built from the chat - never on open, which
+would write a chat another tab may be streaming into. Any picture without
+`w`/`h` is decoded and prepared again; the chat keeps the result. One the
+browser cannot open (HEIC) keeps its bytes and gets `raw: 1`, so it is not
+tried again. v5.28.8 never sent an old picture past `IMG_ONE_MAX` again - a
+camera photo of 4 MB is 5.4 M base64 characters - and sent the rest sideways
+with their GPS position.
+
+On the wire (`picturesToSend(c)`): every picture rides every request
+again. The newest user message's pictures always go; older ones go
+newest-first while they fit `IMG_WIRE_BUDGET` (6,000,000 base64 characters)
+and `IMG_MAX_COUNT` (100 - Claude's limit on its 200k-token models). Never
+sent (`pictureBarred`): a picture past `IMG_ONE_MAX` (5,000,000 - Claude's
+limit on Bedrock and Vertex; its own API takes 10 MB), one with no data, and
+one that is not JPEG, PNG, GIF or WebP (`WIRE_PIC_MIMES`) - on every
+connection: Claude, OpenAI and OpenRouter all refuse the whole request over
+one, and only a picture the browser could not open (`raw`, a HEIC) can be
+anything else. One left out
+is named in its own message ("[a picture ("x.jpg") was attached here; it is
+not sent again...]", or "...it is not sent - <why>" when it never can be). A picture with no words is the whole message: no text part rides
 with it, because Claude refuses a text part that is only whitespace, and Send
 is ready with only a picture in the tray (`sendReady`). "Search every message"
 does not search for a picture sent without words.
@@ -265,9 +296,50 @@ as `run_id`); Cozy shows the same card and answers
 `POST /v1/runs/{run_id}/approval`. Before v5.28.8 that frame was dropped, so
 the agent sat waiting with nothing on screen.
 
+Hermes' approval frame carries a `description` (why it asks: "recursive
+delete"); the card shows it on both transports (`.appr-why`).
+
+**Counting.** The meter (`updateEmber`) counts attached text files as
+`attachmentBody()` sends them and the pictures `picturesToSend()` sends, plus
+the tray; v5.28.8 counted neither, so a 40,000-character file or ten photos
+never moved it. A picture costs `picTokens()` - Claude's 28 px patches, at most
+4784, 1600 when its size is unknown. What the model saw adds the same for the
+pictures a request carried when the service sends no count
+(`sentPicTokens`); a picture rode as "[an image]", three tokens.
+
+A text file is fenced with one more backtick than its longest run
+(`attachmentBody`), so its own code blocks cannot close the fence. Save &
+resend refuses a message with no words and nothing attached, the same rule as
+Send (an emptied message went out as an empty turn, which Claude refuses).
+
+**Getting a message ready is part of sending.** `send()` waits before it
+builds a request - on saving, on the web search, on `readyPictures` - and the
+app used to look idle meanwhile: `streaming` was null, so Send stayed Send (a
+second message started a second request into the same chat and the first
+reply was cut off), `quietNow()` let an update reload in the middle, a chat
+deleted meanwhile was saved back by the next `persistConvo()` and its message
+sent anyway, and nothing could stop a slow search. Now `send()` takes the
+controls at once with a `prep` AbortController as `streaming` (Send is Stop;
+Stop, a delete, Clear or another send aborts it, and its abort listener hands
+the controls back at once). `going()` is checked after every wait; the forced
+search gets `prep.signal`, so Stop calls it off. More and Swipe are checked
+before any of this (`tail.pending`), so Swipe on a reply still coming in
+leaves it coming in instead of cutting it off. `release()` hands over to the
+request's own controller.
+
+**A save that fails is said** (`persistConvo` catches, toasts "Couldn't save
+this chat - ...", and returns false). It used to throw: in `send()` that left
+the message unsent with nothing said, and at a reply's end it skipped the
+final draw. A success message after a save ("Branched", "Pinned", "Attached",
+"Created", an undo) is shown only when the save worked, so it cannot cover
+the failure. Only the browser's IndexedDB can refuse (full); the phone's store
+queues every save and never rejects.
+
 `tests/pictures_e2e.py` builds the pictures with pillow (a sideways 12 MP
 photo with GPS, a 48 MP photo, a screenshot, a see-through sticker, an
-undecodable HEIC) and reads back what the model would receive.
+undecodable HEIC, a v5.28.8-sized photo, 22 wide pictures) and reads back what
+the model would receive; it measures the drawn thread's HTML and redraw time
+on a 4x-slowed CPU, and makes old pictures ready through a real send.
 
 ## Writes come from the app (v5.28.4)
 

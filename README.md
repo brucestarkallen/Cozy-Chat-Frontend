@@ -101,15 +101,25 @@ version is here; one tap takes it.
 - Tap the paperclip, or just paste an image straight into the message box
 - Images go to the model as images; text files are inlined as code blocks
 - A picture is made ready for a vision model as you attach it: turned upright,
-  at most 2048 px on its long side, the camera's GPS position and other
-  metadata gone. A photo becomes a JPEG; a screenshot or a sticker stays a
-  sharp, see-through PNG. Photos up to 40 MB open, 48 MP included
+  at most 2000 px on its long side (Claude refuses more in a request of over
+  20 pictures), the camera's GPS position and other metadata gone. A photo
+  becomes a JPEG; a screenshot or a sticker stays a sharp, see-through PNG.
+  Photos up to 40 MB open, 48 MP included
+- A picture attached before v5.28.9 is made ready the same way the next time
+  its chat is sent, and the chat keeps the ready one
+- The chat shows a small copy of each picture, so a chat full of photos opens
+  and redraws as fast as one without; tap a picture to see it whole, tap again
+  to close it
 - A picture on its own is a message: Send works with no words
-- Tap a picture in the chat to see it whole; tap again to close it
 - Every picture goes to the model again on every message, newest first, until
-  the pictures fill 6 MB; any older one is named in its message instead, so the
-  model knows it was there (Hermes refuses a request over 10 MB)
-- 6 MB per text file
+  the pictures fill 6 MB or number 100; any older one is named in its message
+  instead, so the model knows it was there (Hermes refuses a request over
+  10 MB). Claude, OpenAI and OpenRouter take JPEG, PNG, GIF and WebP only and
+  refuse a whole request over any other kind, so an older picture the browser
+  cannot open (a HEIC photo) is named, not sent
+- The context meter counts attached files and pictures, the way they are sent
+- 6 MB per text file; a file with code blocks of its own keeps them inside its
+  fence
 
 **Files the assistant can edit — and write**
 - Tap the file icon in the top bar → **Let the assistant write files**.
@@ -450,6 +460,8 @@ your reply — so it says so in plain words instead of showing a raw 400.
 **Web search**
 - Off by default. Turn it on in Settings → Search and a magnifier appears next to
   the message box — tap for one message, or set it to search everything.
+- While the search before a message runs, Send is **Stop**: tap it and the
+  search is called off and nothing is sent; your message stays in the chat.
 - **Look things up when needed** (on) hands the decision to the model, which is
   the only participant that knows whether it knows. On a Claude connection its
   own search tool rides every turn and Claude spends a search only when it
@@ -546,7 +558,8 @@ What you get in the chat:
 - **Approvals, answered in the chat.** Turn on **Hermes runs mode** on the
   connection (edit it → *Hermes runs mode*). Sends then travel the agent's
   Runs API, and when a command needs permission a card appears right in the
-  stream — the exact command, and the choices the server offers: **Allow
+  stream — the exact command, why Hermes is asking (when it says), and the
+  choices the server offers: **Allow
   once**, **This chat**, **Always allow**, **Deny**. Tap one and the run
   carries on; no terminal. Stopping the stream also stops the agent
   server-side. A card left unanswered when its run ends is marked expired,
@@ -701,12 +714,12 @@ network-first, so a refresh always gets the newest version.
 | `send()` | Sends and reads the streaming reply |
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
-**Tests.** Everything in `tests/` — `v5288test.js` down to `v2test.js`, plus
+**Tests.** Everything in `tests/` — `v5289test.js` down to `v2test.js`, plus
 `searchtest.js`, `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`,
 `swtest.js`, `scrolltest.js`, `styletest.js`, `hiddentest.js`,
 `coherencetest.js` and `installtest.sh` — runs under Node with jsdom
 (`npm i jsdom fake-indexeddb`).
-1911 checks (plus 107 in real Chromium) across the matching engine, JSON tolerance, prompt assembly,
+1978 checks (plus 124 in real Chromium) across the matching engine, JSON tolerance, prompt assembly,
 multi-block replies, proposal supersede, undo truth, button visibility,
 projects and their instruction blocks, per-connection effort ladders with
 self-healing levels, retrieval, streaming, SSE framing and Hermes tool activity,
