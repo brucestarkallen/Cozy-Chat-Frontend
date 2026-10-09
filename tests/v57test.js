@@ -43,8 +43,14 @@ console.log('=== 1. MARKDOWN IMAGES RENDER ===');
 {
   const dom=await boot(base());
   const w=dom.window;
+  // v5.29.1: a picture from another address waits for a tap before it is fetched
+  const md0=w.eval(`renderMarkdown("Look: ![Ichigo](https://img.x/ichigo.png) and [a link](https://x.y/z)")`);
+  ck('image syntax first becomes a button naming its host, nothing fetched', /<button type="button" class="md-img-ph" data-src="https:\/\/img\.x\/ichigo\.png"[^>]*>Ichigo · from img\.x · tap to show</.test(md0) && md0.indexOf('<img')<0, md0.slice(0,160));
+  w.eval(`current={id:"q",title:"Q",cfg:defaultCfg(),messages:[{id:"u",role:"user",content:"?"},{id:"a",role:"assistant",content:"![Ichigo](https://img.x/ichigo.png)"}]}; renderThread();`);
+  const tapIt=w.document.querySelector('#threadInner .md-img-ph');
+  if (tapIt) tapIt.dispatchEvent(new w.MouseEvent('click',{bubbles:true,cancelable:true}));
   const md=w.eval(`renderMarkdown("Look: ![Ichigo](https://img.x/ichigo.png) and [a link](https://x.y/z)")`);
-  ck('image syntax becomes an image', /<img class="md-img" src="https:\/\/img\.x\/ichigo\.png"/.test(md), md.slice(0,140));
+  ck('once tapped, image syntax becomes an image', /<img class="md-img" src="https:\/\/img\.x\/ichigo\.png"/.test(md), md.slice(0,140));
   ck('wrapped in a link to itself', /<a href="https:\/\/img\.x\/ichigo\.png"[^>]*><img/.test(md));
   ck('plain links stay links, not images', /<a href="https:\/\/x\.y\/z"[^>]*>a link<\/a>/.test(md) && (md.match(/<img/g)||[]).length===1);
   const bad=w.eval(`renderMarkdown("![x](javascript:alert(1))")`);

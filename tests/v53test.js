@@ -134,7 +134,11 @@ console.log('=== 3. A MID-STREAM ERROR OBJECT IS AN ERROR, NOT A SHORT REPLY ===
   const last=msgs[msgs.length-1];
   ck('the failure is shown as an error', last.role==='error', last.role);
   ck('with the service\'s own words', /upstream fell over/.test(last.content), JSON.stringify(last.content));
-  ck('no half reply left pretending to be complete', !msgs.some(m=>m.role==='assistant'),
+  /* The text that came before the failure stays - the reader was reading it,
+     and it used to be deleted with the reply - and it cannot pass for a
+     finished reply: the error is said right after it. */
+  ck('the half reply stays, with the error right after it saying it did not finish',
+     msgs.length===3 && msgs[1].role==='assistant' && msgs[1].content==='Starting. ' && msgs[2].role==='error',
      msgs.map(m=>m.role).join(','));
 }
 

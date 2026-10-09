@@ -83,12 +83,12 @@ const MUTATIONS=[
    '    if (false && autoSearchTextOn() && parseSearchCall({ text: asst.content, think: asst.thinking })){'],
 
   ['a lookup that failed is not recorded, so the model asks for it again',
-   '    um.searchedFor = (um.searchedFor || []).concat([q]);\n    try {\n      const sr = await runSearch(q);',
-   '    try {\n      const sr = await runSearch(q);\n      um.searchedFor = (um.searchedFor || []).concat([q]);'],
+   '    um.searchedFor = (um.searchedFor || []).concat([q]);\n    try {\n      const sr = await runSearch(q, signal);',
+   '    try {\n      const sr = await runSearch(q, signal);\n      um.searchedFor = (um.searchedFor || []).concat([q]);'],
 
   ['a search that came back empty never reaches the wire',
-   '      if (m.role === "user" && ((m.sources && m.sources.length) || (m.searchedFor && m.searchedFor.length))){',
-   '      if (m.role === "user" && (m.sources && m.sources.length)){'],
+   '\n  if (m.role === "user" && ((m.sources && m.sources.length) || (m.searchedFor && m.searchedFor.length))){',
+   '\n  if (m.role === "user" && (m.sources && m.sources.length)){'],
 
   ['the rounds never run out',
    '    if (continuing || searchRound >= AUTO_SEARCH_ROUNDS || !autoSearchTextOn()) break;',

@@ -70,7 +70,10 @@ console.log('\n=== 3. EDIT APPLICATION ===');
   ck('append', A(doc,{type:'append',replace:'line D'}).text==='line A\nline B\nline C\nline D');
   ck('replace_all', A(doc,{type:'replace_all',replace:'brand new'}).text==='brand new');
   ck('missing anchor fails cleanly', A(doc,{type:'replace',find:'not present at all',replace:'x'}).text===null);
-  ck('first of N used', A('dup\ndup',{type:'replace',find:'dup',replace:'X'}).text==='X\ndup');
+  // An anchor that occurs twice names two places. This check used to pin the
+  // guess (the first one), which put edits in the wrong place; it is refused.
+  const dup=A('dup\ndup',{type:'replace',find:'dup',replace:'X'});
+  ck('an anchor that occurs twice is refused, not applied at the first', dup.text===null && /^appears 2 times/.test(dup.note), JSON.stringify(dup));
 }
 
 console.log('\n=== 4. JSON TOLERANCE ===');

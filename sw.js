@@ -5,7 +5,9 @@
    Same-origin documents and scripts are refetched with cache:"reload",
    which skips the HTTP cache and revalidates. Cache is only a fallback
    for being offline. */
-const CACHE = "cozy-chat-v2";
+/* v3: a v2 worker kept a whole copy of the app for every look for an update
+   (index.html?v=<time>) and never let go of one - activating drops it. */
+const CACHE = "cozy-chat-v3";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg"];
 
 self.addEventListener("install", e => {
@@ -36,8 +38,11 @@ self.addEventListener("fetch", e => {
 
   e.respondWith(
     live.then(res => {
-      const copy = res.clone();
-      caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
+      // an address with a query is a one-off look, never what to open offline
+      if (!url.search){
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
+      }
       return res;
     }).catch(() => caches.match(req).then(r => r || caches.match("./index.html")))
   );

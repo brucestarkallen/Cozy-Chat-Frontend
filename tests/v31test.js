@@ -112,6 +112,9 @@ console.log('\n=== 4. MODEL LIST LOADING ===');
   ck('datalist populated too (typing still works)', d.querySelectorAll('#modelList option').length===3);
   const sel=d.querySelector('#pModelSel'); sel.value='glm-4.6'; ev(w,sel,'change');
   ck('picking one fills the model field', d.querySelector('#pModel').value==='glm-4.6');
+  // since v5.29.1 the loaded list is the editor's until Save, like every other field
+  // (tests/v5291uitest.js section 8): Save, then it is on the connection
+  ev(w,d.querySelector('#saveProvBtn'),'click');
   ck('list saved on the connection', w.eval('S.providers[0].models||[]').length===3);
 }
 console.log('\n=== 5. MODEL LIST FAILURE IS SOFT ===');
@@ -174,7 +177,11 @@ console.log('\n=== 8. REGRESSIONS ===');
      w.eval('applyEditToText("a\\nb",{type:"insert",find:"a",replace:"N"})').text==='a\nN\nb');
   ck('six themes', Object.keys(w.eval('THEMES')).length===6);
   ck('five tabs', (ev(w,d.querySelector('#settingsBtn'),'click'), d.querySelectorAll('.tab').length===5));
-  ck('effort defaults to off for new users', w.eval('DEFAULTS.effort')==='off');
+  /* v5.29.1: a new user starts with no level chosen, and nothing about
+     thinking is sent until one is (v5291wiretest.js, section 7). Starting at
+     Off switched thinking off on GLM, Qwen and OpenRouter unasked; Off is now
+     a choice like any other. */
+  ck('a new user starts with no thinking level chosen', w.eval('normalizeSettings({}).effort')===null);
 }
 console.log('\n'+(fail?'FAILED '+fail:'ALL PASS')+'  ('+(pass+fail)+' checks)');
 process.exit(fail?1:0);

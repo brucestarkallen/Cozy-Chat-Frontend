@@ -89,13 +89,13 @@ const MUTATIONS=[
    '  if (style === "zai"){\n    body.thinking = { type: (eff === "off" && !forced) ? "disabled" : "enabled" };\n    if (forced || (eff !== "off" && eff !== "low")) body.reasoning_effort = eff || "medium";'],
 
   ['a refused prefill costs the message instead of being sent again without it',
-   '      if (res.status === 400 && PF_REFUSAL.test(detail)){',
-   '      if (false && res.status === 400 && PF_REFUSAL.test(detail)){'],
+   '          if (!PF_REFUSAL.test(detail)) break;',
+   '          if (true) break;'],
 
   ['the refusal is not remembered, so every message pays for it again',
-   `        markPrefillDown(p);
-        if (req.prefill && req.prefill.detail && req.prefill.detail.appended){`,
-   `        if (req.prefill && req.prefill.detail && req.prefill.detail.appended){`],
+   `          markPrefillDown(p);
+          if (!(req.prefill && req.prefill.detail && req.prefill.detail.appended)) break;`,
+   `          if (!(req.prefill && req.prefill.detail && req.prefill.detail.appended)) break;`],
 
   ['a reason code reaches the user as jargon',
    '  "wire-refused": "Skipped: this connection refused a prefilled reply, so it isn\'t offered one.",',
@@ -138,8 +138,8 @@ const MUTATIONS=[
   ['the test sends the real chat, so what comes after C is a matter of opinion',
    `  const asm = opts.probe
     ? { messages: [{ role:"user", content: PF_PROBE_ASK }], system: "" }
-    : assembleMessages(p.kind, c, asmParts);`,
-   '  const asm = assembleMessages(p.kind, c, asmParts);', 'test'],
+    : assembleMessages(p.kind, c, asmParts, opts.mode);`,
+   '  const asm = assembleMessages(p.kind, c, asmParts, opts.mode);', 'test'],
 
   ['a test overwrites the panel report on the last message the user sent',
    '  if (!opts.probe) lastPrefill = pf;',
@@ -198,9 +198,9 @@ const MUTATIONS=[
    '        if (!first.prefill || !first.prefill.applied){',
    '        if (false){', 'test'],
 
-  ['Runs mode gets a green light while carrying no prefill at all',
-   '    const runsWillSkip = reasonStyle(p) === "hermes" && p.hermesRuns && !runsIsDown(p);',
-   '    const runsWillSkip = false;', 'test'],
+  ['Hermes is sent a test prefill it would read as your message',
+   '    if (wire.hermes){\n        pfSay("bad", "Hermes reads the last message as yours, so a prefilled reply would reach it as something you said. Cozy never sends Hermes one.");\n        return;\n    }\n',
+   '', 'test'],
 
   ['the shipped default puts a Moonshot field on every other service',
    '  flagField:"", reasoningField:"",',

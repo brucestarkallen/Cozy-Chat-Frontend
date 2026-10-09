@@ -12,7 +12,7 @@ ck('app requests are refetched with cache:"reload"', /cache:\s*["']reload["']/.t
 ck('navigation counts as an app request', /req\.mode\s*===\s*["']navigate["']/.test(sw));
 ck('index.html counts as an app request', /index\.html/.test(sw));
 ck('the worker itself counts, so it can update', /sw\.js/.test(sw));
-ck('cache name bumped so the old cache is dropped', /cozy-chat-v2/.test(sw));
+ck('cache name bumped so the old cache is dropped', /cozy-chat-v3/.test(sw));
 ck('old caches are deleted on activate', /caches\.delete/.test(sw));
 ck('cross-origin traffic is left alone', /url\.origin\s*!==\s*location\.origin/.test(sw));
 ck('offline still falls back to cache', /caches\.match/.test(sw));

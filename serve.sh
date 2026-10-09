@@ -2,7 +2,8 @@
 # Run Cozy Chat locally on your phone.
 #   pkg install python
 #   bash serve.sh
-PORT="${1:-8080}"
+# the port cozy uses: one address for the app and its data, however it is started
+PORT="${1:-8787}"
 cd "$(dirname "$0")" || exit 1
 echo ""
 echo "  Cozy Chat is running."

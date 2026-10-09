@@ -140,6 +140,70 @@ if want:
 PYEOF"
 }
 
+# What providers.<name> holds in Hermes' config now: "api<TAB>value" and
+# "api_key<TAB>value" for each that is set, then "entry" - or "none" when
+# there is no such entry. A test that fails puts it back from this exactly:
+# taken out again when it was new, its old address and key when it was a
+# provider added again with a fresh key.
+prov_raw() {
+  inh "PY=\"\$(head -1 \"\$(command -v hermes)\" | sed 's/^#!//')\"; HERMESMODEL_P=$(q "$1") \"\$PY\" - <<'PYEOF'
+import os
+home = os.environ.get('HERMES_HOME') or os.path.expanduser('~/.hermes')
+try:
+    from ruamel.yaml import YAML
+    cfg = YAML(typ='safe').load(open(os.path.join(home, 'config.yaml'))) or {}
+except Exception:
+    try:
+        import yaml
+        cfg = yaml.safe_load(open(os.path.join(home, 'config.yaml'))) or {}
+    except Exception:
+        cfg = {}
+provs = cfg.get('providers') if isinstance(cfg.get('providers'), dict) else {}
+e = provs.get(os.environ['HERMESMODEL_P'])
+if not isinstance(e, dict):
+    print('none')
+else:
+    for k in ('api', 'api_key'):
+        if e.get(k) is not None:
+            print(k + '\t' + str(e[k]))
+    print('entry')
+PYEOF"
+}
+
+# Puts providers.<name> back as prov_raw saw it; fails when it could not.
+put_provider_back() {   # $1 = name, $2 = what prov_raw said before
+  local k v bad=0
+  [ "$(prov_raw "$1")" = "$2" ] && return 0          # already as it was
+  case "$2" in
+    none) inh "hermes config unset providers.$1" >/dev/null 2>&1 || bad=1 ;;
+    *entry)
+      for k in api api_key; do
+        if printf '%s\n' "$2" | awk -F'\t' -v k="$k" '$1==k{f=1} END{exit !f}'; then
+          v="$(printf '%s\n' "$2" | awk -F'\t' -v k="$k" '$1==k{sub(/^[^\t]*\t/, ""); print; exit}')"
+          inh "hermes config set providers.$1.$k $(q "$v")" >/dev/null 2>&1 || bad=1
+        else
+          inh "hermes config unset providers.$1.$k" >/dev/null 2>&1 || bad=1
+        fi
+      done ;;
+    *) bad=1 ;;
+  esac
+  return $bad
+}
+
+# Out, with nothing kept that was not asked for: a provider added on the way
+# (p, then a) is put back first, so "Nothing changed" is still true. When it
+# cannot be, what is left is said, and how to take it out.
+leave() {   # $1 = said when all is as it was, $2 = said otherwise (before what is left), $3 = exit code
+  if [ -z "$ADDED" ] || put_provider_back "$ADDED" "$WAS"; then
+    say "$1"
+  else
+    [ -n "$2" ] && say "$2"
+    if [ "$WAS" = "none" ]; then say "The provider $ADDED you added is still in Hermes' list. Take it out with:  hermes config unset providers.$ADDED"
+    else say "$ADDED's address and key could not be put back as they were - check them with:  hermes config show"; fi
+  fi
+  exit "$3"
+}
+
 hermes_up() { curl -sf -o /dev/null --max-time 3 "http://127.0.0.1:$PORT/health"; }
 
 restart_hermes() {
@@ -161,7 +225,7 @@ restart_hermes() {
 }
 
 set_model() {   # $1 = model id
-  inh "hermes config set model.default $(q "$1")" >/dev/null || { say "Hermes refused that change."; exit 1; }
+  inh "hermes config set model.default $(q "$1")" >/dev/null || leave "Hermes refused that change." "Hermes refused that change." 1
 }
 
 pick_model() {   # $1 = provider name to list models for
@@ -176,7 +240,7 @@ pick_model() {   # $1 = provider name to list models for
     why="$(printf '%s\n' "$out" | awk -F'\t' '$1=="KEY" && $2!="ok"{print $3}')"
     say "${1:-Its provider} didn't list its models (${why:-it sent back no models})."
     read -r -p "Type the model name exactly as ${1:-it} writes it (or just Enter to stop): " choice
-    [ -z "$choice" ] && { say "Nothing changed."; exit 0; }
+    [ -z "$choice" ] && leave "Nothing changed." "" 0
     set_model "$choice"; CHOSEN="$choice"; return
   fi
   say ""
@@ -194,6 +258,7 @@ NOW_MODEL="$(printf '%s\n' "$OUT" | awk -F'\t' '$1=="NOW"{print $3}')"
 mapfile -t PNAMES < <(printf '%s\n' "$OUT" | awk -F'\t' '$1=="PROV"{print $2}')
 mapfile -t PURLS  < <(printf '%s\n' "$OUT" | awk -F'\t' '$1=="PROV"{print $3}')
 CHOSEN=""
+ADDED=""; WAS=""
 
 NOW_URL="$(printf '%s\n' "$OUT" | awk -F'\t' '$1=="NOW"{print $4}')"
 KEYSTATE="$(printf '%s\n' "$OUT" | awk -F'\t' '$1=="KEY"{print $2}')"
@@ -228,8 +293,9 @@ if [ -z "$CHOSEN" ]; then
           read -r -p "Its address (like https://api.wafer.ai/v1): " PU
           read -r -p "Its API key: " PK
           [ -z "$PU" ] && { say "Nothing changed."; exit 0; }
+          WAS="$(prov_raw "$PN")"; ADDED="$PN"
           inh "hermes config set providers.$PN.api $(q "$PU") && hermes config set providers.$PN.api_key $(q "$PK")" >/dev/null \
-            || { say "Hermes refused the new provider."; exit 1; }
+            || leave "Hermes refused the new provider." "Hermes refused the new provider." 1
           PICKED="$PN"; PICKED_URL="$PU" ;;
         *)
           if [[ "$B" =~ ^[0-9]+$ ]] && [ "$B" -ge 1 ] && [ "$B" -le ${#PNAMES[@]} ]; then
@@ -241,10 +307,10 @@ if [ -z "$CHOSEN" ]; then
         read -r -p "Type a number and press Enter (0 keeps everything as it is): " C
         mapfile -t LIST < <(facts "$PICKED" | awk -F'\t' '$1=="MODEL"{print $2}')
         if [[ "$C" =~ ^[0-9]+$ ]] && [ "$C" -ge 1 ] && [ "$C" -le ${#LIST[@]} ]; then CHOSEN="${LIST[$((C-1))]}"
-        else say "Nothing changed."; exit 0; fi
+        else leave "Nothing changed." "" 0; fi
       fi
       inh "hermes config set model.provider $(q "$PICKED") && hermes config set model.base_url $(q "$PICKED_URL") && hermes config set model.default $(q "$CHOSEN")" >/dev/null \
-        || { say "Hermes refused that change."; exit 1; }
+        || leave "Hermes refused that change." "Hermes refused that change." 1
       ;;
     *)
       if [[ "$A" =~ ^[0-9]+$ ]] && [ "$A" -ge 1 ] && [ "$A" -le ${#MODELS[@]} ]; then
@@ -264,8 +330,8 @@ say ""
 if [ "$VERDICT" != "ok" ]; then
   say "That didn't work: ${NEWP:-the provider} answered for $NEWM, but ${REASON:-gave no answer}."
   inh "hermes config set model.provider $(q "$NOW_PROV") && hermes config set model.base_url $(q "$NOW_URL") && hermes config set model.default $(q "$NOW_MODEL")" >/dev/null 2>&1
-  say "Put back as it was: Hermes uses $NOW_MODEL${NOW_PROV:+ from $NOW_PROV}. Nothing else changed."
-  exit 1
+  leave "Put back as it was: Hermes uses $NOW_MODEL${NOW_PROV:+ from $NOW_PROV}. Nothing else changed." \
+        "Put back as it was: Hermes uses $NOW_MODEL${NOW_PROV:+ from $NOW_PROV}." 1
 fi
 say "Hermes now uses $NEWM from $NEWP - it answered a test message."
 restart_hermes

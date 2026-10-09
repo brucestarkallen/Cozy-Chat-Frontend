@@ -9,7 +9,7 @@
 # ============================================================
 set -euo pipefail
 
-LAUNCHER_V=4
+LAUNCHER_V=6
 REPO="${COZY_REPO:-https://github.com/brucestarkallen/Cozy-Chat-Frontend.git}"
 DIR="${COZY_DIR:-$HOME/cozy-chat}"
 PORT="${COZY_PORT:-8787}"
@@ -128,6 +128,56 @@ sys.exit(0 if code == 0 else 1)
 PORTCHECK
 }
 
+# The server holding the chats - their folder's lock, which serve.py takes -
+# whoever started it, on whatever port: "<pid> <address>", or nothing.
+holder() {
+  "\$PY" - "\${COZY_DATA_DIR:-\$HOME/.cozychat}" <<'PYHOLD' 2>/dev/null || true
+import fcntl, os, sys
+lock = os.path.join(os.path.abspath(os.path.expanduser(sys.argv[1])), ".server.lock")
+try:
+    fd = os.open(lock, os.O_RDONLY)
+except OSError:
+    sys.exit(0)
+try:
+    fcntl.flock(fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
+    sys.exit(0)                                     # nobody holds it
+except OSError:
+    pass
+addr = os.read(fd, 200).decode("utf-8", "replace").strip() or "?"
+real, pid = os.path.realpath(lock), ""
+for p in os.listdir("/proc"):
+    if not p.isdigit() or int(p) == os.getpid():
+        continue
+    try:
+        fds = os.listdir("/proc/%s/fd" % p)
+    except OSError:
+        continue
+    for f in fds:
+        try:
+            if os.readlink("/proc/%s/fd/%s" % (p, f)) == real:
+                pid = p
+        except OSError:
+            pass
+print(pid, addr)
+PYHOLD
+}
+
+# A Cozy server for these chats that this launcher holds no pid for - an
+# orphan on cozy's port (an older launcher's, or started by hand), or one on
+# another port (bash serve.sh 8080) - is stopped. Two on one folder wrote
+# over each other's saves, and serve.py lets only one hold it.
+stop_others() {
+  kill_orphan
+  h=\$(holder); n=0
+  while [ -n "\$h" ] && [ \$n -lt 25 ]; do
+    p=\${h%% *}
+    if [ -n "\$p" ]; then
+      if [ \$n -lt 15 ]; then kill "\$p" 2>/dev/null || true; else kill -9 "\$p" 2>/dev/null || true; fi
+    fi
+    sleep 0.2; n=\$((n+1)); h=\$(holder)
+  done
+}
+
 start() {
   running && return 0
   rm -f "\$PID"
@@ -135,6 +185,7 @@ start() {
     kill_orphan
     n=0; while port_taken && [ \$n -lt 30 ]; do sleep 0.1; n=\$((n+1)); done
   fi
+  [ -n "\$(holder)" ] && stop_others
   if port_taken; then
     echo "Port \$PORT is already in use by something else."
     echo "Either stop that, or pick another port:  COZY_PORT=8788 cozy"
@@ -152,9 +203,13 @@ start() {
     nohup "\$PY" -m http.server "\$PORT" --bind "\$BIND" >"\$LOG" 2>&1 </dev/null &
   fi
   echo \$! > "\$PID"
+  # started is not enough: one that stops again at once (another server
+  # holds the chats, the port went) was taken for running - so it has to
+  # answer; one still starting after 15 s (a big store) is left to finish
   n=0
-  while [ \$n -lt 25 ]; do
-    running && return 0
+  while running; do
+    cozy_on_port && return 0
+    [ \$n -ge 75 ] && return 0
     n=\$((n+1)); sleep 0.2
   done
   rm -f "\$PID"
@@ -176,10 +231,22 @@ stop() {
   rm -f "\$PID"
 }
 
+# Never fatal. With no network, GitHub away, or a fetch that hangs
+# (COZY_FETCH_TIMEOUT seconds, 60 by default), nothing is updated and the
+# version already on this phone is what runs: "cozy" used to stop at the
+# fetch and start nothing, while the page told you to run cozy.
 update() {
-  git -C "\$DIR" fetch --quiet origin
-  git -C "\$DIR" reset --hard --quiet origin/HEAD 2>/dev/null \\
-    || git -C "\$DIR" reset --hard --quiet origin/main
+  local t=""
+  command -v timeout >/dev/null 2>&1 && t="timeout \${COZY_FETCH_TIMEOUT:-60}"
+  if ! \$t git -C "\$DIR" fetch --quiet origin; then
+    echo "Couldn't reach GitHub, so nothing was updated."
+    return 1
+  fi
+  if ! { git -C "\$DIR" reset --hard --quiet origin/HEAD 2>/dev/null \\
+         || git -C "\$DIR" reset --hard --quiet origin/main; }; then
+    echo "Couldn't apply the update, so nothing was updated."
+    return 1
+  fi
   # the Hermes helper ships with the app and is refreshed with it
   if [ -f "\$DIR/tools/hermesmodel" ] && [ -n "\${PREFIX:-}" ]; then
     cp -f "\$DIR/tools/hermesmodel" "\$PREFIX/bin/hermesmodel" 2>/dev/null && chmod 755 "\$PREFIX/bin/hermesmodel" 2>/dev/null || true
@@ -196,6 +263,10 @@ ver() { grep -o 'COZY CHAT v[0-9.]*' "\$DIR/index.html" 2>/dev/null | head -1 | 
 # The launcher is written by install.sh, so a newer install.sh in the repo
 # means this script itself is out of date. Re-run it once and carry on.
 relaunch_if_stale() {
+  # once: a reinstall that could not finish (the network dropped) left the
+  # old command in place, and relaunching it again went round for ever
+  [ -z "\${COZY_RELAUNCHED:-}" ] || return 0
+  export COZY_RELAUNCHED=1
   [ -f "\$DIR/install.sh" ] || return 0
   want=\$(grep -m1 '^LAUNCHER_V=' "\$DIR/install.sh" | cut -d= -f2)
   [ -n "\$want" ] || return 0
@@ -210,10 +281,13 @@ case "\${1:-run}" in
     # the version from before the update survives this command rewriting itself
     before=\${COZY_BEFORE:-\$(ver)}
     export COZY_BEFORE="\$before"
-    update
-    relaunch_if_stale run
-    after=\$(ver)
-    if [ "\$before" != "\$after" ]; then echo "Updated \$before -> \$after"; else echo "Already on \$after"; fi
+    if update; then
+      relaunch_if_stale run
+      after=\$(ver)
+      if [ "\$before" != "\$after" ]; then echo "Updated \$before -> \$after"; else echo "Already on \$after"; fi
+    else
+      echo "Starting the version already on this phone (\$(ver))."
+    fi
     # A server still running older code than the files on disk is relit. The
     # server itself is asked, not version numbers compared - an update that
     # also rewrote this command compared two new numbers and left the old
@@ -223,8 +297,23 @@ case "\${1:-run}" in
     echo "Cozy Chat is at \$URL"
     open_url
     ;;
-  update)  update; echo "Updated. Restart with: cozy restart"; ;;
-  stop)    stop; echo "Stopped."; ;;
+  update)  if update; then echo "Updated. Restart with: cozy restart"; else exit 1; fi ;;
+  stop)
+    stop
+    stop_others
+    n=0; while port_taken && cozy_on_port && [ \$n -lt 30 ]; do sleep 0.1; n=\$((n+1)); done
+    h=\$(holder)
+    if [ -n "\$h" ]; then
+      echo "A Cozy server for your chats is still running at http://\${h#* }/ and could not be stopped."
+      [ -n "\${h%% *}" ] && echo "Stop it with:  kill -9 \${h%% *}"
+      exit 1
+    fi
+    if port_taken && cozy_on_port; then
+      echo "A Cozy server is still answering at \$URL and could not be stopped."
+      exit 1
+    fi
+    echo "Stopped."
+    ;;
   restart) stop; start; echo "Running at \$URL"; ;;
   status)
     if running; then echo "Running at \$URL  (pid \$(cat "\$PID"))"

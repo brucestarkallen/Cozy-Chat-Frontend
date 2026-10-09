@@ -126,9 +126,14 @@ console.log('\n=== 6. MANAGING THE LIST ===');
      (w.eval('attachDoc("'+ids[1]+'")'), true));
   await new Promise(r=>setTimeout(r,250));
   ck('no duplicate entry', w.eval('chatDocIds().length')===1, String(w.eval('chatDocIds().length')));
-  await w.eval('(async()=>{ openDocId="'+ids[1]+'"; await DB.docDel("'+ids[1]+'"); docs=docs.filter(x=>x.id!=="'+ids[1]+'"); current.docIds=chatDocIds(); await persist(); })()');
-  await new Promise(r=>setTimeout(r,250));
-  ck('deleting a file drops it from the chat', w.eval('chatDocIds().length')===0);
+  // Through the editor's Delete, which takes the file out of every chat that
+  // has it. This used to drop the file from docs by hand and count on
+  // chatDocIds() pruning ids with no file - the read path that also dropped a
+  // file another tab had just attached, and no longer prunes.
+  w.eval('openDocEditor("'+ids[1]+'")');
+  d.querySelector('#docDelBtn').dispatchEvent(new w.Event('click',{bubbles:true}));
+  await new Promise(r=>setTimeout(r,300));
+  ck('deleting a file drops it from the chat', w.eval('chatDocIds().length')===0 && w.eval('docs.length')===1, String(w.eval('chatDocIds().length')));
 }
 
 console.log('\n=== 7. OLD SINGLE-FILE CHATS CARRY OVER ===');

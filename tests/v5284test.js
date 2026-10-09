@@ -244,7 +244,9 @@ console.log('\n=== 8. THE FILE EDITOR KEEPS WHAT WAS TYPED ===');
   Object.defineProperty(d,'visibilityState',{configurable:true,get:()=>'hidden'});
   d.dispatchEvent(new w.Event('visibilitychange')); await sleep(150);
   ck('the page going to the background keeps it too', textOf()==='fourth, then the phone switched apps');
-  ck('an untouched file is not saved again on close', (function(){ const n=w.eval('(docs.find(x=>x.id==="'+doc.id+'").undo||[]).length'); w.eval('closeDocEdit()'); return w.eval('(docs.find(x=>x.id==="'+doc.id+'").undo||[]).length')===n; })());
+  // closeDocEdit waits its turn behind any other change to a file (fileTask), so it is awaited before the count is read
+  { const n=w.eval('(docs.find(x=>x.id==="'+doc.id+'").undo||[]).length'); w.eval('openDocEditor("'+doc.id+'")'); await w.eval('closeDocEdit()');
+    ck('an untouched file is not saved again on close', w.eval('(docs.find(x=>x.id==="'+doc.id+'").undo||[]).length')===n && !d.querySelector('#docEditModal').classList.contains('show')); }
 }
 
 console.log('\n'+(fail?'FAILED '+fail:'ALL PASS')+'  ('+(pass+fail)+' checks)');

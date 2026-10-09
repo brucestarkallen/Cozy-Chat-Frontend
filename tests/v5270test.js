@@ -204,7 +204,11 @@ console.log('=== 8. WHAT THE MODEL SAW ===');
   ck('its parts are named', ['Main system prompt','Style guide','This chat only','The conversation','Nudge'].every(n=>names.indexOf(n)>=0), names.join(' | '));
   const wire=JSON.stringify(w.__reqs[0].body);
   ck('every part\'s words are in the request', rec.parts.filter(x=>x.name!=='The conversation').every(x=>wire.indexOf(JSON.stringify(x.text).slice(1,-1))>=0));
-  ck('the in-chat block says where it sat', rec.parts.find(x=>x.name==='Nudge').where==='in the chat, 1 message up from the newest');
+  /* v5.29.1: the chat is one message long, so the block at depth 1 opens the
+     list - and with squash on it joins the system prompt in front of it
+     (v5291wiretest.js, section 8), which is where its part says it sat. It
+     used to go out as a second system message. */
+  ck('the in-chat block says where it sat', rec.parts.find(x=>x.name==='Nudge').where==='the system prompt', rec.parts.find(x=>x.name==='Nudge').where);
   ck('the service\'s counts and the timing are kept', rec.usage.in===4321 && rec.usage.out===12 && rec.usage.cached===4000 && typeof rec.durationMs==='number');
   ck('no key in what was kept', JSON.stringify(rec).indexOf('"k"')<0 && JSON.stringify(rec).indexOf('Bearer')<0);
   const btn=d.querySelector('[data-sent="'+m.id+'"]');
@@ -221,8 +225,8 @@ console.log('=== 8. WHAT THE MODEL SAW ===');
   ck('the foot names the service\'s count', /4,321 tokens in, 12 out \(4,000 read from cache\) — counted by the service/.test(d.querySelector('#sentFoot').textContent), d.querySelector('#sentFoot').textContent);
   d.querySelector('[data-sentview="raw"]').click(); await sleep(50);
   const raw=d.querySelector('#sentRaw');
-  // system string first (main prompt + the leading block + this chat's text), the in-chat block one up, the user turn
-  ck('Raw shows the settings and every message by role', /"model": "m"/.test(raw.textContent) && [...raw.querySelectorAll('.sent-role')].map(r=>r.textContent).join(',')==='settings,system,system,user', [...raw.querySelectorAll('.sent-role')].map(r=>r.textContent).join(','));
+  // one system string (main prompt + the leading block + this chat's text + the in-chat block that opens the chat, squashed), then the user turn
+  ck('Raw shows the settings and every message by role', /"model": "m"/.test(raw.textContent) && [...raw.querySelectorAll('.sent-role')].map(r=>r.textContent).join(',')==='settings,system,user', [...raw.querySelectorAll('.sent-role')].map(r=>r.textContent).join(','));
   raw.querySelector('.sent-req-head .sent-copy').click(); await sleep(30);
   ck('Copy all is the request body exactly', w.__clip()===JSON.stringify(w.__reqs[0].body,null,2));
   d.querySelector('#closeSent').click();

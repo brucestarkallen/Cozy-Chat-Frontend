@@ -151,8 +151,9 @@ console.log('=== 6. A KNOWN CAP IS RESPECTED FROM THE START ===');
 
 console.log('=== 7. A REFUSAL AT LOW IS NOT A LEVEL PROBLEM ===');
 {
+  // the level itself refused at low: there is no rung below it
   const dom=await boot(base(),w=>fq(w,[
-    {status:400,msg:"reasoning_effort is not supported at all here"},
+    {status:400,msg:"reasoning_effort 'low' is not supported here"},
     {sse:[oa('never')]}
   ]));
   const w=dom.window,d=w.document;
@@ -162,6 +163,22 @@ console.log('=== 7. A REFUSAL AT LOW IS NOT A LEVEL PROBLEM ===');
   ck('the error explains itself instead', d.querySelector('#threadInner').textContent.indexOf('said no (400)')>=0,
      d.querySelector('#threadInner').textContent.slice(-120));
   ck('nothing was marked', !w.eval('S.providers.find(x=>x.id==="p1").effortCap'));
+}
+{
+  /* the parameter itself refused (v5.29.1): no level would be taken, so the
+     message goes again without it. This refusal used to be left to surface
+     as the error above; the model was never going to think, and the
+     message is not spent finding that out. */
+  const dom=await boot(base(),w=>fq(w,[
+    {status:400,msg:"reasoning_effort is not supported at all here"},
+    {sse:[oa('Plain.')]}
+  ]));
+  const w=dom.window,d=w.document;
+  w.eval('newConvo(); cfgSet("effort","low");');
+  await sendMsg(w,'go'); await drain(w,3);
+  ck('one retry, without the parameter — no rung is invented', w.__reqs.length===2 && w.__reqs[1].body.reasoning_effort===undefined, String(w.__reqs.length));
+  ck('the reply arrived', d.querySelector('#threadInner').textContent.indexOf('Plain.')>=0);
+  ck('nothing was marked here either', !w.eval('S.providers.find(x=>x.id==="p1").effortCap'));
 }
 
 console.log('=== 8. AN ORDINARY 400 IS NOT MISTAKEN FOR A LEVEL ===');

@@ -75,9 +75,13 @@ ck('no fenced file dump survives in the conversation', !/```story\.md/.test(A));
 ck('the live file is still sent, once, in the instructions', /\[FILE: story\.md\]\nV4 LIVE BODY/.test(r.system));
 ck('exactly one [FILE: story.md] heading', (r.system.match(/\[FILE: story\.md\]/g)||[]).length===1,
   (r.system.match(/\[FILE: story\.md\]/g)||[]).length);
-ck('every suppressed copy says where the real text is',
-  (A.match(/Its current contents are in your instructions/g)||[]).length===4,
-  (A.match(/Its current contents are in your instructions/g)||[]).length);
+// Only a copy that provably IS the editable file (its exact text, or its id)
+// is suppressed as that file - here the newest, V4. A file that merely shares
+// the name is another text and goes (v5291filestest section 7); the three
+// older snapshots here are superseded by the newest one instead.
+ck('the copy that is the editable file says where the real text is, the older ones point forward',
+  (A.match(/Its current contents are in your instructions/g)||[]).length===1 && (A.match(/an older copy of "story\.md"/g)||[]).length===3,
+  (A.match(/Its current contents are in your instructions/g)||[]).length+' / '+(A.match(/an older copy of "story\.md"/g)||[]).length);
 ck('the newest turn still ends with what the user typed',
   /MY NEWEST MESSAGE$/.test(txt(r.messages.filter(m=>m.role==='user').pop())));
 
@@ -97,12 +101,14 @@ w.eval(`current.messages=[{id:'x1',role:'user',content:'q',ts:1,attachments:[
 r=JSON.parse(w.eval('JSON.stringify(assembleMessages("openai",current))'));A=all(r);
 ck('unrelated files are not collapsed into each other', /ALPHA BODY/.test(A)&&/BETA BODY/.test(A));
 
-/* ---- 4. a repeated name inside one message is sent once ----------------- */
+/* ---- 4. the same file twice in one message is sent once ---------------- */
+// Two different files that share a name are two texts: both go. This check
+// used to send one body for any repeated name, which dropped SECOND unseen.
 w.eval(`current.messages=[{id:'x1',role:'user',content:'q',ts:1,attachments:[
-  {kind:'text',name:'a.md',text:'FIRST'},{kind:'text',name:'a.md',text:'SECOND'}]}];`);
+  {kind:'text',name:'a.md',text:'FIRST'},{kind:'text',name:'a.md',text:'SECOND'},{kind:'text',name:'a.md',text:'FIRST'}]}];`);
 r=JSON.parse(w.eval('JSON.stringify(assembleMessages("openai",current))'));A=all(r);
-ck('a name repeated within one message yields one body',
-  (A.match(/```a\.md/g)||[]).length===1,(A.match(/```a\.md/g)||[]).length);
+ck('the same file repeated within one message yields one body; another file of that name keeps its own',
+  (A.match(/```a\.md/g)||[]).length===2 && /FIRST/.test(A) && /SECOND/.test(A),(A.match(/```a\.md/g)||[]).length);
 
 /* ---- 5. images are untouched by any of this ----------------------------- */
 w.eval(`current.messages=[{id:'x1',role:'user',content:'q',ts:1,attachments:[
@@ -112,9 +118,12 @@ ck('an image attachment still goes out as a content block',
   Array.isArray(r.messages[0].content)&&r.messages[0].content.some(b=>b.type==='image_url'));
 
 /* ---- 6. pure function, no conversation needed --------------------------- */
-ck('attachmentBody: editable file wins',
-  /instructions under \[FILE: z\.md\]/.test(w.eval(
-    'attachmentBody({kind:"text",name:"z.md",text:"T"},0,{live:{"z.md":1},newest:{"z.md":0}})')));
+ck('attachmentBody: the editable file wins over a copy of its own text',
+  /instructions under \[FILE: z\.md\] — that is the only copy/.test(w.eval(
+    'attachmentBody({kind:"text",name:"z.md",text:"T"},0,{live:{"z.md":{id:"d1",text:"T"}},newest:{"z.md":0}})')));
+ck('attachmentBody: another text of that name goes, said not to be the editable file',
+  /^\[a file named "z\.md" was attached here\. It is not the editable file[^\n]*\n```z\.md\nOTHER\n```$/.test(w.eval(
+    'attachmentBody({kind:"text",name:"z.md",text:"OTHER"},0,{live:{"z.md":{id:"d1",text:"T"}},newest:{"z.md":0}})')));
 ck('attachmentBody: superseded snapshot points forward',
   /an older copy/.test(w.eval(
     'attachmentBody({kind:"text",name:"z.md",text:"T"},0,{live:{},newest:{"z.md":3}})')));

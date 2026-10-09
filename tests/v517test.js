@@ -291,8 +291,12 @@ console.log(NL+'=== X. A GREEN LIGHT THAT WOULD BE A LIE ===');
   const dom=await boot(base(),rec.attach);const w=dom.window,d=w.document;
   await rig(w,'pH',{});
   await press(w,d,600);
-  ck('Runs mode is not reported as a plain pass',!/pf-ok/.test(statCls(d)),statCls(d));
-  ck('because a run carries no prefill',/Runs mode/.test(statTxt(d)),statTxt(d).slice(-120));
+  /* Hermes reads the last message as yours on either transport, so no
+     prefill reaches it at all; the test says so without spending a request.
+     (This used to say only that a run carries none - as if the plain stream
+     delivered one, where Hermes answered the prefill as your message.) */
+  ck('Hermes is not reported as a pass',!/pf-ok/.test(statCls(d)),statCls(d));
+  ck('it is told why no prefill reaches Hermes, without a request spent',/Hermes/.test(statTxt(d))&&rec.n===0,rec.n+' requests; '+statTxt(d).slice(-120));
   await sleep(60);
   dom.window.close();
 }

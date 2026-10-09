@@ -11,11 +11,14 @@ worker, `install.sh` the Termux installer, `tests/` the gate.
       node "$t" || exit 1
     done
     bash tests/installtest.sh
-    python3 tests/device_e2e.py       # real Chromium + the real serve.py
-    python3 tests/thinking_e2e.py     # real Chromium + a real stream: the thinking box
-    python3 tests/pictures_e2e.py     # real Chromium: what a vision model receives (needs pillow)
+    for t in tests/*_e2e.py; do python3 "$t" || exit 1; done
+        # device_e2e        real Chromium + the real serve.py
+        # thinking_e2e      real Chromium + a real stream: the thinking box
+        # pictures_e2e      real Chromium: what a vision model receives (needs pillow)
+        # v5290ui_e2e, v5291ui_e2e      real Chromium at 412x915 with touch
+        # v5290data_e2e, v5291data_e2e  the real serve.py + Chromium (about 6 minutes)
 
-1978 checks as of v5.28.9, plus 57 in `tests/device_e2e.py`, 24 in `tests/thinking_e2e.py`, 43 in `tests/pictures_e2e.py` and 12 in `tests/hermesmodeltest.sh` (needs a Hermes install), measured from real output: each file's own count line ("(N checks)" or "N passed", else its `ok` lines), plus `installtest.sh`'s `ok` lines.
+2680 checks as of v5.29.0, plus 359 in real Chromium (57 in `tests/device_e2e.py`, 24 in `tests/thinking_e2e.py`, 43 in `tests/pictures_e2e.py`, 53 in `tests/v5290data_e2e.py`, 36 in `tests/v5290ui_e2e.py`, 115 in `tests/v5291data_e2e.py`, 31 in `tests/v5291ui_e2e.py`) and 12 in `tests/hermesmodeltest.sh` (needs a Hermes install), measured from real output: each file's own count line ("(N checks)" or "N passed", else its `ok` lines), plus `installtest.sh`'s `ok` lines.
 
 `tests/inerttest.js` is in the loop but prints SKIP without a second checkout
 to compare against. It answers the question a passing gate does not: whether a
@@ -633,3 +636,88 @@ message is plain language: `vX.Y.Z — what changed, from the user's side`.
 A commit that adds or fixes only tests is not a release and does not bump
 `VERSION` — the app checks that string for updates, and a bump with nothing
 behind it tells every install there is something new to fetch.
+
+## The audit (v5.29.0)
+
+Four audits (what goes to the model, where the data lives, what the user sees,
+the files the model edits) found about eighty faults; every one fixed is pinned
+by a check that fails on v5.28.9. The rules they leave behind:
+
+**Nothing stored reaches the page unescaped, and no selector is built from an
+id.** A restored backup or a shared instruction set is a stored record: every
+id, role, version number and switch goes into an attribute through
+`escapeHtml` (roles drawn as user/assistant/error only, `Number(vi)`,
+`!!enabled`), and an element is found by exact attribute value with
+`byAttr()` / `msgEl()` / `inMsg(id, sel)` — an id with a quote in it used to
+make `querySelector` throw mid-reply. The markdown renderer escapes once,
+parses quotes with the same line parser (`mdLines`) and fills code
+placeholders once at the end; it drops NULs first so every placeholder is its
+own. A remote picture in a reply is a tap-to-show button (`showPic`); data:
+pictures and the search strip show at once.
+
+**One test for "still arriving": `arriving(m)`** — `m.pending`, or the reply
+`streaming.asstId` is writing (More never marks it pending). More, Swipe,
+Retry and the version arrows leave such a reply alone. **Stop belongs to the
+chat whose reply is arriving** (`stopHere()`); `setSending()` takes no argument
+and works it out, `renderThread()` keeps it right, and Send, Swipe, More,
+Retry and Save & resend in another chat refuse with that chat's name
+(`busyElsewhere`). The keyboard calls `submit()` once per press and never
+stops a reply.
+
+**A failed reply keeps what arrived** (`heard` in send()'s catch); an error
+riding on a chunk that still carries `choices` (OpenRouter, Hermes'
+finish_reason "error") is thrown as the error it is (`streamErrText`).
+`friendlyError` names a dropped connection. `splitReasoning` takes a tag at the
+start of a reply, or one used rather than named outside code
+(`tagUse`/`codeRanges`); one reasoning field per delta.
+
+**More is Send's request with the reply left out, then the reply verbatim,
+last** (`assembleMessages(kind, c, partsOut, mode)`, `carriedOn`). Hermes is
+never sent a prefill (`pfWire`) and is not offered More; Runs are used only
+when the list ends with the user's turn, carry `model` and `model_options`,
+send `session_id` only with a non-empty history, read `run.completed.output`
+when nothing streamed, and treat `run.interrupted` as a failure.
+`refusalRepair` tells a refused thinking *field* (resend without it, drop the
+cap) from a refused *level* (step down), and learns `max_completion_tokens`
+(`tokensField`). `DEFAULTS.effort` is null: nothing about thinking is sent
+until a level is chosen. With squash on, a system message that opens the list
+folds into the system prompt. `webResultsText()` is read by the request and
+the meter alike. Save & resend with new words drops the old web results and
+searches again.
+
+**Files.** `chatFilesOn(c)` is the one answer to "does this chat have files";
+`allChatDocs()` leaves the project's files out when `c.filesOn === false`.
+`chatDocIds()` and `projDocs()` never prune — an id leaves only when the user
+removes or deletes the file. `stampEdits()` records at parse time the file
+each edit is for (`docId`, `docName`; `""` for an unnamed edit made while
+several files were attached), a full rewrite's base text (`base`, a
+`textStamp`) and whether its request sent the file as excerpts (`excerpt`,
+from `asmExcerpts` → `convo.sentExcerpts`). `locate()` counts every
+occurrence; `applyEditToText()` refuses a count above 1; `keepJson()` guards
+every edit and create of a JSON file. Every file change runs through one
+queue (`fileTask`) and is stored with `storeDoc()`, which rolls back and says
+"Couldn't save" on a refusal. `editList()` is how anything walks `m.edits`.
+
+**Data.** `keepArriving()` saves a reply while it arrives (every
+`BEAT_EVERY` with new words, at least every `BEAT_MAX`, at once on an approval
+and when the tab is hidden), stamping `beat`; `unstick()` settles a half-saved
+reply only when its beat is `BEAT_STALE` old. `mergeChat`/`mergeFile` merge
+three ways against the version this tab last had from or gave to the phone
+(journal entries carry it as `cbase`), keep an arriving reply as one message,
+and `settle` merges from the newest local state. `reloadAll()` adopts in
+place. A hidden tab closes its EventSource; store requests time out (15 s plus
+1 s per MB, 60 s for `/api/store/all`) into the journal. A deleted chat leaves
+`convos` before its delete is awaited (`dropChat`). `quietNow(panel)` counts
+the tray and pictures still being prepared, and "Check for updates" goes
+through it. `backupProblem()` checks a backup whole before anything is asked.
+
+**Server.** `serve.py` answers only when Host is one of its own names
+(`127.0.0.1`, `localhost`, `[::1]`, the bound address) and refuses a write
+from a foreign Origin; dot-files are checked on the decoded path. One server
+per data folder (`.server.lock`); a write that fails for space answers 507.
+The daily copy and `/api/store/all` stream record by record. `replace_all`
+refuses records without a usable id. The trash is pruned hourly
+(`COZY_HOURLY_SECONDS`). The launcher is v6: a failed fetch is not fatal
+(`COZY_FETCH_TIMEOUT`), and `cozy stop` finds a server it has no pid for
+through the lock. `serve.sh` defaults to 8787. The service worker caches no
+address with a query (cache `cozy-chat-v3`).

@@ -199,7 +199,11 @@ console.log('\n=== 6. WEB SEARCH ===');
   await new Promise(r=>setTimeout(r,900));
   const b=JSON.parse(call.o.body);
   ck('native web_search tool attached', b.tools && b.tools[0].type==='web_search_20250305', '→ '+JSON.stringify(b.tools));
-  ck('max_uses honours the count setting', b.tools[0].max_uses===4);
+  /* v5.29.1: "Results to fetch" is how many results one search brings, not
+     how many searches Claude may make - sent as max_uses it capped Claude at
+     that many searches a turn. Claude's own tool now goes without a limit
+     (v5291wiretest.js, section 10). */
+  ck('the results count is not sent as a limit on searches', !('max_uses' in b.tools[0]), JSON.stringify(b.tools[0]));
   // window left open; closing mid-async trips jsdom
 }
 

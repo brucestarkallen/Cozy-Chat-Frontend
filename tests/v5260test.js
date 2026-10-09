@@ -91,13 +91,19 @@ console.log('=== 3. DEPTH IS OBEYED ===');
   ck('depth 0: right before the reply, after everything', last.content.indexOf('YOU ARE PCESS')===0 || last.content==='YOU ARE PCESS, KNIGHT OF CUPS.', last.content.slice(0,60));
 }
 {
+  /* v5.29.1: a depth past the start would put the copy at the very top,
+     with nothing of the conversation between it and the system prompt it
+     repeats - the main prompt twice in a row (and, squashed, one system
+     message saying it twice). It rides once the chat is longer than its
+     depth (v5291wiretest.js, section 8). It used to be pinned to the first
+     message. */
   const st=base(); st.presets[0].remind={mode:'main',depth:50};
   const dom=await boot(st);const w=dom.window;
   fourMessages(w);
   const asm=JSON.parse(w.eval('JSON.stringify(assembleMessages("openai"))'));
-  const msgs=asm.messages;
-  ck('a depth past the start pins to the very first message',
-     typeof msgs[0].content==='string' && msgs[0].content.indexOf('YOU ARE PCESS')>=0, JSON.stringify(msgs[0]).slice(0,90));
+  ck('a depth past the start sends no copy beside the system prompt it repeats',
+     asm.system.indexOf('YOU ARE PCESS')>=0 && !asm.messages.some(m=>typeof m.content==='string' && m.content.indexOf('YOU ARE PCESS')>=0),
+     JSON.stringify(asm.messages).slice(0,120));
 }
 
 console.log('=== 4. OFF COSTS NOTHING — THE WIRE IS WHAT IT ALWAYS WAS ===');

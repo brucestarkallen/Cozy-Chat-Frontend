@@ -28,7 +28,7 @@ cd Cozy-Chat-Frontend
 bash serve.sh
 ```
 
-Then open `http://localhost:8080` in Chrome. That's it — no build, no npm,
+Then open `http://localhost:8787` in Chrome. That's it — no build, no npm,
 no waiting. Edit `index.html` in Termux, refresh the tab, changes are live.
 
 **One thing to know:** only the copy served from Termux keeps your data on the
@@ -52,20 +52,41 @@ Tap **Test** before saving.
 
 **Chat**
 - Several connections saved at once, switch anytime
-- Streaming replies with a stop button
+- Streaming replies with a stop button. Stop shows in the chat whose reply is
+  arriving; in any other chat the button is Send, and Send, Swipe, More, Retry or
+  Save & resend there says which chat's reply is still coming in instead of
+  cutting it off
+- A reply that fails part-way — an overloaded model, a dropped connection, an
+  error the service sends mid-reply — keeps what had arrived, with the error
+  after it; a Swipe that fails that way keeps what came as a new version
+- A reply still arriving is saved on the phone as it comes, and the moment you
+  switch away, so Android closing the browser tab loses nothing that had arrived
 - **Swipe** — regenerate without losing the old answer; arrows move between versions.
   The new version streams into the reply itself, so its earlier versions never
   leave the chat — close the tab mid-swipe and nothing is lost. **Retry** under
   the message box means the same thing; after a failed send it clears the error
-  and tries again. A swipe that fails puts the reply back exactly as it was.
+  and tries again. A swipe that fails before anything arrives puts the reply back
+  exactly as it was. Swipe, More, Retry and the arrows leave a reply that is
+  still arriving alone.
 - **Retry** on an older reply asks first: retrying it removes every message after it
-- **More** — make the model continue where it stopped instead of restarting
+- **More** — make the model continue where it stopped instead of restarting. It
+  is sent exactly what Send would send, with the reply as the last turn, word for
+  word. Not offered on a Hermes connection, which can't carry a reply on
 - **Branch** — fork any point of a chat into a new conversation. The branch keeps
   the chat's connection, model, instruction set, temperature, project, "this chat
   only" text and files
-- Edit any message and re-run from there
-- Copy, delete, retry per message
-- Markdown, tables, code blocks with copy buttons
+- Edit any message and re-run from there. The edit box keeps your words through
+  a redraw, and new words search the web again when search is on
+- Copy, delete, retry per message. Delete on a reply still arriving stops its
+  request first. On a phone a message's buttons show on the first tap; a tap
+  where a hidden button sits never presses it
+- The keyboard only sends: Enter (with *Enter sends* on) or Ctrl/Cmd+Enter sends
+  once, and never stops a reply
+- Markdown, tables, code blocks with copy buttons; a quote shows what it says and
+  can hold a code block. A picture a reply links from another website waits for a
+  tap (a button names the site), so a reply can't make the phone fetch an address
+  on its own; pictures sent inline and the search picture strip show at once
+- A long model name wraps; the buttons never leave the screen
 
 **The sidebar is a library** (the way Cozy Tavern keeps its shelves)
 - **Projects fold.** Each one is a single line — its name and how many chats it
@@ -135,11 +156,28 @@ version is here; one tap takes it.
 - With several files attached, each action must name the file it changes, and
   the card shows it. An action that names no file, or names one that isn't
   attached, is **refused** — writing into the wrong document silently would be
-  much worse than a failed card.
+  much worse than a failed card. Each edit keeps the file it was proposed for:
+  its card names it, it follows a rename, and it is refused once that file is
+  taken off the chat.
+- **In a project, its files work like the chat's own.** Edits to them arrive as
+  cards; switching files off for a chat switches the project's off there too,
+  and the toast names them.
 - Matching is deliberately strict: exact first, then punctuation-normalised
   (curly quotes, em dashes), then a fuzzy word-window that **only applies when the
   difference is whitespace**. If the model misquotes a single word, the edit is
-  refused rather than written approximately into your file.
+  refused rather than written approximately into your file. A quote that occurs
+  more than once is refused too ("appears N times — quote a longer span that
+  occurs once") instead of changing whichever came first, and text inserted after
+  a line quoted with its line break goes right under it.
+- **A JSON file stays JSON.** An edit that would break it is repaired when it
+  safely can be (the card says "JSON repaired") and refused otherwise.
+- **A full rewrite applies only to the text it was written from.** If the file
+  changed since — a newer edit applied, words typed by hand — or the request sent
+  it as excerpts, the rewrite is refused, and Ask again gets a fresh one.
+- **A save that fails is said.** When the browser refuses to store a file (it is
+  full), the change is put back and the card says "Couldn't save <file>";
+  "applied", "Undone" and "Saved" appear only when the save worked. File changes
+  run one at a time, so a double tap on Apply all can't split its batch.
 - Malformed JSON from the model is repaired where it's safely repairable
   (trailing commas, raw newlines inside strings) and reported plainly when it isn't.
 - The file icon shows a count when more than one is attached; tap it to open,
@@ -190,7 +228,9 @@ version is here; one tap takes it.
   already applied. Now the body is worked out when the message is sent: a file
   you can edit is the only truth for its name, older copies of the same name
   collapse to one line saying where the current text is, and what you typed
-  stays the newest thing in your turn.
+  stays the newest thing in your turn. A file you attach that only shares its
+  name with an editable file reaches the model, marked as not the editable one;
+  only an exact copy is left out.
 - **An applied edit is always visible to the assistant.** On a long file in
   **smart** mode, only the relevant parts are sent — and the part your applied
   edit landed in could be one of the parts left out, while the instructions
@@ -211,7 +251,9 @@ version is here; one tap takes it.
   per-file undo still reaches anything buried. Undoing tells the truth
   everywhere: the cards come back as **Undone**, ready to re-apply, and the
   assistant is told the edit is no longer in the file instead of being told
-  it is already there.
+  it is already there. The reply's Undo takes the batch applied most recently.
+  An edit applied in one chat is applied on every Branch copy of it, so it can
+  never land twice; More adds the continuation's edits to the reply's cards.
 - **Check, deterministically.** A Check button in the file editor lints what
   a language model can't perceive: double spaces, trailing whitespace, tabs,
   invalid JSON — with one-tap undoable fixes that keep your content — plus a
@@ -219,11 +261,15 @@ version is here; one tap takes it.
   move-for-move and flags exactly what it would silently drop (dead
   wrong-case markers, nameless or fieldless dossiers, broken payloads,
   duplicate names, empty snippets and pins, unclosed blocks, stray closers),
-  each with a line number and an inventory of what re-imports.
+  each with a line number and an inventory of what re-imports — a second
+  NOTEPAD, a NOTEPAD without its closer and ledger labels the importer won't
+  read included. Notes that merely start with `{{user}}`, `[1]` or `[ ]` are
+  not called invalid JSON.
 - **Worldbook to SillyTavern.** Keep lore as a plain JSON file, and Check
   offers Export ST worldbook: blue/green/chain strategies map to
   constant/selective/vectorized World Info entries — position, order, depth,
-  probability all carried — ready for ST → World Info → Import.
+  probability all carried — ready for ST → World Info → Import. A file that
+  is already an ST export keeps every entry's own settings.
 - **Two working briefs built in.** Instruction sets ship with a Worldbook
   Maker and a Summaryception Auditor — full working agent briefs, editable
   like any set, and deleting one sticks.
@@ -232,13 +278,17 @@ version is here; one tap takes it.
   undoable edit — the card reads **Replace everywhere** and reports how many
   it changed. Exact literal match only, on purpose: it touches real
   occurrences of exactly that text or fails cleanly touching nothing, so a
-  misquote can never be written into your file N times.
+  misquote can never be written into your file N times. A name inside a longer
+  word is left alone (renaming Bob leaves Bobby) and the card says how many;
+  Chinese, Japanese, Korean and Thai names are still renamed everywhere.
 - **Failed edits fix themselves.** The assistant is shown the fate of every
   card it proposed — applied, pending, skipped, superseded, or failed and
   why — folded into each request, never stored, never shown to you. A
   misquoted find comes back re-quoted character-for-character on the next
   message by itself; applied and still-pending work stops being re-proposed;
-  an unparseable edit block is re-sent as valid JSON without you asking.
+  an unparseable edit block is re-sent as valid JSON without you asking. Edit
+  actions Cozy doesn't understand are reported, and an empty edit block never
+  stays in the reply.
 
 **Projects** (sidebar → **+ Project**)
 - A project is a self-contained workspace. Its chats use the project's own
@@ -344,13 +394,21 @@ It only affects blocks that end up adjacent. Anything separated by a user or
 assistant turn is never merged.
 
 **Thinking**
+- **Nothing about thinking is sent until you pick a level.** A fresh install
+  leaves the service's own default alone; picking **Off** sends that service's
+  switch-off.
 - **A level the model refuses can't eat your message.** If a service rejects
   the effort you picked, Cozy steps down one rung, sends the turn again, and
   caps that connection there — the picker stops offering the refused rung until
-  you re-save the connection, which is the cure printed right under it.
+  you re-save the connection, which is the cure printed right under it. A model
+  that refuses the thinking setting altogether gets the message without it, and
+  a model that wants `max_completion_tokens` instead of `max_tokens` (OpenAI's
+  reasoning models) gets that — the connection remembers either.
 - Shown in a collapsible block, with a Copy button on the block
 - Handles models with a separate reasoning field *and* models that write
-  `<think>…</think>` inline. The tags never leak into the reply text.
+  `<think>…</think>` inline. The tags never leak into the reply text, and a
+  reply that only names a tag — in a sentence, in quotes, in code — is kept
+  whole. Thinking from vLLM is no longer shown twice.
 - **Effort** — Settings → Chat. The picker offers what the connection in front
   of it can say: Off / Low / Medium / High everywhere, plus the rungs newer
   models added above High — XHigh and Max on Claude and recent OpenAI models,
@@ -450,7 +508,12 @@ behind an address, the connection *learns* it: the first refusal is remembered,
 the message is sent again without the prefill instead of being lost, and the
 connection stops being offered one. Saving that connection tries again. The
 same refusal on **More** can't be worked around — there the assistant turn *is*
-your reply — so it says so in plain words instead of showing a raw 400.
+your reply — so it says so in plain words instead of showing a raw 400, and More
+on a connection that has refused once says so without spending a request.
+
+**Hermes is never sent a prefill.** Hermes takes the last message as yours,
+whatever its role, so a prefilled turn would be answered as if you had said it;
+the panel says so, and More isn't offered on a Hermes connection.
 
 **Picking a model**
 - **Load list** next to the Model field pulls the service's `/models` and turns
@@ -462,6 +525,11 @@ your reply — so it says so in plain words instead of showing a raw 400.
   the message box — tap for one message, or set it to search everything.
 - While the search before a message runs, Send is **Stop**: tap it and the
   search is called off and nothing is sent; your message stays in the chat.
+  Stop during a lookup the model asked for calls that off too.
+- Where the chosen search can't run — **Built into Claude** on a chat that isn't
+  on a Claude connection — the magnifier is faded, and a tap says why.
+- Claude's own search is not limited by "Results to fetch" (that number is how
+  many results the other services return, not how many searches Claude may run).
 - **Look things up when needed** (on) hands the decision to the model, which is
   the only participant that knows whether it knows. On a Claude connection its
   own search tool rides every turn and Claude spends a search only when it
@@ -550,6 +618,8 @@ What you get in the chat:
 - **Reasoning control.** The same Off / Low / Medium / High switch every other
   service uses, sent in the shape the Hermes agent understands. Off sends
   nothing, so the agent's own configuration decides.
+- **An error Hermes sends mid-turn is shown as an error,** with any text that
+  had already arrived kept above it — not as "(empty reply)".
 - **Session continuity, free.** Hermes recognises a conversation by its system
   prompt and first message, so every Cozy chat maps to one agent session (and
   one sandbox) with no setup.
@@ -566,7 +636,13 @@ What you get in the chat:
   never left with live-looking buttons. A chat that holds a picture talks
   to Hermes over the plain stream (the Runs API can't carry pictures), and
   Hermes asks for approval there too: the same card appears, and your answer
-  goes to the run Hermes names. Runs mode needs a
+  goes to the run Hermes names. A request that doesn't end with your message
+  (an instruction block placed after the conversation, or in it at depth 0)
+  goes over the plain stream too, instead of failing with "Missing 'input'
+  field". A run carries the connection's model and thinking level, starts a
+  fresh agent session when the chat's history was cleared or replaced, shows an
+  answer that only arrives at the run's end, and says when a run was
+  interrupted. Runs mode needs a
   Hermes build with the Runs API. **If yours doesn't have it, or the browser
   can't reach it, the message is never lost:** Cozy falls back to the plain
   stream, tells you **once ever**, stops any run it had already started, and
@@ -644,7 +720,10 @@ Settings → App, or tap the moon icon to cycle.
 - **A turned-down key says where to fix it.** A 401/403 names the connection and
   the place to paste the key; for a Hermes connection it says the key has to be
   the same as `API_SERVER_KEY` in Hermes' `~/.hermes/.env`
-- Backup and restore everything — conversations, settings, and your files — to a JSON file
+- Backup and restore everything — conversations, settings, and your files — to a JSON file.
+  A file is checked whole before anything is asked or replaced: a broken one
+  changes nothing and says what is wrong with it
+- A connection with no key is named, and Settings opens at its key
 - Save any conversation as Markdown
 
 ## If a connection won't connect
@@ -714,12 +793,12 @@ network-first, so a refresh always gets the newest version.
 | `send()` | Sends and reads the streaming reply |
 | `on()` | Safe event binding — a missing element warns instead of breaking the app |
 
-**Tests.** Everything in `tests/` — `v5289test.js` down to `v2test.js`, plus
+**Tests.** Everything in `tests/` — `v5291*test.js` and `v5290*test.js` down to `v2test.js`, plus
 `searchtest.js`, `domtest.js`, `migtest.js`, `negtest.js`, `csstest.js`,
 `swtest.js`, `scrolltest.js`, `styletest.js`, `hiddentest.js`,
 `coherencetest.js` and `installtest.sh` — runs under Node with jsdom
 (`npm i jsdom fake-indexeddb`).
-1978 checks (plus 124 in real Chromium) across the matching engine, JSON tolerance, prompt assembly,
+2680 checks (plus 359 in real Chromium) across the matching engine, JSON tolerance, prompt assembly,
 multi-block replies, proposal supersede, undo truth, button visibility,
 projects and their instruction blocks, per-connection effort ladders with
 self-healing levels, retrieval, streaming, SSE framing and Hermes tool activity,
@@ -733,6 +812,14 @@ real `serve.py`: two browsers in step, a wiped browser, a stale tab, the server
 killed mid-chat, a tab closed mid-swipe, a browser handing over its old chats,
 delete, restore and a page from an old server (`pip install playwright &&
 playwright install chromium`, then `python3 tests/device_e2e.py`).
+
+`tests/v5290ui_e2e.py` and `tests/v5291ui_e2e.py` drive the interface in real
+Chromium at phone size with touch (injection, taps on hidden buttons, long
+names, fast replies, pictures from other sites, copying without a clipboard);
+`tests/v5290data_e2e.py` and `tests/v5291data_e2e.py` drive the real `serve.py`
+with real browsers (deletes during a reply, foreign Host and Origin, a dying
+tab, stale browsers and three-way merges, six background tabs, a full disk,
+two servers on one folder, the memory a daily copy takes).
 
 `tests/thinking_e2e.py` streams a real reply into real Chromium on a phone-sized
 screen and drags the thinking box with real touch events: it follows its end
@@ -781,6 +868,11 @@ server which code it runs, and relights it whenever that isn't the code on
 disk — including when an update rewrote the `cozy` command itself, and when
 the server was started some other way. `serve.py` relights itself too when an
 update replaces it.
+
+With no internet, or when GitHub doesn't answer within a minute, `cozy` says it
+couldn't reach GitHub and starts the version already on the phone. `cozy stop`
+stops every Cozy server for your chats, including one it didn't start, and
+says so if one is still running.
 
 The local copy is served by `serve.py`, which forbids caching. Plain
 `python -m http.server` answers conditional requests with 304, which lets a
@@ -844,6 +936,10 @@ data on the phone in `~/.cozychat` (set `COZY_DATA_DIR` to move it):
 It lives outside the app folder, so updating or reinstalling never touches it,
 and outside every browser, so clearing one never touches it. Any browser on the
 phone that opens `http://127.0.0.1:8787/` reads and writes the same files.
+The server answers only to the phone's own addresses (`127.0.0.1`,
+`localhost`), so a web page that points its own name at your phone can't read
+or change your chats and keys. Only one server runs on your chats at a time: a
+second one says which port is already serving them and stops.
 
 - **Every save goes straight to the phone**, one chat at a time — not the whole
   library on every change.
@@ -851,19 +947,33 @@ phone that opens `http://127.0.0.1:8787/` reads and writes the same files.
   within a moment, with no reload.
 - **A browser that fell behind cannot write over newer work.** Every record
   carries a revision number; a write made from an old one is refused and merged
-  instead. If the other browser only carried the chat further, or only renamed
+  instead, three ways: against the version this browser last had, so a rename,
+  pin or chat setting made elsewhere stays, and messages deleted elsewhere stay
+  deleted. If the other browser only carried the chat further, or only renamed
   it, the two simply combine. If both wrote different messages into it, both are
   kept — this browser's version appears beside it as "… (this browser's copy)".
-  Nothing is ever dropped.
+  Nothing is ever dropped. A change made while an earlier save was still being
+  answered is kept too.
+- **A reply is saved as it arrives,** and the moment you switch away from the
+  tab. Another browser shows it arriving and treats it as abandoned only after
+  three minutes of silence.
+- **Background tabs can't stall saving.** A hidden tab lets go of its live link
+  to the phone and picks it up when shown again; a save the phone doesn't answer
+  within 15 seconds waits in the browser, and the line under the top bar says so.
 - **If Termux stops** (Android can kill it), a line under the top bar says so.
   Changes made meanwhile wait in the browser and save by themselves the moment
   the server is back — even if you closed the tab in between.
-- **Delete** and **Restore** move what they remove into `trash/` first.
+- **Delete** and **Restore** move what they remove into `trash/` first. A chat
+  deleted while its reply is arriving stays deleted. The trash drops what is
+  older than 30 days every hour.
+- **When the phone's storage is full** Cozy says so; a restore without room
+  changes nothing, and no half-written files are left behind.
 - **A copy of everything, every day.** The phone keeps a daily copy in
   `backups/` (the newest 14), in the same shape as a **Back up** file.
   Settings → App → **Copies on this phone** lists them: **Bring this copy back**
   restores one (what it replaces goes to the trash first), **Make a copy now**
-  takes one on the spot.
+  takes one on the spot. Making the copy, and opening the app, no longer need
+  several times the store's size in memory.
 
 Anywhere else (github.io, any static host) there is no phone server, so the app
 makes no store requests at all and keeps everything in the browser — use
